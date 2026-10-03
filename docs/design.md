@@ -64,6 +64,21 @@ Missiles on a Finnish gravel road are a joke in the Super Cars II register.
 Decide before the first track is drawn, because the setting decides the
 sprites.
 
+## The look
+
+**Mad Max the movie, not Toy Story** (2026-10-03, after the first look
+came out as the second). Everything is worn: dust hangs in the air, paint
+is faded and dented, tyres are black and tired, the gravel is grey and
+brown, the grass is dry late-summer straw, the spruce is near black, and
+the sun is low so shadows are long and hard and fall one way. The
+palette is muted; the only saturated things are fire, tracers, the
+player's car and the warning colours on the HUD. No rounded toy shapes,
+no bubbly trees, no bright green lawn, no emoji, no system-font buttons
+on a gradient. The HUD is stencilled and industrial, like a rally car's
+dash. Finland stays: gravel, spruce and birch, a barn, kilometre posts,
+power lines, a crowd at the line, but it is a dry evening in August and
+somebody is about to get wrecked.
+
 ## Shape
 
 The Räkkä architecture, copied: Vite + TypeScript + React for the garage
