@@ -20,6 +20,8 @@ import { CARS } from '../game/content/cars';
 const CHUNK = 16;
 /** chunks kept; older ones are reused */
 const KEEP = 30;
+/** the most device pixels per metre a chunk is baked at: 30 chunks of 16 m at 56 px/m is 100 MB */
+const MAX_RES = 56;
 /** the centreline sample spacing for stones and ragged edges, metres */
 const STEP = 0.5;
 /** how far beyond a chunk's edge a road sample can still paint into it */
@@ -46,6 +48,8 @@ export class Ground {
   private ys: Float32Array;
   private txs: Float32Array;
   private tys: Float32Array;
+  /** the bend at each sample: heading change over the next 16 m, signed, right turns positive */
+  private ks: Float32Array;
   /** road sample indices per chunk, margin included */
   private bins = new Map<number, number[]>();
   /** milliseconds the last bake took, for the dev readout */
@@ -84,7 +88,9 @@ export class Ground {
     this.ys = new Float32Array(n);
     this.txs = new Float32Array(n);
     this.tys = new Float32Array(n);
+    this.ks = new Float32Array(n);
     for (let i = 0; i < n; i++) {
+      this.ks[i] = t.curvatureAhead(i * STEP - 8, 16);
       const p = t.at(i * STEP);
       const l = Math.hypot(p.tx, p.ty) || 1;
       this.xs[i] = p.x;
@@ -124,11 +130,15 @@ export class Ground {
   }
 
   /**
-   * Draw the ground under a world-space transform. `res` is the device
-   * pixels per metre the camera wants; a change of zoom rebakes.
+   * Draw the ground. `res` is the device pixels per metre the camera wants
+   * and (ox, oy) where world (0, 0) lands in device pixels. When a chunk is
+   * a whole number of device pixels across, the chunks are copied 1:1 onto
+   * whole pixels with no resampling, the cheapest blit there is; past the
+   * size a chunk may grow to, they are scaled. A change of zoom rebakes.
    */
-  draw(g: CanvasRenderingContext2D, res: number, x0: number, y0: number, x1: number, y1: number, aheadX: number, aheadY: number): void {
-    res = Math.max(16, Math.min(48, Math.round(res / 4) * 4));
+  draw(g: CanvasRenderingContext2D, res: number, ox: number, oy: number, x0: number, y0: number, x1: number, y1: number, aheadX: number, aheadY: number): void {
+    const exact = res <= MAX_RES && Math.abs(res * CHUNK - Math.round(res * CHUNK)) < 1e-6;
+    res = exact ? Math.max(16, res) : Math.max(16, Math.min(MAX_RES, Math.round(res / 4) * 4));
     if (res !== this.res) {
       this.res = res;
       for (const ch of this.chunks.values()) this.spare.push(ch.c);
@@ -139,11 +149,27 @@ export class Ground {
     const cx1 = Math.floor(x1 / CHUNK);
     const cy0 = Math.floor(y0 / CHUNK);
     const cy1 = Math.floor(y1 / CHUNK);
-    const bleed = 1 / res;
-    for (let cx = cx0; cx <= cx1; cx++) {
-      for (let cy = cy0; cy <= cy1; cy++) {
-        const ch = this.chunk(cx, cy);
-        g.drawImage(ch.c, cx * CHUNK - bleed, cy * CHUNK - bleed, CHUNK + bleed * 2, CHUNK + bleed * 2);
+    if (exact) {
+      g.save();
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.imageSmoothingEnabled = false;
+      const side = Math.round(CHUNK * res);
+      const bx = Math.round(ox);
+      const by = Math.round(oy);
+      for (let cx = cx0; cx <= cx1; cx++) {
+        for (let cy = cy0; cy <= cy1; cy++) {
+          // the chunk's canvas has a pixel of bleed round it, so it starts one pixel early
+          g.drawImage(this.chunk(cx, cy).c, bx + cx * side - 1, by + cy * side - 1);
+        }
+      }
+      g.restore();
+    } else {
+      const bleed = 1 / res;
+      for (let cx = cx0; cx <= cx1; cx++) {
+        for (let cy = cy0; cy <= cy1; cy++) {
+          const ch = this.chunk(cx, cy);
+          g.drawImage(ch.c, cx * CHUNK - bleed, cy * CHUNK - bleed, CHUNK + bleed * 2, CHUNK + bleed * 2);
+        }
       }
     }
     // bake one chunk ahead of the camera a frame, so driving never waits on a bake
@@ -173,7 +199,7 @@ export class Ground {
       this.spare.push(old!.c);
     }
     const t0 = performance.now();
-    const px = Math.ceil(CHUNK * this.res) + 2;
+    const px = Math.round(CHUNK * this.res) + 2;
     let c = this.spare.pop();
     if (!c || c.width !== px) {
       c = document.createElement('canvas');
@@ -189,10 +215,15 @@ export class Ground {
   private strawFor = 0;
   private strawPat: CanvasPattern | null = null;
 
-  /** The straw: one seamless tile of short blades in four tones, laid as a pattern in world space. */
+  /**
+   * The straw's fine fuzz: one seamless tile of short blades, low in
+   * contrast so its repeat never shows. The character of the straw, the
+   * clumps, the lean and the tone, is laid per chunk on top of it from
+   * world-space hashes, so it never repeats at all.
+   */
   private straw(g: CanvasRenderingContext2D): CanvasPattern {
     if (this.strawPat && this.strawFor === this.res) return this.strawPat;
-    const T = 8;
+    const T = 6;
     const R = this.res;
     const c = document.createElement('canvas');
     c.width = c.height = T * R;
@@ -200,17 +231,17 @@ export class Ground {
     tg.scale(R, R);
     tg.fillStyle = PAL.straw;
     tg.fillRect(0, 0, T, T);
-    const tones = ['rgba(184,166,112,0.6)', 'rgba(92,82,50,0.5)', 'rgba(136,124,78,0.6)', 'rgba(66,60,38,0.45)'];
-    tg.lineWidth = 0.045;
+    const tones = ['rgba(170,154,106,0.32)', 'rgba(100,90,56,0.3)', 'rgba(150,136,90,0.3)', 'rgba(80,72,46,0.24)'];
+    tg.lineWidth = 0.04;
     for (let tone = 0; tone < 4; tone++) {
       tg.strokeStyle = tones[tone];
       tg.beginPath();
-      for (let i = 0; i < 700; i++) {
+      for (let i = 0; i < 420; i++) {
         const h = hash32((i * 4 + tone) * 2654435761 + 12345);
         const x = ((h & 0xffff) / 0xffff) * T;
         const y = (((h >>> 16) & 0xff) / 255) * T + (((h >>> 24) & 0xf) / 15) * (T / 255);
-        const a = (((h >>> 12) & 0xff) / 255) * Math.PI;
-        const l = 0.12 + (((h >>> 20) & 0xf) / 15) * 0.24;
+        const a = (((h >>> 12) & 0xff) / 255) * Math.PI * 2;
+        const l = 0.08 + (((h >>> 20) & 0xf) / 15) * 0.16;
         // drawn four times so a blade over an edge comes back on the other side
         for (const [ox, oy] of [[0, 0], [-T, 0], [0, -T], [-T, -T]]) {
           tg.moveTo(x + ox, y + oy);
@@ -224,6 +255,141 @@ export class Ground {
     this.strawPat = pat;
     this.strawFor = R;
     return pat;
+  }
+
+  /**
+   * The straw's character, from world hashes: a clump of blades every
+   * metre or so, leaning the way a slow field says, each blade its own
+   * length and tone; bare earth and damp dark patches at a larger scale,
+   * their edges frayed with blades rather than drawn.
+   */
+  private strawField(g: CanvasRenderingContext2D, wx: number, wy: number): void {
+    // the lie of the grass: a slow field of angles, so neighbouring clumps agree and far ones do not
+    const lie = (x: number, y: number) => Math.sin(x * 0.11 + Math.sin(y * 0.07) * 2) * 1.4 + Math.sin(y * 0.13 - x * 0.05) * 0.9;
+    // a slow field of tone, -1 to 1: where the straw is greener, paler, thinner
+    const tone = (x: number, y: number) => Math.sin(x * 0.09 + 1.3) * Math.sin(y * 0.083 + 0.4) + Math.sin((x + y) * 0.21) * 0.35;
+
+    // large patches first: bare earth where the soil shows, damp dark hollows
+    const M = 6;
+    for (let gx = Math.floor((wx - M) / 9); gx * 9 < wx + CHUNK + M; gx++) {
+      for (let gy = Math.floor((wy - M) / 9); gy * 9 < wy + CHUNK + M; gy++) {
+        const h = hash32((gx * 73856093) ^ (gy * 19349663) ^ 4242);
+        if ((h & 0xff) > 120) continue;
+        const x = gx * 9 + ((h >>> 8) & 0xff) / 255 * 9;
+        const y = gy * 9 + ((h >>> 16) & 0xff) / 255 * 9;
+        const r = 1.2 + ((h >>> 24) & 0xff) / 255 * 3.2;
+        const damp = (h >>> 5) & 1;
+        const colour = damp ? '#4f4a2e' : (h >>> 6) & 1 ? PAL.earth : '#7a6a4c';
+        g.globalAlpha = damp ? 0.32 : 0.4;
+        g.fillStyle = colour;
+        blob(g, x, y, r, h, 15);
+        g.fill();
+        g.globalAlpha = damp ? 0.22 : 0.28;
+        blob(g, x + r * 0.2, y - r * 0.15, r * 0.65, h >>> 2, 11);
+        g.fill();
+        // the fray: blades of the patch's colour across its edge, and straw blades into it
+        const fray = new Path2D();
+        const n = Math.round(r * 26);
+        for (let i = 0; i < n; i++) {
+          const hb = hash32(h + i * 2654435761);
+          const a = (i / n) * Math.PI * 2;
+          const rr = r * (0.7 + ((hb & 0xff) / 255) * 0.55);
+          const px = x + Math.cos(a) * rr;
+          const py = y + Math.sin(a) * rr;
+          const ba = a + ((((hb >>> 8) & 0xff) / 255) - 0.5) * 1.6;
+          const l = 0.15 + (((hb >>> 16) & 0xff) / 255) * 0.45;
+          fray.moveTo(px - Math.cos(ba) * l * 0.5, py - Math.sin(ba) * l * 0.5);
+          fray.lineTo(px + Math.cos(ba) * l * 0.5, py + Math.sin(ba) * l * 0.5);
+        }
+        g.globalAlpha = 0.45;
+        g.strokeStyle = colour;
+        g.lineWidth = 0.07;
+        g.lineCap = 'round';
+        g.stroke(fray);
+      }
+    }
+    g.globalAlpha = 1;
+
+    // clumps of blades: one tone path per shade, every blade its own direction, length and weight
+    const shades = ['rgba(196,178,124,0.55)', 'rgba(160,144,96,0.55)', 'rgba(112,100,62,0.5)', 'rgba(78,70,44,0.5)', 'rgba(96,96,58,0.45)'];
+    const paths = shades.map(() => new Path2D());
+    const C = 0.8;
+    for (let gx = Math.floor((wx - 1) / C); gx * C < wx + CHUNK + 1; gx++) {
+      for (let gy = Math.floor((wy - 1) / C); gy * C < wy + CHUNK + 1; gy++) {
+        const h = hash32((gx * 73856093) ^ (gy * 19349663) ^ 9001);
+        if ((h & 0xff) < 50) continue;
+        const x = gx * C + ((h >>> 8) & 0xff) / 255 * C;
+        const y = gy * C + ((h >>> 16) & 0xff) / 255 * C;
+        const base = lie(x, y);
+        const tn = tone(x, y);
+        const blades = 3 + ((h >>> 24) & 7);
+        for (let b = 0; b < blades; b++) {
+          const hb = hash32(h + b * 40503);
+          const a = base + ((hb & 0xff) / 255 - 0.5) * 1.3;
+          const l = 0.12 + (((hb >>> 8) & 0xff) / 255) ** 2 * 0.5;
+          const ox = ((((hb >>> 16) & 0xff) / 255) - 0.5) * 0.35;
+          const oy = ((((hb >>> 24) & 0xff) / 255) - 0.5) * 0.35;
+          // tone leans with the slow field: pale where it is high, dark and green where low
+          const pick = Math.max(0, Math.min(4, Math.floor(((hb >>> 4) & 0xf) / 16 * 3 + (tn < -0.3 ? 2 : tn > 0.4 ? 0 : 1))));
+          const p = paths[(hb >>> 28) & 7 ? pick : 4];
+          p.moveTo(x + ox, y + oy);
+          p.lineTo(x + ox + Math.cos(a) * l, y + oy + Math.sin(a) * l);
+        }
+      }
+    }
+    g.lineCap = 'round';
+    g.lineWidth = 0.05;
+    paths.forEach((p, i) => {
+      g.strokeStyle = shades[i];
+      g.stroke(p);
+    });
+  }
+
+  /**
+   * Where cars run wide: two flattened tracks a car's track apart in the
+   * straw outside the bends, wandering in and out, darker where the
+   * straw is crushed and paler where it is bruised.
+   */
+  private wideTracks(g: CanvasRenderingContext2D, list: number[], half: number): void {
+    const dark = [new Path2D(), new Path2D(), new Path2D()];
+    const n = this.xs.length;
+    for (const i of list) {
+      const j = (i + 1) % n;
+      const k = this.ks[i];
+      const bend = Math.abs(k);
+      if (bend < 0.22) continue;
+      const side = -Math.sign(k);
+      const s0 = i * STEP;
+      const level = bend > 0.7 ? 2 : bend > 0.42 ? 1 : 0;
+      // two cars' lines, each wandering on its own
+      for (let line = 0; line < 2; line++) {
+        const wander = (s: number) => half + 4.6 + line * 1.9 + Math.sin(s * 0.06 + line * 2.1) * 1.3 + Math.sin(s * 0.17 + line) * 0.4 + (bend - 0.22) * 2.2;
+        for (const gauge of [-0.72, 0.72]) {
+          const d0 = side * (wander(s0) + gauge);
+          const d1 = side * (wander(s0 + STEP) + gauge);
+          const ax = this.xs[i] - this.tys[i] * d0;
+          const ay = this.ys[i] + this.txs[i] * d0;
+          const bx = this.xs[j] - this.tys[j] * d1;
+          const by = this.ys[j] + this.txs[j] * d1;
+          // broken where the straw stood back up
+          if ((hash32(i * 4 + line * 2 + (gauge > 0 ? 1 : 0) + 515) & 0xff) < 40) continue;
+          dark[line ? Math.max(0, level - 1) : level].moveTo(ax, ay);
+          dark[line ? Math.max(0, level - 1) : level].lineTo(bx, by);
+        }
+      }
+    }
+    g.lineCap = 'round';
+    dark.forEach((p, level) => {
+      g.globalAlpha = 0.14 + level * 0.07;
+      g.strokeStyle = '#4a4129';
+      g.lineWidth = 0.42;
+      g.stroke(p);
+      g.globalAlpha = 0.1 + level * 0.04;
+      g.strokeStyle = PAL.strawPale;
+      g.lineWidth = 0.12;
+      g.stroke(p);
+    });
+    g.globalAlpha = 1;
   }
 
   private bake(c: HTMLCanvasElement, cx: number, cy: number): void {
@@ -258,20 +424,21 @@ export class Ground {
       }
       g.globalAlpha = 1;
     };
-    drift(10, 4, 9, 0.3, 101);
-    drift(4, 1, 2.6, 0.28, 202);
+    drift(13, 4, 9, 0.18, 101);
+    this.strawField(g, wx, wy);
     // needle litter under the trees
     g.fillStyle = PAL.forestFloor;
     for (const tr of this.sc.trees) {
       if (!inChunk(tr.x, tr.y, tr.r * 1.4)) continue;
       g.globalAlpha = tr.birch ? 0.25 : 0.45;
-      spiky(g, tr.x, tr.y, tr.r * 1.15, hash32(Math.round(tr.x * 100) ^ Math.round(tr.y * 100)), 13);
+      blob(g, tr.x, tr.y, tr.r * 1.1, hash32(Math.round(tr.x * 100) ^ Math.round(tr.y * 100)), 13);
       g.fill();
     }
     g.globalAlpha = 1;
 
     // the road and its edges, outside in: worn earth, the ditch, the verge, the gravel berm, the road
     if (this.bins.has(key(cx, cy))) {
+      this.wideTracks(g, this.bins.get(key(cx, cy))!, half);
       g.lineJoin = 'round';
       g.lineCap = 'round';
       const band = (w: number, colour: string, alpha = 1) => {
@@ -289,13 +456,61 @@ export class Ground {
         g.shadowBlur = 0;
         g.shadowColor = 'transparent';
       };
-      soft(half + 3.9, 0.7, PAL.earth, 0.5);
+      const list0 = this.bins.get(key(cx, cy))!;
+      /**
+       * Fray a band's outer edge: dabs of its colour pushed out past the edge
+       * and pulled back from it, wandering slowly along the road, and blades
+       * across the line, so the edge is a ragged seam and never a ruled line.
+       */
+      const fray = (d: number, colour: string, alpha: number, amp: number, salt: number) => {
+        const dabs = new Path2D();
+        const blades = new Path2D();
+        for (const i of list0) {
+          const sv = i * STEP;
+          for (const side of [-1, 1]) {
+            const h = hash32(i * 2 + (side > 0 ? 1 : 0) + salt * 7919);
+            const wob = amp * (Math.sin(sv * 0.23 + salt + side) * 0.6 + Math.sin(sv * 0.71 + salt * 2) * 0.4);
+            const nx = -this.tys[i] * side;
+            const ny = this.txs[i] * side;
+            const dd = d + wob * 0.6 + (((h & 0xff) / 255) - 0.5) * amp * 0.5;
+            const r = amp * (0.35 + (((h >>> 8) & 0xff) / 255) * 0.5);
+            const along = ((((h >>> 16) & 0xff) / 255) - 0.5) * STEP;
+            blob(dabs, this.xs[i] + nx * dd + this.txs[i] * along, this.ys[i] + ny * dd + this.tys[i] * along, r, h, 9);
+            for (let b = 0; b < 3; b++) {
+              const hb = hash32(h + b * 977);
+              const a = Math.atan2(ny, nx) + ((hb & 0xff) / 255 - 0.5) * 1.4;
+              const at0 = d + ((((hb >>> 8) & 0xff) / 255) - 0.6) * amp;
+              const l = amp * (0.4 + (((hb >>> 16) & 0xff) / 255) * 0.9);
+              const al = ((((hb >>> 24) & 0xff) / 255) - 0.5) * STEP * 1.5;
+              const x0 = this.xs[i] + nx * at0 + this.txs[i] * al;
+              const y0 = this.ys[i] + ny * at0 + this.tys[i] * al;
+              blades.moveTo(x0, y0);
+              blades.lineTo(x0 + Math.cos(a) * l, y0 + Math.sin(a) * l);
+            }
+          }
+        }
+        g.globalAlpha = alpha;
+        g.fillStyle = colour;
+        g.fill(dabs);
+        g.strokeStyle = colour;
+        g.lineWidth = 0.06;
+        g.lineCap = 'round';
+        g.stroke(blades);
+        g.globalAlpha = 1;
+        g.lineCap = 'round';
+      };
+      soft(half + 3.9, 0.7, PAL.earth, 0.45);
+      fray(half + 3.9, PAL.earth, 0.35, 0.9, 1);
       soft(half + 3.1, 0.35, PAL.ditch);
-      soft(half + 2.5, 0.4, PAL.ditchBottom, 0.7);
+      fray(half + 3.1, PAL.ditch, 0.8, 0.55, 2);
+      soft(half + 2.5, 0.4, PAL.ditchBottom, 0.6);
       soft(half + 2.05, 0.25, PAL.ditch);
       soft(half + 1.45, 0.3, PAL.verge);
+      fray(half + 1.45, PAL.verge, 0.85, 0.45, 3);
       soft(half + 0.4, 0.25, PAL.berm);
+      fray(half + 0.4, PAL.berm, 0.7, 0.35, 4);
       soft(half, 0.15, PAL.gravel);
+      fray(half, PAL.gravel, 0.6, 0.3, 5);
       g.globalAlpha = 1;
       // tyres polish two lanes pale; a ridge of loose gravel between them
       g.lineCap = 'butt';
@@ -341,30 +556,35 @@ export class Ground {
       g.stroke(ridge);
       g.globalAlpha = 1;
 
-      // ragged edges: tufts of straw lean over the worn earth and the ditch lip
+      // tufts across the seams: straw over the worn earth, the ditch lip and the verge's edge,
+      // each a few blades of their own length leaning one loose way, never a fan
       const tufts = [new Path2D(), new Path2D(), new Path2D()];
+      const seams = [half + 3.8, half + 3.1, half + 1.5, half + 0.3];
       for (const i of list) {
         for (const side of [-1, 1]) {
-          for (let k = 0; k < 3; k++) {
-            const h = hash32(i * 6 + k * 2 + (side > 0 ? 1 : 0) + 7777);
-            const lip = k === 2;
-            const d = side * (lip ? half + 1.45 + ((h & 0xff) / 255) * 0.5 : half + 3.6 + ((h & 0xff) / 255) * 1.0);
-            const p = at(i, d);
-            const path = tufts[lip ? 2 : (h >>> 8) & 1];
-            // a tuft: a few short blades from one root, leaning toward the road
-            const root = Math.atan2(-this.txs[i] * side, this.tys[i] * side);
-            for (let b2 = 0; b2 < 6; b2++) {
+          for (let k = 0; k < 4; k++) {
+            const h = hash32(i * 8 + k * 2 + (side > 0 ? 1 : 0) + 7777);
+            if ((h & 0xff) < (k === 3 ? 170 : 70)) continue;
+            const d = side * (seams[k] + ((((h >>> 8) & 0xff) / 255) - 0.5) * 0.8);
+            const along = ((((h >>> 16) & 0xff) / 255) - 0.5) * STEP;
+            const px = this.xs[i] - this.tys[i] * d + this.txs[i] * along;
+            const py = this.ys[i] + this.txs[i] * d + this.tys[i] * along;
+            const path = tufts[k === 0 ? 0 : k === 3 ? 2 : (h >>> 24) & 1 ? 1 : 2];
+            const lean = ((h >>> 4) & 0xff) / 255 * Math.PI * 2;
+            const n = 2 + ((h >>> 12) & 3);
+            for (let b2 = 0; b2 < n; b2++) {
               const hb = hash32(h + b2 * 7919);
-              const a2 = root + Math.PI + ((hb & 0xff) / 255 - 0.5) * 2.4;
-              const l = 0.08 + (((hb >>> 8) & 0xff) / 255) * 0.2;
-              path.moveTo(p.x, p.y);
-              path.lineTo(p.x + Math.cos(a2) * l, p.y + Math.sin(a2) * l);
+              const a2 = lean + ((hb & 0xff) / 255 - 0.5) * 0.9;
+              const l = 0.1 + ((((hb >>> 8) & 0xff) / 255) ** 1.5) * 0.32;
+              const ox = ((((hb >>> 16) & 0xff) / 255) - 0.5) * 0.12;
+              path.moveTo(px + ox, py - ox);
+              path.lineTo(px + ox + Math.cos(a2) * l, py - ox + Math.sin(a2) * l);
             }
           }
         }
       }
       g.lineCap = 'round';
-      g.lineWidth = 0.035;
+      g.lineWidth = 0.04;
       g.globalAlpha = 0.6;
       g.strokeStyle = PAL.strawPale;
       g.stroke(tufts[0]);
@@ -604,6 +824,15 @@ export class Ground {
     // juniper and boulders
     for (const b of sc.shrubs) {
       if (!casts(b.x, b.y, b.r, 1.4)) continue;
+      if (b.tuft) {
+        // a grass clump: a thin, ragged shadow of a few blades
+        const hh = hash32(b.v * 977 + Math.round(b.x * 13));
+        for (let i = 0; i < 5; i++) {
+          const o = ((hash32(hh + i) & 0xff) / 255 - 0.5) * b.r * 1.4;
+          line(b.x - SHADOW_Y * o, b.y + SHADOW_X * o, 0, 0.35 + b.r * (0.6 + ((hash32(hh + i * 7) & 0xff) / 255) * 0.6), 0.06);
+        }
+        continue;
+      }
       const hgt = b.rock ? b.r * 0.9 : 1.1 + b.r;
       const k = hgt * (b.rock ? 0.5 : 0.6);
       line(b.x, b.y, 0, k, b.r * (b.rock ? 1.7 : 1.1));
@@ -627,7 +856,33 @@ export class Ground {
     for (const b of sc.shrubs) {
       if (!inChunk(b.x, b.y, b.r + 0.2)) continue;
       const h = hash32(b.v * 7919 + Math.round(b.x * 10));
-      if (b.rock) {
+      if (b.tuft) {
+        // a clump of tall dry grass: blades out from one root, paler at the tips, a dark heart
+        const dark = new Path2D();
+        const pale = new Path2D();
+        const n = 14 + (h & 7);
+        for (let i = 0; i < n; i++) {
+          const hb = hash32(h + i * 2654435761);
+          const a = ((hb & 0xffff) / 0xffff) * Math.PI * 2;
+          const l = b.r * (0.5 + (((hb >>> 16) & 0xff) / 255) * 0.8);
+          const bend = ((((hb >>> 24) & 0xff) / 255) - 0.5) * 0.6;
+          const mx = b.x + Math.cos(a) * l * 0.55;
+          const my = b.y + Math.sin(a) * l * 0.55;
+          dark.moveTo(b.x, b.y);
+          dark.lineTo(mx, my);
+          pale.moveTo(mx, my);
+          pale.lineTo(b.x + Math.cos(a + bend) * l, b.y + Math.sin(a + bend) * l);
+        }
+        g.lineCap = 'round';
+        g.lineWidth = 0.05;
+        g.strokeStyle = '#4c4630';
+        g.stroke(dark);
+        g.strokeStyle = (h >>> 3) & 1 ? PAL.strawPale : '#b8a878';
+        g.stroke(pale);
+        g.fillStyle = 'rgba(40,36,22,0.7)';
+        blob(g, b.x, b.y, b.r * 0.25, h, 7);
+        g.fill();
+      } else if (b.rock) {
         // a glacial boulder: grey granite, lichen, a lit shoulder
         const p = new Path2D();
         blob(p, b.x, b.y, b.r, h, 9);
@@ -638,17 +893,16 @@ export class Ground {
         blob(g, b.x + b.r * 0.2, b.y - b.r * 0.1, b.r * 0.3, h >>> 3, 7);
         g.fill();
       } else {
-        // juniper: a dark ragged clump
-        // juniper: two or three ragged lobes, never a ball
-        const p = new Path2D();
+        // juniper: two or three ragged lobes, never a ball and never a star, each lit on its own
         const lobes = 2 + (h & 1);
         for (let i = 0; i < lobes; i++) {
           const a = (h >>> 3) / 1e8 + i * 2.1;
-          spiky(p, b.x + Math.cos(a) * b.r * 0.45, b.y + Math.sin(a) * b.r * 0.45, b.r * (0.75 - i * 0.12), h + i * 101, 9);
+          const p = new Path2D();
+          blob(p, b.x + Math.cos(a) * b.r * 0.4, b.y + Math.sin(a) * b.r * 0.4, b.r * (0.7 - i * 0.1), h + i * 101, 17);
+          g.fillStyle = i ? '#243022' : '#1c261d';
+          g.fill(p);
+          lit(g, p, b.r * 0.16, 'rgba(92,102,66,0.5)', 'rgba(0,0,0,0.4)');
         }
-        g.fillStyle = '#1f2a20';
-        g.fill(p);
-        lit(g, p, b.r * 0.2, 'rgba(96,108,72,0.55)', 'rgba(0,0,0,0.4)');
       }
     }
     const b = sc.barn;
@@ -784,19 +1038,6 @@ export class Ground {
       }
     }
   }
-}
-
-/** A spiky clump: a blob with alternating long and short points. */
-function spiky(g: CanvasRenderingContext2D | Path2D, x: number, y: number, r: number, h: number, n: number): void {
-  if (!(g instanceof Path2D)) g.beginPath();
-  for (let i = 0; i < n * 2; i++) {
-    const j = hash32(h + i * 2654435761);
-    const a = (i / (n * 2)) * Math.PI * 2;
-    const rr = r * (i % 2 ? 0.4 + (j & 0xff) / 800 : 0.75 + (j & 0xff) / 900);
-    if (i) g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
-    else g.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
-  }
-  g.closePath();
 }
 
 /** Light a shape: a bright strip on the side toward the sun, a dark one away from it. */

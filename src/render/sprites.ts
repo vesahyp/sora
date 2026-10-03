@@ -551,20 +551,41 @@ export const TREE_SPAN = 1.1;
 /** The sun's direction on the ground, toward the sun, for things that never turn. */
 const SUN = { x: -SHADOW_X, y: -SHADOW_Y };
 
-/** A spiky star: a layer of spruce branches seen from above. */
-function star(seed: number, r: number, n: number, inner: number): Path2D {
-  const p = new Path2D();
-  const rot = (hash32(seed) / 4294967296) * Math.PI * 2;
-  for (let i = 0; i < n * 2; i++) {
-    const h = hash32(seed * 131 + i) / 4294967296;
-    const a = rot + (i / (n * 2)) * Math.PI * 2;
-    const rr = i % 2 ? r * (inner + h * 0.12) : r * (0.84 + h * 0.2);
-    const x = Math.cos(a) * rr;
-    const y = Math.sin(a) * rr;
-    if (i) p.lineTo(x, y);
-    else p.moveTo(x, y);
+/** a hash as a fraction, 0 to 1 */
+function frac(seed: number): number {
+  return hash32(seed) / 4294967296;
+}
+
+/**
+ * A ragged lobe: a clump of branch tips seen from above. The radius wanders
+ * slowly round the lobe and every few points a tip pokes out or a gap cuts
+ * in, unevenly, so no two lobes and no two sides of one lobe match.
+ */
+function lobe(p: Path2D, seed: number, x: number, y: number, r: number, n = 30): void {
+  const w1 = frac(seed) * 6.3;
+  const w2 = frac(seed + 1) * 6.3;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + w1;
+    const h = frac(seed * 131 + i);
+    const slow = 0.82 + 0.12 * Math.sin(a * 2 + w1) + 0.08 * Math.sin(a * 3 + w2);
+    const tip = h > 0.72 ? 0.16 * (h - 0.72) / 0.28 : h < 0.2 ? -0.18 * (0.2 - h) / 0.2 : 0;
+    const rr = r * (slow + tip);
+    if (i) p.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+    else p.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
   }
   p.closePath();
+}
+
+/** A crown tier: a few overlapping lobes round a centre, their union one ragged mass. */
+function tier(seed: number, r: number, lobes: number, cx = 0, cy = 0): Path2D {
+  const p = new Path2D();
+  lobe(p, seed, cx, cy, r * 0.62, 26);
+  for (let i = 0; i < lobes; i++) {
+    const a = (i / lobes) * Math.PI * 2 + frac(seed + 7) * 6.3 + (frac(seed * 3 + i) - 0.5) * 0.9;
+    const d = r * (0.36 + frac(seed * 5 + i) * 0.18);
+    const lr = r * (0.42 + frac(seed * 11 + i) * 0.2);
+    lobe(p, seed * 17 + i, cx + Math.cos(a) * d, cy + Math.sin(a) * d, lr, 24);
+  }
   return p;
 }
 
@@ -578,29 +599,102 @@ function treeCanvas(): { c: HTMLCanvasElement; g: CanvasRenderingContext2D } {
   return { c, g };
 }
 
-/** A spruce from above: near black, layered, its apex catching the last light. */
+/**
+ * rim() for a shape made of overlapping subpaths: an even-odd fill would
+ * cut the overlaps into petals, so the strip is cut out on a scratch canvas
+ * instead, the shape minus its shifted copy, and laid over in one go.
+ */
+let scratch: HTMLCanvasElement | null = null;
+function unionRim(g: CanvasRenderingContext2D, shape: Path2D, dx: number, dy: number, style: string): void {
+  const c = g.canvas;
+  scratch ??= document.createElement('canvas');
+  if (scratch.width !== c.width || scratch.height !== c.height) {
+    scratch.width = c.width;
+    scratch.height = c.height;
+  }
+  const s = scratch.getContext('2d')!;
+  s.setTransform(1, 0, 0, 1, 0, 0);
+  s.globalCompositeOperation = 'source-over';
+  s.clearRect(0, 0, c.width, c.height);
+  s.setTransform(g.getTransform());
+  s.fillStyle = style;
+  s.fill(shape);
+  s.globalCompositeOperation = 'destination-out';
+  s.translate(dx, dy);
+  s.fillStyle = '#000';
+  s.fill(shape);
+  g.save();
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.drawImage(scratch, 0, 0);
+  g.restore();
+}
+
+/** Spruce shape variants: shape, lobe count and how far the top tier sits off centre all change. */
+export const SPRUCE_VARIANTS = 8;
+
+/**
+ * A spruce from above in a low sun: a soft, near-black mass with a ragged
+ * edge, a darker core, the whorls only hinted, and the apex catching the
+ * last light. Built from a few overlapping lobes per tier, never a star.
+ */
 export function spruceSprite(v: number): HTMLCanvasElement {
   const key = `spruce:${v}`;
   const hit = cache.get(key);
   if (hit) return hit;
   const { c, g } = treeCanvas();
-  const layers = [
-    { r: TREE_R, n: 13, inner: 0.55 },
-    { r: TREE_R * 0.76, n: 11, inner: 0.5 },
-    { r: TREE_R * 0.52, n: 9, inner: 0.48 },
-    { r: TREE_R * 0.3, n: 7, inner: 0.45 },
+  const R = TREE_R;
+  const seed = v * 977 + 31;
+  // the apex leans a little off the trunk, so a stand is never a grid of bullseyes
+  const ox = (frac(seed + 3) - 0.5) * R * 0.12 + SUN.x * R * 0.05;
+  const oy = (frac(seed + 4) - 0.5) * R * 0.12 + SUN.y * R * 0.05;
+  const tiers = [
+    { r: R * (0.98 + frac(seed + 5) * 0.06), lobes: 5 + (v % 3), k: 0 },
+    { r: R * 0.7, lobes: 4 + ((v >> 1) % 2), k: 0.45 },
+    { r: R * 0.42, lobes: 3 + (v % 2), k: 0.8 },
   ];
-  layers.forEach((l, i) => {
-    const p = star(v * 17 + i, l.r, l.n, l.inner);
+  // a soft fringe first: the outer tier a touch larger and faint, so the edge never cuts clean
+  const fringe = tier(seed + 99, tiers[0].r * 1.08, tiers[0].lobes + 1);
+  g.fillStyle = 'rgba(16,20,14,0.45)';
+  g.fill(fringe);
+  tiers.forEach((t, i) => {
+    const p = tier(seed + i * 13, t.r, t.lobes, ox * t.k, oy * t.k);
     g.fillStyle = PAL.spruce[i];
     g.fill(p);
-    rim(g, p, -SUN.x * l.r * 0.16, -SUN.y * l.r * 0.16, i < 2 ? 'rgba(70,80,48,0.55)' : 'rgba(92,100,60,0.6)');
-    rim(g, p, SUN.x * l.r * 0.12, SUN.y * l.r * 0.12, 'rgba(0,0,0,0.45)');
+    // the lit side is a dull olive and narrow; the far side drops into black
+    unionRim(g, p, -SUN.x * t.r * 0.1, -SUN.y * t.r * 0.1, i === 0 ? 'rgba(58,66,40,0.5)' : 'rgba(74,82,48,0.55)');
+    unionRim(g, p, SUN.x * t.r * 0.14, SUN.y * t.r * 0.14, 'rgba(0,0,0,0.5)');
+    if (i < 2) {
+      // the core between tiers sits in its own shade
+      const gr = g.createRadialGradient(ox * t.k, oy * t.k, 0, ox * t.k, oy * t.k, t.r * 0.75);
+      gr.addColorStop(0, 'rgba(4,6,4,0.55)');
+      gr.addColorStop(1, 'rgba(4,6,4,0)');
+      g.save();
+      g.clip(p);
+      g.fillStyle = gr;
+      g.fill(p);
+      g.restore();
+    }
   });
-  // the apex: a hard point of light toward the sun
-  g.fillStyle = '#5c5e3a';
+  // whorls hinted: a few short broken arcs of lit tips on the sun side
+  g.lineCap = 'round';
+  g.lineWidth = 0.9;
+  for (let i = 0; i < 7; i++) {
+    const h = frac(seed * 7 + i);
+    const rr = R * (0.5 + h * 0.4);
+    const a0 = Math.atan2(SUN.y, SUN.x) + (frac(seed * 13 + i) - 0.5) * 2.2;
+    g.strokeStyle = `rgba(80,88,52,${0.25 + h * 0.2})`;
+    g.beginPath();
+    g.arc(ox * 0.4, oy * 0.4, rr, a0, a0 + 0.25 + h * 0.3);
+    g.stroke();
+  }
+  // the apex: a small lit clump toward the sun, not a dot
+  const top = new Path2D();
+  lobe(top, seed + 777, ox + SUN.x * 1.6, oy + SUN.y * 1.6, R * 0.12, 14);
+  g.fillStyle = '#4e5434';
+  g.fill(top);
+  g.fillStyle = 'rgba(150,140,90,0.45)';
   g.beginPath();
-  g.arc(SUN.x * 1.5, SUN.y * 1.5, 1.6, 0, Math.PI * 2);
+  g.arc(ox + SUN.x * 2.6, oy + SUN.y * 2.6, 1.3, 0, Math.PI * 2);
   g.fill();
   cache.set(key, c);
   return c;
@@ -636,7 +730,7 @@ export function birchSprite(v: number): HTMLCanvasElement {
     const rr = Math.sqrt(((h >>> 16) & 0xff) / 255) * TREE_R * 0.78;
     const cr = TREE_R * (0.13 + (((h >>> 24) & 0xff) / 255) * 0.12);
     const q = new Path2D();
-    q.addPath(star(v * 77 + i, cr, 6, 0.62), new DOMMatrix().translate(Math.cos(a) * rr, Math.sin(a) * rr));
+    lobe(q, v * 77 + i, Math.cos(a) * rr, Math.sin(a) * rr, cr, 16);
     g.fillStyle = PAL.birchLeaf[(h >>> 4) & 3];
     g.fill(q);
     rim(g, q, -SUN.x * cr * 0.3, -SUN.y * cr * 0.3, 'rgba(200,180,110,0.4)');
@@ -773,33 +867,226 @@ export function fireSprite(): HTMLCanvasElement {
   return c;
 }
 
-/** A pickup as a stencilled steel box with a coloured band, 1.6 m across. */
-export function crateSprite(kind: string, colour: string): HTMLCanvasElement {
-  const key = `crate:${kind}`;
+/**
+ * A tongue of flame: a stretched teardrop, white-yellow at the root, red
+ * and gone at the tip. Points +x from its root at the left third; the
+ * renderer layers several, flickering, leaned downwind.
+ */
+export function flameSprite(): HTMLCanvasElement {
+  const key = 'flame';
   const hit = cache.get(key);
   if (hit) return hit;
-  const res = 48;
-  const s = 1.6;
   const c = document.createElement('canvas');
-  c.width = c.height = Math.ceil(s * res);
+  c.width = 128;
+  c.height = 64;
+  const g = c.getContext('2d')!;
+  g.scale(2, 1);
+  const gr = g.createRadialGradient(18, 32, 0, 22, 32, 30);
+  gr.addColorStop(0, 'rgba(255,240,190,0.95)');
+  gr.addColorStop(0.25, 'rgba(255,186,70,0.85)');
+  gr.addColorStop(0.55, 'rgba(226,96,24,0.5)');
+  gr.addColorStop(0.8, 'rgba(120,34,10,0.18)');
+  gr.addColorStop(1, 'rgba(60,16,6,0)');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 64, 64);
+  cache.set(key, c);
+  return c;
+}
+
+/** metres across a pickup sprite, and how tall a pickup stands for its shadow */
+export const PICKUP_SIZE = 1.5;
+export const PICKUP_HEIGHT = 0.32;
+
+/**
+ * What lies on the road, each drawn as the thing it is: a jerrycan of
+ * nitro, a bundle of notes, a wrench, a missile, a mine. Muted, worn,
+ * lit from the one sun. The silhouette is kept apart so the renderer can
+ * lay the hard shadow from the same shape.
+ */
+function pickupShape(kind: string): Path2D {
+  const p = new Path2D();
+  if (kind === 'nitro') {
+    // a jerrycan lying flat: the body, the triple handle at one end, the spout
+    p.rect(-0.42, -0.3, 0.84, 0.6);
+    p.rect(0.42, -0.2, 0.14, 0.4);
+    p.rect(-0.56, -0.07, 0.15, 0.14);
+  } else if (kind === 'cash') {
+    // a bundle of notes, a second bundle askew under it
+    const a = new DOMMatrix().rotate(-14);
+    const under = new Path2D();
+    under.rect(-0.46, -0.22, 0.92, 0.44);
+    p.addPath(under, a.translate(0.06, 0.14));
+    p.rect(-0.46, -0.24, 0.92, 0.46);
+  } else if (kind === 'wrench') {
+    // an open-ended spanner: a bar and two jaws
+    p.rect(-0.4, -0.085, 0.8, 0.17);
+    p.moveTo(0.34, 0);
+    p.arc(0.47, 0, 0.2, 0, Math.PI * 2);
+    p.moveTo(-0.3, 0);
+    p.arc(-0.47, 0, 0.18, 0, Math.PI * 2);
+  } else if (kind === 'missile') {
+    // a tube with an ogive nose and four fins seen from above as two
+    p.moveTo(-0.55, -0.1);
+    p.lineTo(0.38, -0.1);
+    p.quadraticCurveTo(0.62, -0.08, 0.66, 0);
+    p.quadraticCurveTo(0.62, 0.08, 0.38, 0.1);
+    p.lineTo(-0.55, 0.1);
+    p.closePath();
+    p.moveTo(-0.55, -0.1);
+    p.lineTo(-0.66, -0.28);
+    p.lineTo(-0.4, -0.1);
+    p.closePath();
+    p.moveTo(-0.55, 0.1);
+    p.lineTo(-0.66, 0.28);
+    p.lineTo(-0.4, 0.1);
+    p.closePath();
+  } else {
+    // a mine: a squat drum with a pressure plate and a carry handle
+    p.arc(0, 0, 0.42, 0, Math.PI * 2);
+    p.moveTo(0.42, 0);
+    p.rect(0.36, -0.06, 0.16, 0.12);
+  }
+  return p;
+}
+
+function pickupCanvas(): { c: HTMLCanvasElement; g: CanvasRenderingContext2D } {
+  const res = 56;
+  const c = document.createElement('canvas');
+  c.width = c.height = Math.ceil(PICKUP_SIZE * res);
   const g = c.getContext('2d')!;
   g.scale(res, res);
-  g.translate(s / 2, s / 2);
-  const box = new Path2D();
-  box.rect(-0.62, -0.62, 1.24, 1.24);
-  g.fillStyle = '#3b382f';
-  g.fill(box);
-  g.fillStyle = faded(colour, 0.2);
-  g.fillRect(-0.62, -0.62, 1.24, 0.3);
-  g.fillStyle = 'rgba(0,0,0,0.35)';
-  for (let i = 0; i < 4; i++) g.fillRect(-0.62, -0.32 + i * 0.24, 1.24, 0.02);
-  rim(g, box, -SUN.x * 0.08, -SUN.y * 0.08, 'rgba(255,236,204,0.4)');
-  rim(g, box, SUN.x * 0.1, SUN.y * 0.1, 'rgba(0,0,0,0.5)');
-  g.fillStyle = PAL.hud;
-  g.font = 'bold 0.7px "Arial Black", Impact, sans-serif';
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.fillText({ cash: '$', nitro: 'N', wrench: '+', missile: 'M', mine: 'X' }[kind] ?? '?', 0, 0.2);
+  g.translate(PICKUP_SIZE / 2, PICKUP_SIZE / 2);
+  return { c, g };
+}
+
+/** the turns a pickup can lie at on the road, so its shadow can be baked per turn */
+export const PICKUP_TURNS = [-0.45, -0.15, 0.15, 0.45];
+/** metres across a pickup's shadow sprite: the pickup and the length of its shadow */
+export const PICKUP_SHADOW_SIZE = PICKUP_SIZE + 1.2;
+
+/**
+ * The pickup's shadow for one of its turns: the silhouette swept along the
+ * sun up to its height, in solid ink, so the renderer lays it once at the
+ * shadow alpha and it never doubles. Drawn in the pickup's own frame, so
+ * the sweep runs against the turn.
+ */
+export function pickupShadow(kind: string, turn: number): HTMLCanvasElement {
+  const key = `pickup-shadow:${kind}:${turn}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const res = 56;
+  const S = PICKUP_SHADOW_SIZE;
+  const c = document.createElement('canvas');
+  c.width = c.height = Math.ceil(S * res);
+  const g = c.getContext('2d')!;
+  g.scale(res, res);
+  g.translate(S / 2, S / 2);
+  const a = PICKUP_TURNS[turn];
+  const len = PICKUP_HEIGHT * SHADOW_PER_M;
+  const dx = (SHADOW_X * Math.cos(-a) - SHADOW_Y * Math.sin(-a)) * len;
+  const dy = (SHADOW_X * Math.sin(-a) + SHADOW_Y * Math.cos(-a)) * len;
+  const shape = pickupShape(kind);
+  g.fillStyle = SHADOW_INK;
+  for (let i = 0; i <= 8; i++) {
+    g.save();
+    g.translate((dx * i) / 8, (dy * i) / 8);
+    g.fill(shape);
+    g.restore();
+  }
+  cache.set(key, c);
+  return c;
+}
+
+export function pickupSprite(kind: string): HTMLCanvasElement {
+  const key = `pickup:${kind}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const { c, g } = pickupCanvas();
+  const shape = pickupShape(kind);
+  const lit = (style: string, k = 0.05) => rim(g, shape, SUN.x * k, SUN.y * k, style);
+  const dark = (k = 0.06) => rim(g, shape, -SUN.x * k, -SUN.y * k, 'rgba(0,0,0,0.5)');
+  g.lineCap = 'round';
+  if (kind === 'nitro') {
+    g.fillStyle = '#5b5a3c';
+    g.fill(shape);
+    // the pressed X and the rim seam
+    g.strokeStyle = 'rgba(20,18,10,0.45)';
+    g.lineWidth = 0.035;
+    g.beginPath();
+    g.moveTo(-0.34, -0.22);
+    g.lineTo(0.3, 0.22);
+    g.moveTo(-0.34, 0.22);
+    g.lineTo(0.3, -0.22);
+    g.stroke();
+    g.strokeStyle = 'rgba(210,200,160,0.25)';
+    g.strokeRect(-0.38, -0.26, 0.76, 0.52);
+    // a faded blue band: what is in it
+    g.fillStyle = faded('#4a8ab0', 0.35);
+    g.fillRect(-0.12, -0.3, 0.1, 0.6);
+    // paint worn off the edges
+    g.fillStyle = 'rgba(120,110,90,0.5)';
+    g.fillRect(0.3, -0.3, 0.12, 0.05);
+    g.fillRect(-0.42, 0.18, 0.06, 0.12);
+    g.fillStyle = '#2c2a20';
+    g.fillRect(-0.56, -0.07, 0.15, 0.14);
+  } else if (kind === 'cash') {
+    g.fillStyle = '#7d8064';
+    g.fill(shape);
+    // note edges along the bundle, the paper band across it
+    g.strokeStyle = 'rgba(40,44,30,0.4)';
+    g.lineWidth = 0.02;
+    g.beginPath();
+    for (let y = -0.18; y < 0.22; y += 0.08) {
+      g.moveTo(-0.44, y);
+      g.lineTo(0.44, y);
+    }
+    g.stroke();
+    g.fillStyle = '#c9bc96';
+    g.fillRect(-0.08, -0.24, 0.16, 0.46);
+    g.fillStyle = 'rgba(60,50,30,0.5)';
+    g.fillRect(-0.03, -0.1, 0.06, 0.18);
+  } else if (kind === 'wrench') {
+    g.fillStyle = '#7c7a72';
+    g.fill(shape);
+    // the jaws cut open, a dull sheen along the bar
+    g.fillStyle = '#2e2b24';
+    g.fillRect(0.52, -0.08, 0.2, 0.16);
+    g.beginPath();
+    g.arc(-0.47, 0, 0.08, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = 'rgba(230,220,200,0.3)';
+    g.fillRect(-0.32, -0.08, 0.64, 0.04);
+    g.fillStyle = 'rgba(110,60,30,0.45)';
+    g.fillRect(0.05, -0.085, 0.12, 0.17);
+  } else if (kind === 'missile') {
+    g.fillStyle = '#6a6a58';
+    g.fill(shape);
+    g.fillStyle = '#3a3a30';
+    g.fillRect(-0.55, -0.1, 0.12, 0.2);
+    // a yellow band, faded, and the stencil dash behind the nose
+    g.fillStyle = faded('#c8a030', 0.35);
+    g.fillRect(0.24, -0.1, 0.06, 0.2);
+    g.fillStyle = 'rgba(220,210,180,0.35)';
+    g.fillRect(-0.3, -0.02, 0.3, 0.04);
+  } else {
+    g.fillStyle = '#4c4c3a';
+    g.fill(shape);
+    g.strokeStyle = 'rgba(15,14,10,0.6)';
+    g.lineWidth = 0.035;
+    g.beginPath();
+    g.arc(0, 0, 0.3, 0, Math.PI * 2);
+    g.stroke();
+    g.fillStyle = '#3a3a2c';
+    g.beginPath();
+    g.arc(0, 0, 0.16, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = 'rgba(200,190,150,0.3)';
+    g.beginPath();
+    g.arc(-0.04, -0.04, 0.07, 0, Math.PI * 2);
+    g.fill();
+  }
+  lit('rgba(255,236,200,0.38)');
+  dark();
   cache.set(key, c);
   return c;
 }

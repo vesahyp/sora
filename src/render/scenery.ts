@@ -1,5 +1,6 @@
 import type { Track } from '../game/track';
 import { hash32 } from '../game/rng';
+import { SPRUCE_VARIANTS } from './sprites';
 
 /**
  * The roadside, read off the track once: kilometre posts, reflector posts
@@ -55,12 +56,14 @@ export interface SceneTree {
   v: number;
 }
 
-/** Low things in the straw past the ditch: juniper and glacial boulders. Baked into the ground. */
+/** Low things in the straw past the ditch: juniper, glacial boulders, clumps of tall grass. Baked into the ground. */
 export interface Shrub {
   x: number;
   y: number;
   r: number;
   rock: boolean;
+  /** a clump of tall dry grass rather than a juniper */
+  tuft?: boolean;
   v: number;
 }
 
@@ -96,6 +99,13 @@ export function buildScenery(t: Track): Scenery {
   for (let s = 100, n = 1; s < t.length - 20; s += 100, n++) {
     const q = side(s, half + 1.4);
     props.push({ kind: 'km', x: q.x, y: q.y, a: q.a, n });
+  }
+
+  // reflector posts along the straights too, now and then, either side
+  for (let s = 20, n = 0; s < t.length - 10; s += 38, n++) {
+    if (Math.abs(t.curvatureAhead(s - 8, 16)) >= 0.42) continue;
+    const q = side(s, (n & 1 ? 1 : -1) * (half + 1.1));
+    props.push({ kind: 'reflector', x: q.x, y: q.y, a: q.a, n: 0 });
   }
 
   // corners: reflector posts on the outside, bales at the apex of the tightest ones
@@ -195,6 +205,23 @@ export function buildScenery(t: Track): Scenery {
     }
   }
 
+  // life just past the worn earth, inside the frame on a phone held upright: grass clumps,
+  // young juniper, half-buried stones. All low enough to drive over; the sim never sees them
+  for (let s = 0; s < t.length; s += 1.6) {
+    for (const sign of [-1, 1]) {
+      const h = hash32(Math.round(s * 5) * 2 + (sign > 0 ? 1 : 0) + 77001);
+      const roll = h & 0xff;
+      if (roll > 72) continue;
+      const tuft = roll < 36;
+      const rock = !tuft && roll < 52;
+      const d = sign * (half + 3.5 + (((h >>> 8) & 0xff) / 255) * 2.2);
+      const q = side(s + (((h >>> 16) & 0xff) / 255 - 0.5) * 1.4, d);
+      if (clear.some((c) => (q.x - c.x) ** 2 + (q.y - c.y) ** 2 < c.r * c.r)) continue;
+      const k = ((h >>> 24) & 0xff) / 255;
+      shrubs.push({ x: q.x, y: q.y, r: tuft ? 0.3 + k * 0.25 : rock ? 0.18 + k * 0.28 : 0.25 + k * 0.2, rock, tuft, v: (h >>> 4) & 7 });
+    }
+  }
+
   // the forest: spruce, and birch where the light gets in at the edge
   const trees: SceneTree[] = [];
   for (const tr of t.trees) {
@@ -203,8 +230,10 @@ export function buildScenery(t: Track): Scenery {
     const h = hash32(Math.round(tr.x * 13) * 7349 + Math.round(tr.y * 7));
     const edge = Math.abs(t.locate(tr.x, tr.y).d) < limit + 6;
     const birch = tr.kind === 2 ? edge || (h & 3) === 0 : tr.kind === 3 && edge && (h & 1) === 0;
-    const r = birch ? tr.r * 0.82 : tr.r * 0.86;
-    trees.push({ x: tr.x, y: tr.y, r, birch, h: birch ? r * 3 : r * 3.3, v: (h >>> 4) & 3 });
+    // spruce in three ages, so a stand never reads as one tree stamped: young, grown, old
+    const age = birch ? 1 : [0.62, 1, 1, 1.28][(h >>> 10) & 3];
+    const r = birch ? tr.r * 0.82 : tr.r * 0.86 * age;
+    trees.push({ x: tr.x, y: tr.y, r, birch, h: birch ? r * 3 : r * 3.3, v: birch ? (h >>> 4) & 3 : (h >>> 4) % SPRUCE_VARIANTS });
   }
   // the taller drawn last, so a crown never sits under a smaller one
   trees.sort((p, q) => p.h - q.h);

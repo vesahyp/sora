@@ -6,7 +6,12 @@ import {
   carSprite,
   coneSprite,
   fireSprite,
-  crateSprite,
+  flameSprite,
+  pickupShadow,
+  pickupSprite,
+  PICKUP_SHADOW_SIZE,
+  PICKUP_SIZE,
+  PICKUP_TURNS,
   damageSprite,
   damageStage,
   propSprite,
@@ -17,7 +22,7 @@ import {
   SPRITE_PX,
   TREE_SPAN,
 } from './sprites';
-import { PICKUPS } from '../game/content/pickups';
+import { hash32 } from '../game/rng';
 import { GUN } from '../game/content/weapons';
 import { buildScenery, type Scenery } from './scenery';
 import { Ground } from './ground';
@@ -40,12 +45,15 @@ interface Dust {
   age: number;
   life: number;
   r: number;
-  /** 0 gravel dust, 1 straw dust, 2 black smoke, 3 grey smoke */
+  /** 0 gravel dust, 1 straw dust, 2 black smoke, 3 grey smoke, 4 dark impact dust */
   tint: number;
 }
 
-const DUST_TINTS = ['176,160,128', '168,150,104', '30,26,24', '96,90,84'];
-const DUST_MAX = 220;
+const DUST_TINTS = ['176,160,128', '168,150,104', '30,26,24', '96,90,84', '92,80,64'];
+/** the evening breeze, m/s: it blows the way the shadows fall, so smoke leans with them */
+const WIND_X = SHADOW_X * 0.45;
+const WIND_Y = SHADOW_Y * 0.45;
+const DUST_MAX = 150;
 /** the race numbers, player first */
 const NUMBERS = [7, 23, 41, 12, 5, 66];
 
@@ -58,6 +66,8 @@ const MARK_PPM = 4;
  */
 const CARS_ACROSS = 10;
 const CAR_WIDTH = 1.7;
+/** pickups are drawn larger than life, so the thing reads at a glance at this camera */
+const PICKUP_SCALE = 1.25;
 /** seconds of travel the camera looks ahead of the car */
 const LEAD = 0.35;
 
@@ -81,9 +91,16 @@ export class Renderer {
   /** skid marks, drawn once and kept: a canvas over the track's bounds at MARK_PPM; the ground copies from it */
   private marksG: CanvasRenderingContext2D | null = null;
   private lastWheel: { x: number; y: number }[][] = [];
+  /** bursts that have already thrown their dust, so each throws it once */
+  private thrown = new WeakSet<object>();
   /** the air over the frame: haze, the evening grade and the vignette in one small canvas */
   private air: HTMLCanvasElement | null = null;
   private airFor = -1;
+  /** the minimap's plate and road, drawn once; the cars go on top each frame */
+  private map: HTMLCanvasElement | null = null;
+  private mapFor = -1;
+  /** the safe-area inset at the top, read on resize rather than every frame */
+  private sat = 0;
   /** render time, ms: a smoothed average and the worst since the last read, for the dev readout */
   stats = { avg: 0, worst: 0, frames: 0 };
 
@@ -100,8 +117,13 @@ export class Renderer {
     this.canvas.width = Math.round(this.w * this.dpr);
     this.canvas.height = Math.round(this.h * this.dpr);
     const short = Math.min(this.w, this.h);
-    this.ppm = Math.max(16, Math.min(40, short / (CAR_WIDTH * CARS_ACROSS)));
+    const ppm = Math.max(16, Math.min(40, short / (CAR_WIDTH * CARS_ACROSS)));
+    // snapped so a 16 m ground chunk is a whole number of device pixels: the ground then
+    // blits 1:1 with no resampling. The zoom moves by less than a pixel across the chunk
+    this.ppm = Math.round(16 * ppm * this.dpr) / (16 * this.dpr);
     this.airFor = -1;
+    this.mapFor = -1;
+    this.sat = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')) || 0;
   }
 
   view(): { w: number; h: number } {
@@ -129,6 +151,7 @@ export class Renderer {
     this.scenery = buildScenery(t);
     this.ground = new Ground(t, this.scenery);
     this.ground.marks = { c: m, ppm: MARK_PPM, x: b.minX, y: b.minY };
+    this.mapFor = -1;
   }
 
   draw(s: SimState, dt: number): void {
@@ -171,7 +194,8 @@ export class Renderer {
     // skid marks: laid into the layer and straight into the baked ground, then the ground,
     // the start line and every static shadow, all baked
     this.layMarks(s);
-    this.ground!.draw(g, this.ppm * this.dpr, this.camX - halfW, this.camY - halfH, this.camX + halfW, this.camY + halfH, this.camX + c.vx * 1.2, this.camY + c.vy * 1.2);
+    const R = this.ppm * this.dpr;
+    this.ground!.draw(g, R, this.dpr * (shakeX + this.w / 2) - this.camX * R, this.dpr * (shakeY + this.h / 2) - this.camY * R, this.camX - halfW, this.camY - halfH, this.camX + halfW, this.camY + halfH, this.camX + c.vx * 1.2, this.camY + c.vy * 1.2);
 
     // the shadows of what moves, laid at the same alpha as the baked ones
     g.globalAlpha = SHADOW_ALPHA;
@@ -189,15 +213,13 @@ export class Renderer {
     const sy = SHADOW_Y * SHADOW_PER_M;
     for (const p of s.pickups) {
       if (p.gone > 0 || !visible(p.x, p.y)) continue;
-      g.beginPath();
-      g.moveTo(p.x - 0.6, p.y - 0.6);
-      g.lineTo(p.x + 0.6, p.y - 0.6);
-      g.lineTo(p.x + 0.6 + sx * 0.7, p.y - 0.6 + sy * 0.7);
-      g.lineTo(p.x + 0.6 + sx * 0.7, p.y + 0.6 + sy * 0.7);
-      g.lineTo(p.x - 0.6 + sx * 0.7, p.y + 0.6 + sy * 0.7);
-      g.lineTo(p.x - 0.6, p.y + 0.6);
-      g.closePath();
-      g.fill();
+      const turn = this.pickupTurn(p.x, p.y);
+      const S = PICKUP_SHADOW_SIZE * PICKUP_SCALE;
+      g.save();
+      g.translate(p.x, p.y);
+      g.rotate(PICKUP_TURNS[turn]);
+      g.drawImage(pickupShadow(p.kind, turn), -S / 2, -S / 2, S, S);
+      g.restore();
     }
     for (const m of s.missiles) {
       g.beginPath();
@@ -233,16 +255,31 @@ export class Renderer {
       g.restore();
     }
 
-    // pickups: stencilled steel boxes
+    // pickups: the thing itself, drawn small and muted, with an amber tick so it can be found
+    const blink = 0.55 + 0.35 * Math.sin(s.time * 4);
     for (const p of s.pickups) {
       if (p.gone > 0 || !visible(p.x, p.y)) continue;
-      const def = PICKUPS[p.kind];
-      const img = crateSprite(p.kind, def.colour);
       g.save();
       g.translate(p.x, p.y);
-      g.rotate(Math.sin(p.x * 3.1 + p.y) * 0.3);
-      g.drawImage(img, -0.8, -0.8, 1.6, 1.6);
+      g.rotate(PICKUP_TURNS[this.pickupTurn(p.x, p.y)]);
+      const P = PICKUP_SIZE * PICKUP_SCALE;
+      g.drawImage(pickupSprite(p.kind), -P / 2, -P / 2, P, P);
       g.restore();
+      g.strokeStyle = PAL.warn;
+      g.globalAlpha = blink;
+      g.lineWidth = 0.08;
+      g.lineCap = 'butt';
+      g.beginPath();
+      const m = 1.0;
+      const arm = 0.3;
+      g.moveTo(p.x - m, p.y - m + arm);
+      g.lineTo(p.x - m, p.y - m);
+      g.lineTo(p.x - m + arm, p.y - m);
+      g.moveTo(p.x + m, p.y + m - arm);
+      g.lineTo(p.x + m, p.y + m);
+      g.lineTo(p.x + m - arm, p.y + m);
+      g.stroke();
+      g.globalAlpha = 1;
     }
 
     // mines: a dark disc with a red eye
@@ -291,7 +328,7 @@ export class Renderer {
       const car = s.cars[i];
       if (!visible(car.x, car.y)) continue;
       if (car.wreck > 0) {
-        this.drawWreck(car, i, s.time, dt);
+        this.drawWreck(car);
         continue;
       }
       this.drawCar(car, i);
@@ -348,40 +385,47 @@ export class Renderer {
       }
     }
 
-    // bursts: the fire stays saturated
+    // bursts: the fire stays saturated; the dust and smoke they throw go into the air below
     for (const f of s.fx) {
       const k = f.age;
+      if (!this.thrown.has(f)) {
+        this.thrown.add(f);
+        this.throwDust(f.kind, f.x, f.y);
+      }
       if (f.kind === 'boom') {
-        // the fireball, a dark shock ring, then smoke that hangs
-        const r = 1.6 + Math.sqrt(k) * 5;
+        // the fireball, short and hot; what hangs after it is smoke
+        if (k > 0.6) continue;
+        const r = 1.4 + Math.sqrt(k) * 4.5;
         g.globalCompositeOperation = 'lighter';
-        g.globalAlpha = Math.max(0, 1 - k * 1.2);
+        g.globalAlpha = Math.max(0, 1 - k / 0.6) ** 1.5;
         g.drawImage(fireSprite(), f.x - r, f.y - r, r * 2, r * 2);
         g.globalCompositeOperation = 'source-over';
         g.globalAlpha = 1;
-        g.strokeStyle = `rgba(40,30,22,${(1 - k) * 0.45})`;
-        g.lineWidth = 0.35;
-        g.beginPath();
-        g.arc(f.x, f.y, 2 + k * 9, 0, Math.PI * 2);
-        g.stroke();
-        if (k < 0.15 && Math.random() < 0.5) this.puff(f.x + (Math.random() - 0.5) * 2, f.y + (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5, 3, 1.6, 2);
-      } else if (f.kind === 'puff') {
-        g.globalAlpha = (1 - k) * 0.6;
-        const img = puffSprite(DUST_TINTS[0]);
-        const r = 1 + k * 3;
-        g.drawImage(img, f.x - r, f.y - r, r * 2, r * 2);
-        g.globalAlpha = 1;
       } else if (f.kind === 'spark') {
-        if (k > 0.35) continue;
-        g.strokeStyle = `rgba(255,220,120,${1 - k / 0.35})`;
-        g.lineWidth = 0.07;
-        g.beginPath();
-        for (let i = 0; i < 6; i++) {
-          const a = i * 1.05 + f.x * 3;
-          g.moveTo(f.x, f.y);
-          g.lineTo(f.x + Math.cos(a) * k * 4.5, f.y + Math.sin(a) * k * 4.5);
+        // short hot streaks thrown off the hit, slowing, cooling from white to red, gone
+        if (k > 0.3) continue;
+        const q = k / 0.3;
+        const seed = Math.round(f.x * 131) ^ Math.round(f.y * 71);
+        g.globalCompositeOperation = 'lighter';
+        g.lineCap = 'round';
+        for (const [w, core] of [[0.13, false], [0.05, true]] as const) {
+          g.lineWidth = w;
+          g.strokeStyle = core ? `rgba(255,${Math.round(240 - q * 120)},${Math.round(180 - q * 160)},${1 - q})` : `rgba(255,120,30,${(1 - q) * 0.35})`;
+          g.beginPath();
+          for (let i = 0; i < 6; i++) {
+            const h = hash32(seed + i * 977);
+            const a = ((h & 0xffff) / 0xffff) * Math.PI * 2;
+            const v = 7 + ((h >>> 16) & 0xff) / 255 * 10;
+            const dist = (v * (1 - Math.exp(-k * 7))) / 7;
+            const len = 0.15 + v * 0.04 * (1 - q);
+            const cx = Math.cos(a);
+            const cy = Math.sin(a);
+            g.moveTo(f.x + cx * Math.max(0, dist - len), f.y + cy * Math.max(0, dist - len));
+            g.lineTo(f.x + cx * dist, f.y + cy * dist);
+          }
+          g.stroke();
         }
-        g.stroke();
+        g.globalCompositeOperation = 'source-over';
       } else if (f.kind === 'flash') {
         g.strokeStyle = f.colour ?? PAL.hud;
         g.globalAlpha = (1 - k) * 0.8;
@@ -389,7 +433,7 @@ export class Renderer {
         const r = 1 + k * 4;
         g.strokeRect(f.x - r, f.y - r, r * 2, r * 2);
         g.globalAlpha = 1;
-      } else {
+      } else if (f.kind === 'cash') {
         // cash: the sign rises, stencilled
         g.fillStyle = `rgba(240,200,90,${1 - k})`;
         g.font = 'bold 2.2px "Arial Black", Impact, sans-serif';
@@ -402,14 +446,18 @@ export class Renderer {
     this.stepDust(s, dt);
     for (const d of this.dust) {
       const k = d.age / d.life;
-      const a = (k < 0.12 ? k / 0.12 : Math.pow(1 - (k - 0.12) / 0.88, 1.4)) * (d.tint >= 2 ? 0.55 : 0.32);
+      const a = (k < 0.12 ? k / 0.12 : Math.pow(1 - (k - 0.12) / 0.88, 1.4)) * (d.tint === 2 ? 0.68 : d.tint === 3 ? 0.42 : d.tint === 4 ? 0.3 : 0.32);
       if (a < 0.03) continue;
-      const r = d.r * (0.7 + k * 1.9);
+      const r = d.r * (0.7 + k * 1.4);
       if (!visible(d.x, d.y, r)) continue;
       g.globalAlpha = a;
       g.drawImage(puffSprite(DUST_TINTS[d.tint]), d.x - r, d.y - r, r * 2, r * 2);
     }
     g.globalAlpha = 1;
+    for (let i = 0; i < s.cars.length; i++) {
+      const car = s.cars[i];
+      if (car.wreck > 0 && visible(car.x, car.y)) this.drawFire(car, i, s.time, dt);
+    }
 
     // trees over the cars: they are taller
     for (const tr of sc.trees) {
@@ -436,12 +484,17 @@ export class Renderer {
     g.stroke();
     g.restore();
 
-    // the air: haze that thickens with the pack's dust, the evening grade and a vignette,
-    // one upscaled drawImage, rebuilt only when the haze moves a step
+    // the air: haze that thickens with the pack's dust, the evening grade and a vignette, all
+    // in one cached overlay the size of the canvas, laid 1:1 with no resampling; rebuilt only
+    // when the haze moves a step or the screen changes size
     this.activity += (0 - this.activity) * (1 - Math.exp(-dt * 0.6));
-    const haze = Math.round(Math.min(0.12, 0.02 + this.activity * 0.0008) * 100);
-    if (haze !== this.airFor) this.buildAir(haze / 100);
-    g.drawImage(this.air!, -20, -20, this.w + 40, this.h + 40);
+    const haze = Math.round(Math.min(0.12, 0.02 + this.activity * 0.0008) * 50) * 2;
+    if (haze !== this.airFor) this.buildAir(haze);
+    g.save();
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.imageSmoothingEnabled = false;
+    g.drawImage(this.air!, 0, 0);
+    g.restore();
 
     // the sights on top of the air, so they stay sharp
     if (me.target >= 0 && me.wreck <= 0) {
@@ -461,17 +514,19 @@ export class Renderer {
     if (import.meta.env.DEV) (window as unknown as { __render: unknown }).__render = { ...this.stats, bake: this.ground!.lastBake };
   }
 
+  /** Paint the air overlay at the canvas's own size: haze, grade and vignette in one canvas. */
   private buildAir(haze: number): void {
-    this.airFor = Math.round(haze * 100);
-    // a quarter of the screen: the gradients are smooth, so the upscale costs nothing
-    const w = Math.max(8, Math.round((this.w + 40) / 4));
-    const h = Math.max(8, Math.round((this.h + 40) / 4));
+    this.airFor = haze;
+    const w = this.canvas.width;
+    const h = this.canvas.height;
     const c = this.air ?? document.createElement('canvas');
-    c.width = w;
-    c.height = h;
+    if (c.width !== w || c.height !== h) {
+      c.width = w;
+      c.height = h;
+    }
     const g = c.getContext('2d')!;
     g.clearRect(0, 0, w, h);
-    g.fillStyle = `rgba(178,160,124,${haze})`;
+    g.fillStyle = `rgba(178,160,124,${haze / 100})`;
     g.fillRect(0, 0, w, h);
     // the grade: warm where the sun comes from, cool and dark where it goes
     const grade = g.createLinearGradient(0, 0, w, h);
@@ -549,7 +604,12 @@ export class Renderer {
   }
 
   /** A wreck: the body charred black, fire on it, black smoke rising. */
-  private drawWreck(car: Car, i: number, time: number, dt: number): void {
+  /** a pickup's lie on the road: one of the fixed turns, picked by where it is */
+  private pickupTurn(x: number, y: number): number {
+    return hash32(Math.round(x * 10) * 7919 + Math.round(y * 10)) % PICKUP_TURNS.length;
+  }
+
+  private drawWreck(car: Car): void {
     const g = this.g;
     g.save();
     g.translate(car.x, car.y);
@@ -561,16 +621,44 @@ export class Renderer {
     g.drawImage(spr, -w / 2, -h / 2, w, h);
     g.drawImage(damageSprite(def, 3)!, -w / 2, -h / 2, w, h);
     g.restore();
+  }
+
+  /** A wreck's fire, over its own smoke so the flames burn through it. */
+  private drawFire(car: Car, i: number, time: number, dt: number): void {
+    const g = this.g;
+    // the fire: layered tongues leaning downwind, a dull wide base and a bright small core,
+    // each flickering on its own; the smoke column leans the same way, the way the shadows fall
+    const lean = Math.atan2(WIND_Y, WIND_X);
+    const flame = flameSprite();
     g.globalCompositeOperation = 'lighter';
-    for (let k = 0; k < 3; k++) {
-      const a = time * 9 + k * 2.1 + i;
-      g.fillStyle = `rgba(255,${110 + Math.sin(a) * 50},30,${0.6 + Math.sin(a * 1.7) * 0.2})`;
-      g.beginPath();
-      g.arc(car.x + Math.cos(a) * 0.8, car.y + Math.sin(a * 1.3) * 0.6, 0.9 + Math.sin(a * 2) * 0.3, 0, Math.PI * 2);
-      g.fill();
+    for (let k = 0; k < 6; k++) {
+      const ph = time * (7 + k * 1.3) + k * 2.1 + i * 1.7;
+      const flick = 0.75 + Math.sin(ph) * 0.15 + Math.sin(ph * 2.7) * 0.1;
+      const big = k < 3;
+      const len = (big ? 4.4 : 2.6) * flick;
+      const wid = (big ? 2.2 : 1.2) * (0.9 + Math.sin(ph * 1.9) * 0.1);
+      const ox = Math.cos(k * 2.4 + i) * (big ? 0.7 : 0.35);
+      const oy = Math.sin(k * 2.4 + i) * (big ? 0.5 : 0.25);
+      g.save();
+      g.translate(car.x + ox, car.y + oy);
+      g.rotate(lean + Math.sin(ph * 0.7) * 0.25);
+      g.globalAlpha = big ? 0.8 : 1;
+      g.drawImage(flame, -len * 0.3, -wid / 2, len, wid);
+      g.restore();
     }
+    // the seat of the fire: white heat where it burns hottest
+    const core = fireSprite();
+    for (let k = 0; k < 2; k++) {
+      const r = 0.7 + Math.sin(time * 11 + k * 3 + i) * 0.15;
+      g.globalAlpha = 0.9;
+      g.drawImage(core, car.x + (k - 0.5) * 0.9 - r, car.y - r, r * 2, r * 2);
+    }
+    g.globalAlpha = 1;
     g.globalCompositeOperation = 'source-over';
-    if (Math.random() < dt * 22) this.puff(car.x, car.y, (Math.random() - 0.5) * 1.5 + 0.4, -1.2 - Math.random(), 2.4, 1.2, 2);
+    if (Math.random() < dt * 30) {
+      const v = 1.2 + Math.random() * 0.8;
+      this.puff(car.x + Math.cos(lean) * 1.4 + (Math.random() - 0.5), car.y + Math.sin(lean) * 1.4 + (Math.random() - 0.5), Math.cos(lean) * v + (Math.random() - 0.5) * 0.4, Math.sin(lean) * v + (Math.random() - 0.5) * 0.4, 3.4 + Math.random(), 1.3 + Math.random() * 0.6, 2);
+    }
   }
 
   /** Four corner brackets that close on the target as the lock builds; amber when it holds. */
@@ -643,6 +731,24 @@ export class Renderer {
     this.dust.push({ x, y, vx, vy, age: 0, life, r, tint });
   }
 
+  /** What a burst leaves in the air: dark dust that hangs, smoke that rises and leans. */
+  private throwDust(kind: string, x: number, y: number): void {
+    const rnd = () => Math.random() - 0.5;
+    if (kind === 'spark') {
+      for (let i = 0; i < 2; i++) this.puff(x + rnd() * 0.6, y + rnd() * 0.6, rnd() * 1.5, rnd() * 1.5, 1.2 + Math.random() * 0.6, 0.45, 4);
+    } else if (kind === 'puff') {
+      for (let i = 0; i < 4; i++) this.puff(x + rnd() * 0.8, y + rnd() * 0.8, rnd() * 2.4, rnd() * 2.4, 1.8 + Math.random(), 0.6 + Math.random() * 0.4, i ? 4 : 0);
+    } else if (kind === 'boom') {
+      // a ring of dirt thrown outward, then a dark column that hangs and leans
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2 + rnd() * 0.4;
+        const v = 5 + Math.random() * 4;
+        this.puff(x + Math.cos(a), y + Math.sin(a), Math.cos(a) * v, Math.sin(a) * v, 2.2 + Math.random(), 1.0 + Math.random() * 0.5, 4);
+      }
+      for (let i = 0; i < 7; i++) this.puff(x + rnd() * 2, y + rnd() * 2, WIND_X * 2 + rnd() * 1.5, WIND_Y * 2 + rnd() * 1.5, 3.5 + Math.random() * 1.5, 1.6 + Math.random() * 0.6, 2);
+    }
+  }
+
   private stepDust(s: SimState, dt: number): void {
     for (const c of s.cars) {
       if (c.wreck > 0) continue;
@@ -661,19 +767,29 @@ export class Renderer {
           c.y + fy * back + fx * side,
           c.vx * 0.2 + (Math.random() - 0.5) * 2.5,
           c.vy * 0.2 + (Math.random() - 0.5) * 2.5,
-          1.8 + Math.random() * 1.6,
+          1.5 + Math.random() * 1.3,
           (c.onRoad ? 0.7 : 0.9) + Math.random() * 0.6,
           c.onRoad ? 0 : 1,
         );
       }
     }
-    // the air is still but not dead: dust slows, drifts a little with the evening breeze
+    // the air is still but not dead: dust slows, drifts with the evening breeze, and a car
+    // that passes through it drags it along in its wake
     const drag = Math.exp(-dt * 1.6);
     for (let i = this.dust.length - 1; i >= 0; i--) {
       const d = this.dust[i];
       d.age += dt;
-      d.vx = d.vx * drag + 0.35 * dt;
-      d.vy = d.vy * drag + 0.1 * dt;
+      d.vx = d.vx * drag + WIND_X * dt;
+      d.vy = d.vy * drag + WIND_Y * dt;
+      for (const c of s.cars) {
+        const dx = d.x - c.x;
+        const dy = d.y - c.y;
+        const q = dx * dx + dy * dy;
+        if (q > 9 || c.wreck > 0) continue;
+        const pull = (1 - Math.sqrt(q) / 3) * dt * 2.2;
+        d.vx += (c.vx * 0.6 - d.vx) * pull;
+        d.vy += (c.vy * 0.6 - d.vy) * pull;
+      }
       d.x += d.vx * dt;
       d.y += d.vy * dt;
       if (d.age >= d.life) {
@@ -694,45 +810,65 @@ export class Renderer {
     const bh = b.maxY - b.minY - pad * 2;
     const k = size / Math.max(bw, bh);
     const x0 = this.w - size - 12;
-    const sat = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')) || 0;
-    const y0 = sat + 56;
+    const y0 = this.sat + 56;
     const m = 6;
-    g.fillStyle = 'rgba(18,16,12,0.5)';
-    g.fillRect(x0 - m, y0 - m, size + m * 2, size + m * 2);
-    g.strokeStyle = PAL.hud;
-    g.lineWidth = 1;
-    g.beginPath();
     const tick = 7;
-    for (const [cx, cy, dx, dy] of [
-      [x0 - m, y0 - m, 1, 1],
-      [x0 + size + m, y0 - m, -1, 1],
-      [x0 + size + m, y0 + size + m, -1, -1],
-      [x0 - m, y0 + size + m, 1, -1],
-    ]) {
-      g.moveTo(cx + 0.5 * dx, cy + tick * dy);
-      g.lineTo(cx + 0.5 * dx, cy + 0.5 * dy);
-      g.lineTo(cx + tick * dx, cy + 0.5 * dy);
+    // the plate and the road never change: drawn once at device pixels, copied 1:1 each frame
+    const ox = x0 - m - tick;
+    const oy = y0 - m - tick;
+    const span = size + (m + tick) * 2;
+    if (this.mapFor !== size || !this.map) {
+      this.mapFor = size;
+      const c = this.map ?? document.createElement('canvas');
+      c.width = c.height = Math.ceil(span * this.dpr);
+      const mg = c.getContext('2d')!;
+      mg.setTransform(this.dpr, 0, 0, this.dpr, -ox * this.dpr, -oy * this.dpr);
+      mg.clearRect(ox, oy, span, span);
+      mg.fillStyle = 'rgba(18,16,12,0.5)';
+      mg.fillRect(x0 - m, y0 - m, size + m * 2, size + m * 2);
+      mg.strokeStyle = PAL.hud;
+      mg.lineWidth = 1;
+      mg.beginPath();
+      for (const [cx, cy, dx, dy] of [
+        [x0 - m, y0 - m, 1, 1],
+        [x0 + size + m, y0 - m, -1, 1],
+        [x0 + size + m, y0 + size + m, -1, -1],
+        [x0 - m, y0 + size + m, 1, -1],
+      ]) {
+        mg.moveTo(cx + 0.5 * dx, cy + tick * dy);
+        mg.lineTo(cx + 0.5 * dx, cy + 0.5 * dy);
+        mg.lineTo(cx + tick * dx, cy + 0.5 * dy);
+      }
+      mg.stroke();
+      mg.translate(x0, y0);
+      mg.scale(k, k);
+      mg.translate(-(b.minX + pad), -(b.minY + pad));
+      mg.lineCap = 'butt';
+      mg.lineJoin = 'miter';
+      mg.strokeStyle = 'rgba(10,8,6,0.6)';
+      mg.lineWidth = 4 / k;
+      mg.stroke(this.roadPath!);
+      mg.strokeStyle = PAL.hud;
+      mg.lineWidth = 1.5 / k;
+      mg.stroke(this.roadPath!);
+      // the start line, a short bar across
+      const sp = t.at(0);
+      mg.lineWidth = 2 / k;
+      mg.beginPath();
+      mg.moveTo(sp.x + sp.ty * 6, sp.y - sp.tx * 6);
+      mg.lineTo(sp.x - sp.ty * 6, sp.y + sp.tx * 6);
+      mg.stroke();
+      this.map = c;
     }
-    g.stroke();
     g.save();
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.imageSmoothingEnabled = false;
+    g.drawImage(this.map, Math.round(ox * this.dpr), Math.round(oy * this.dpr));
+    // the dots ride the plate, not the shake
+    g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.translate(x0, y0);
     g.scale(k, k);
     g.translate(-(b.minX + pad), -(b.minY + pad));
-    g.lineCap = 'butt';
-    g.lineJoin = 'miter';
-    g.strokeStyle = 'rgba(10,8,6,0.6)';
-    g.lineWidth = 4 / k;
-    g.stroke(this.roadPath!);
-    g.strokeStyle = PAL.hud;
-    g.lineWidth = 1.5 / k;
-    g.stroke(this.roadPath!);
-    // the start line, a short bar across
-    const sp = t.at(0);
-    g.lineWidth = 2 / k;
-    g.beginPath();
-    g.moveTo(sp.x + sp.ty * 6, sp.y - sp.tx * 6);
-    g.lineTo(sp.x - sp.ty * 6, sp.y + sp.tx * 6);
-    g.stroke();
     for (let i = s.cars.length - 1; i >= 1; i--) {
       const car = s.cars[i];
       const r = 2.6 / k;

@@ -5,6 +5,18 @@ The design is in `docs/design.md`.
 
 ## Next
 
+- **Playtest by hand on a phone, again.** The race was rebuilt (start
+  last, a paced field with grudges, a 6 m road, a close camera) and so
+  was the look. The questions now: does it feel like Death Rally, is
+  the field close enough or too close, and the frame rate on a device:
+  the frame draws in about 11 ms portrait in headless Chromium, a chunk
+  bake takes 5 to 11 ms, and the first frame about 700 ms during the
+  countdown. Knobs: `PACING` and `GRUDGE` in `drivers.ts`, `CARS_ACROSS`
+  in `renderer.ts`.
+- The look, what is still short: the birch crowns are too yellow-green
+  and their limbs too stark, the spruce reads as a dark bush more than
+  a conifer, the hurt-engine smoke leaves a row of spots, the haze
+  overlay does not move with the shake, the ditch edge scallops.
 - **Playtest by hand on a phone.** The bot is the only driver so far.
   The questions: does the car now feel like a car, does braking into a
   bend bring the tail round the way it should, is the nitro burst long
