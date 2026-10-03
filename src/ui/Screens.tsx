@@ -56,6 +56,12 @@ export function Result({ r, purpose, prize, repair, passed, set, records, onAgai
       {licence ? (
         <div className="prize">
           {fmt(r.time)} <small>/ {fmt(LICENCE_BY_CLASS[purpose.cls]!.target)}</small>
+          {repair > 0 && (
+            <small>
+              {' '}
+              · {tr('korjaus', 'repair')} − {cr(repair)}
+            </small>
+          )}
         </div>
       ) : (
         <>
@@ -72,8 +78,11 @@ export function Result({ r, purpose, prize, repair, passed, set, records, onAgai
               ))}
             </tbody>
           </table>
+          <div className="tally">
+            {tr('Romutit', 'You wrecked')} <b>{r.wrecks}</b> · {tr('romuna', 'wrecked')} <b>{r.wrecked}</b> · {tr('tieltä', 'from the road')} <b>{cr(r.cash)}</b>
+          </div>
           <div className="prize">
-            + {cr(prize)}
+            + {cr(prize + r.cash)}
             {repair > 0 && (
               <small>
                 {' '}

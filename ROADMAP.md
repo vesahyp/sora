@@ -5,18 +5,14 @@ The design is in `docs/design.md`.
 
 ## Next
 
-- **Playtest by hand on a phone.** The bot is the only driver so far. The
-  question is whether the car feels like a car with one thumb: the
-  steering lock, how fast the wheel follows, how much the gravel slides.
-  Tune `src/game/content/cars.ts` and the constants in `sim.ts` beside
-  `make balance`.
-- Skid marks and a dust trail that reads the slide, so the slide is
-  visible before it is felt.
-- The guns need a playtest: are three missiles a race too many or too
-  few, and does a spin at 1.1 s feel like a punishment or a pause.
-- The opponents are the bot with a skill knob. Watch for what they do
-  wrong (bunching, a car parked across the road) and give them what a
-  race needs: a touch of rubber banding so the field stays in view.
+- **Playtest by hand on a phone.** The bot is the only driver so far.
+  The questions: does the tail swing on the pedal feel like a drift or a
+  crash, is the nitro burst long enough to matter, and do the guns
+  read as yours. The knobs are in `weapons.ts` and `sim.ts`.
+- Opponent aggression as a per-driver number (Burnout's arrow): the
+  leader is leaned on more than the tail.
+- The bounty and the pickups against the prize table: a race should pay
+  more for driving well than for driving over cash.
 
 ## Later
 
@@ -26,8 +22,8 @@ The design is in `docs/design.md`.
 - Sell a car back at the dealer; a used-car column with cheaper worn cars.
 - More tracks; tracks reused across classes with a different car.
 - Reverse layouts of the two tracks as cheap extra events.
-- Armour as a fifth part, so a built car shrugs off a missile.
-- Mines, and a rear missile: the Super Cars II set.
+- Spikes and a ram plate as armour's look; a rear missile.
+- Boost pads and jumps on the road.
 - Two players on one phone, a thumb each, the Räkkä pattern.
 - The clavesa rollup of the pixel logs and the `?stats` board (Räkkä's
   `analytics/` and `StatsScreen`), then global lap records in DynamoDB

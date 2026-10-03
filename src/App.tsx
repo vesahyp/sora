@@ -56,7 +56,7 @@ function Screens() {
     const shapes: CarShape[] = ['coupe', 'rally', 'hatch'];
     // the field shoots back from the second event of a class on, more as the cars get built
     const built = Object.values(e.fieldParts).reduce((a, b) => a + b, 0);
-    const field: Entry[] = OPPONENTS.map((driver, i) => ({ driver, car: { ...tuned(fieldCar, e.fieldParts), shape: shapes[(i + CLASS_RANK[e.cls]) % 3] }, missiles: Math.round(built / 3), oil: Math.round(built / 4) }));
+    const field: Entry[] = OPPONENTS.map((driver, i) => ({ driver, car: { ...tuned(fieldCar, e.fieldParts), shape: shapes[(i + CLASS_RANK[e.cls]) % 3] }, missiles: 1 + Math.round(built / 3), mines: 1 + Math.round(built / 4) }));
     setScreen({ kind: 'race', purpose: { kind: 'event', id: e.id }, trackId: e.trackId, car: playerCar(save), field, laps: e.laps });
   };
   const take = (l: LicenceDef) => {
@@ -126,11 +126,11 @@ function Screens() {
           save={save}
           onBuy={(w: WeaponDef) =>
             update((s) => {
-              const have = w.id === 'missile' ? s.missiles : s.oil;
+              const have = w.id === 'missile' ? s.missiles : s.mines;
               if (have >= w.max || w.price > s.credits) return;
               s.credits -= w.price;
               if (w.id === 'missile') s.missiles++;
-              else s.oil++;
+              else s.mines++;
               track('buy_ammo', { weapon: w.id, price: w.price });
             })
           }
@@ -145,7 +145,7 @@ function Screens() {
           car={screen.car}
           field={screen.field}
           laps={screen.laps}
-          ammo={{ missiles: save.missiles, oil: save.oil }}
+          ammo={{ missiles: save.missiles, mines: save.mines }}
           onEnd={(r) => {
             const set = saveRace(records, recordKey(r.trackId, r.carId), r.laps);
             setRecords({ ...records });
@@ -158,10 +158,11 @@ function Screens() {
               const e = EVENT_BY_ID[purpose.id];
               prize = e.prizes[r.place - 1] ?? 0;
               update((s) => {
-                s.credits += prize - repair;
+                s.credits += prize + r.cash - repair;
                 s.missiles = r.missiles;
-                s.oil = r.oil;
+                s.mines = r.mines;
                 s.races++;
+                s.wrecks = (s.wrecks ?? 0) + r.wrecks;
                 if (r.place === 1) s.wins++;
                 s.results = { ...s.results, [e.id]: Math.min(s.results[e.id] ?? 99, r.place) };
               });
@@ -169,7 +170,9 @@ function Screens() {
               const l = LICENCE_BY_CLASS[purpose.cls]!;
               passed = r.time >= 0 && r.time <= l.target;
               update((s) => {
-                s.credits -= repair;
+                s.credits += r.cash - repair;
+                s.missiles = r.missiles;
+                s.mines = r.mines;
                 if (passed && !s.licences.includes(l.cls)) s.licences = [...s.licences, l.cls];
               });
             }

@@ -9,7 +9,7 @@ import { InputController } from '../input/input';
 import { audio } from '../audio';
 import { botInput } from '../../tools/autoplayer';
 import { fmt, track } from '../records';
-import { tr } from '../i18n';
+import { t, tr } from '../i18n';
 
 export interface RaceResult {
   trackId: string;
@@ -21,7 +21,11 @@ export interface RaceResult {
   damage: number;
   /** what is left in the boot */
   missiles: number;
-  oil: number;
+  mines: number;
+  /** the race's tally */
+  wrecks: number;
+  wrecked: number;
+  cash: number;
   /** 1-based finishing place */
   place: number;
   /** the field in finishing order; time is -1 for a car still out */
@@ -33,7 +37,13 @@ interface Hud {
   field: number;
   damage: number;
   missiles: number;
-  oil: number;
+  mines: number;
+  boost: number;
+  boosting: boolean;
+  heat: number;
+  overheated: boolean;
+  wreck: boolean;
+  toasts: { text: string; colour: string; age: number }[];
   lap: number;
   total: number;
   time: number;
@@ -49,15 +59,13 @@ interface Hud {
  * `field` is the rest of the grid, empty for a licence test. The sim
  * runs here; React only draws the HUD and the overlays.
  */
-export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { trackId: string; car: CarDef; field: Entry[]; laps: number; ammo: { missiles: number; oil: number }; onEnd: (r: RaceResult) => void; onQuit: () => void }) {
+export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { trackId: string; car: CarDef; field: Entry[]; laps: number; ammo: { missiles: number; mines: number }; onEnd: (r: RaceResult) => void; onQuit: () => void }) {
   const carId = car.id;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const wheelRef = useRef<HTMLDivElement>(null);
   const pedalRef = useRef<HTMLDivElement>(null);
-  const fireRef = useRef<HTMLDivElement>(null);
   const steerRef = useRef<HTMLDivElement>(null);
-  const dropRef = useRef<HTMLDivElement>(null);
   const simRef = useRef<SimState | null>(null);
   const [hud, setHud] = useState<Hud | null>(null);
   const [paused, setPaused] = useState(false);
@@ -91,8 +99,6 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
     };
     const layoutPedal = () => {
       input.pedal = circle(pedalRef.current);
-      input.fireBtn = circle(fireRef.current);
-      input.dropBtn = circle(dropRef.current);
     };
     const onResize = () => {
       renderer.resize();
@@ -118,7 +124,13 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
         field: s.cars.length,
         damage: me.damage,
         missiles: me.missiles,
-        oil: me.oil,
+        mines: me.mines,
+        boost: me.boost,
+        boosting: me.boosting > 0,
+        heat: me.heat,
+        overheated: me.overheated,
+        wreck: me.wreck > 0,
+        toasts: s.toasts.map((x) => ({ text: t(x.text), colour: x.colour, age: x.age })),
         lap: Math.min(me.lap, s.totalLaps),
         total: s.totalLaps,
         time: s.finished ? me.laps[me.laps.length - 1] : s.time - me.lapStart,
@@ -142,7 +154,10 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
         time: me.finishedAt,
         damage: me.damage,
         missiles: me.missiles,
-        oil: me.oil,
+        mines: me.mines,
+        wrecks: me.wrecks,
+        wrecked: me.wrecked,
+        cash: me.cash,
         place,
         order: standings(s).map((c) => ({ name: c.driver.name, colour: c.def.colour, time: c.finishedAt, player: c === me })),
       };
@@ -165,7 +180,7 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
         step(s, inputs, DT);
         acc -= DT;
         n++;
-        for (const name of s.sounds) if (name !== 'fire-far') audio.play(name);
+        for (const name of s.sounds) if (name !== 'missile-far') audio.play(name);
         s.sounds.length = 0;
         const count = Math.ceil(s.hold);
         if (s.hold > 0 && count !== lastCount) {
@@ -175,7 +190,7 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
         if (s.finished && finishedAt < 0) {
           finishedAt = s.time;
           const me = s.cars[0];
-          track('race_end', { track: trackId, car: carId, place: placeOf(s, me), best: Math.round(Math.min(...me.laps) * 100) / 100, total: Math.round(me.laps.reduce((a, b) => a + b, 0) * 100) / 100 });
+          track('race_end', { track: trackId, car: carId, place: placeOf(s, me), wrecks: me.wrecks, wrecked: me.wrecked, best: Math.round(Math.min(...me.laps) * 100) / 100, total: Math.round(me.laps.reduce((a, b) => a + b, 0) * 100) / 100 });
         }
         if (s.finished && s.time - finishedAt > 2.2 && !endedRef.current) {
           endedRef.current = true;
@@ -200,14 +215,12 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
         pd.classList.toggle('on', input.braking);
         pd.classList.toggle('rev', s.cars[0].speed < -0.3);
       }
-      fireRef.current?.classList.toggle('empty', s.cars[0].missiles === 0);
       // the steering wheel turns with the car's wheel, a quarter turn at full lock
       const sw = steerRef.current;
       if (sw) {
         sw.style.transform = `translateX(-50%) rotate(${s.cars[0].steer * 90}deg)`;
         sw.classList.toggle('held', input.wheel.active);
       }
-      dropRef.current?.classList.toggle('empty', s.cars[0].oil === 0);
       if (now - hudAt > 50) {
         hudAt = now;
         publishHud();
@@ -253,14 +266,7 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
       <div className="steerwheel" ref={steerRef}>
         <i />
       </div>
-      <div className="weapon fire" ref={fireRef}>
-        <span>🚀</span>
-        <b>{hud?.missiles ?? ammo.missiles}</b>
-      </div>
-      <div className="weapon drop" ref={dropRef}>
-        <span>🛢️</span>
-        <b>{hud?.oil ?? ammo.oil}</b>
-      </div>
+      <div className="nitrohint">{tr('napautus: nitro', 'tap: nitro')}</div>
       {hud && (
         <div className="hud">
           <div className="place">
@@ -291,6 +297,28 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
               <div style={{ width: `${hud.damage}%` }} />
             </div>
           </div>
+          <div className={`nitro${hud.boosting ? ' on' : ''}`}>
+            <span>{tr('Nitro', 'Nitro')}</span>
+            <div className="bar">
+              <div style={{ width: `${hud.boost * 100}%` }} />
+            </div>
+          </div>
+          <div className={`heat${hud.overheated ? ' hot' : ''}`}>
+            <span>{tr('Kk', 'MG')}</span>
+            <div className="bar">
+              <div style={{ width: `${hud.heat * 100}%` }} />
+            </div>
+            <b>
+              🚀{hud.missiles} 💣{hud.mines}
+            </b>
+          </div>
+          <div className="toasts">
+            {hud.toasts.map((x, i) => (
+              <div key={i} style={{ color: x.colour, opacity: Math.min(1, (2.6 - x.age) * 2) }}>
+                {x.text}
+              </div>
+            ))}
+          </div>
         </div>
       )}
       <button className="iconbtn pause" data-ui onClick={() => pause(true)} aria-label={tr('Tauko', 'Pause')}>
@@ -307,6 +335,11 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
       {hud && hud.hold <= 0 && hud.hold > -1 && (
         <div className="banner go">
           <div className="t">{tr('AJA!', 'GO!')}</div>
+        </div>
+      )}
+      {hud?.wreck && !hud.finished && (
+        <div className="banner">
+          <div className="t">{tr('ROMUNA', 'WRECKED')}</div>
         </div>
       )}
       {hud?.finished && (

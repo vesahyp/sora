@@ -1,5 +1,11 @@
 # Sora: the design
 
+> Revised 2026-10-03 after the first playable: the race half is now
+> Death Rally and Burnout as much as Super Cars II. Cars slide, ram and
+> wreck each other, nitro is earned by driving dangerously, pickups lie
+> on the road, and every weapon fires itself. The career half is as
+> below.
+
 A top-down arcade racer in the shape of Super Cars II (Gremlin, Amiga, 1991),
 with a career in the shape of Gran Turismo: start in a cheap car, win credits,
 buy parts, pass a licence, move up a class. Phones first, Canvas 2D, the

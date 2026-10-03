@@ -2,6 +2,8 @@ import type { SimState } from '../game/state';
 import type { Track } from '../game/track';
 import { carSprite, treeSprite, wheelLayout, SPRITE_PPM } from './sprites';
 import { hash32 } from '../game/rng';
+import { PICKUPS } from '../game/content/pickups';
+import { GUN } from '../game/content/weapons';
 
 /**
  * Draws the world. North-up camera that follows the car and leads it a
@@ -21,6 +23,9 @@ interface Dust {
   dark?: boolean;
 }
 
+/** pixels per metre of the skid mark layer */
+const MARK_PPM = 3;
+
 export class Renderer {
   private g: CanvasRenderingContext2D;
   private w = 0;
@@ -37,6 +42,10 @@ export class Renderer {
   private roadFor: Track | null = null;
   private rutL: Path2D | null = null;
   private rutR: Path2D | null = null;
+  /** skid marks, drawn once and kept: a canvas over the track's bounds at MARK_PPM */
+  private marks: HTMLCanvasElement | null = null;
+  private marksG: CanvasRenderingContext2D | null = null;
+  private lastWheel: { x: number; y: number }[][] = [];
 
   constructor(private canvas: HTMLCanvasElement) {
     this.g = canvas.getContext('2d')!;
@@ -67,6 +76,13 @@ export class Renderer {
   private ensureRoad(t: Track): void {
     if (this.roadFor === t) return;
     this.roadFor = t;
+    const b = t.bounds;
+    const m = document.createElement('canvas');
+    m.width = Math.ceil((b.maxX - b.minX) * MARK_PPM);
+    m.height = Math.ceil((b.maxY - b.minY) * MARK_PPM);
+    this.marks = m;
+    this.marksG = m.getContext('2d');
+    this.lastWheel = [];
     const path = new Path2D();
     const l = new Path2D();
     const r = new Path2D();
@@ -129,6 +145,10 @@ export class Renderer {
     }
 
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    // the shake: a jolt that dies with s.shake
+    const shakeX = s.shake > 0 ? (Math.random() - 0.5) * s.shake * 14 : 0;
+    const shakeY = s.shake > 0 ? (Math.random() - 0.5) * s.shake * 14 : 0;
+    g.translate(shakeX, shakeY);
     // grass, the whole screen
     g.save();
     const ps = this.ppm / 12;
@@ -178,18 +198,55 @@ export class Renderer {
     }
     g.restore();
 
-    // oil on the road
-    for (const k of s.slicks) {
-      if (!visible(k.x, k.y)) continue;
-      const fade = Math.min(1, (25 - k.age) / 5);
-      g.fillStyle = `rgba(20,16,12,${0.75 * fade})`;
+    // skid marks: lay this frame's, then paint the layer
+    this.layMarks(s);
+    if (this.marks) g.drawImage(this.marks, t.bounds.minX, t.bounds.minY, this.marks.width / MARK_PPM, this.marks.height / MARK_PPM);
+
+    // pickups: a disc with a glyph, bobbing
+    for (const p of s.pickups) {
+      if (p.gone > 0 || !visible(p.x, p.y)) continue;
+      const def = PICKUPS[p.kind];
+      const bob = Math.sin(s.time * 4 + p.x) * 0.15;
+      g.fillStyle = 'rgba(0,0,0,0.3)';
       g.beginPath();
-      g.ellipse(k.x, k.y, k.r * 1.1, k.r * 0.85, k.x * 0.7, 0, Math.PI * 2);
+      g.arc(p.x, p.y + 0.4, 1.3, 0, Math.PI * 2);
       g.fill();
-      g.fillStyle = `rgba(120,110,160,${0.35 * fade})`;
+      g.fillStyle = def.colour;
       g.beginPath();
-      g.ellipse(k.x - k.r * 0.3, k.y - k.r * 0.25, k.r * 0.45, k.r * 0.25, k.x * 0.7, 0, Math.PI * 2);
+      g.arc(p.x, p.y + bob, 1.3, 0, Math.PI * 2);
       g.fill();
+      g.strokeStyle = 'rgba(0,0,0,0.5)';
+      g.lineWidth = 0.2;
+      g.stroke();
+      g.fillStyle = '#1a1612';
+      g.font = 'bold 1.6px sans-serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText({ cash: '$', nitro: 'N', wrench: '+', missile: '^', mine: 'o' }[p.kind], p.x, p.y + bob + 0.1);
+    }
+
+    // mines: a dark disc with a red eye
+    for (const m of s.mines) {
+      if (!visible(m.x, m.y)) continue;
+      g.fillStyle = '#2a2420';
+      g.beginPath();
+      g.arc(m.x, m.y, 0.9, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = Math.sin(s.time * 8) > 0 ? '#ff3020' : '#701008';
+      g.beginPath();
+      g.arc(m.x, m.y, 0.3, 0, Math.PI * 2);
+      g.fill();
+    }
+
+    // bullets: tracers
+    g.strokeStyle = 'rgba(255,230,120,0.9)';
+    g.lineWidth = 0.22;
+    g.lineCap = 'round';
+    for (const b of s.bullets) {
+      g.beginPath();
+      g.moveTo(b.x, b.y);
+      g.lineTo(b.x - b.vx * 0.018, b.y - b.vy * 0.018);
+      g.stroke();
     }
 
     // dust
@@ -202,9 +259,54 @@ export class Renderer {
       g.fill();
     }
 
+    // the player's sights: a ring on the car in the cone, filling as the lock holds
+    const me = s.cars[0];
+    if (me.target >= 0 && me.wreck <= 0) {
+      const o = s.cars[me.target];
+      const k = Math.min(1, me.lockTime / 0.5);
+      g.strokeStyle = `rgba(255,${k < 1 ? 230 : 80},60,0.9)`;
+      g.lineWidth = 0.3;
+      g.setLineDash(k < 1 ? [0.8, 0.6] : []);
+      g.beginPath();
+      g.arc(o.x, o.y, 2.8, 0, Math.PI * 2);
+      g.stroke();
+      g.setLineDash([]);
+    }
+    // the cone, faint, so the auto-fire reads
+    if (me.wreck <= 0 && s.hold <= 0) {
+      g.fillStyle = `rgba(255,220,120,${me.target >= 0 ? 0.1 : 0.04})`;
+      g.beginPath();
+      g.moveTo(me.x, me.y);
+      g.arc(me.x, me.y, GUN.range * 0.6, me.heading - GUN.cone, me.heading + GUN.cone);
+      g.closePath();
+      g.fill();
+    }
+
     // the cars, the player last so it is never hidden: shadow, then the sprite
     for (let i = s.cars.length - 1; i >= 0; i--) {
       const car = s.cars[i];
+      if (car.wreck > 0) {
+        // a wreck: the body, charred, and fire on it
+        g.save();
+        g.translate(car.x, car.y);
+        g.rotate(car.heading);
+        g.globalAlpha = 0.6;
+        g.filter = 'brightness(0.35)';
+        const w = carSprite(car.def);
+        g.drawImage(w, -w.width / SPRITE_PPM / 2, -w.height / SPRITE_PPM / 2, w.width / SPRITE_PPM, w.height / SPRITE_PPM);
+        g.filter = 'none';
+        g.globalAlpha = 1;
+        g.restore();
+        for (let k = 0; k < 3; k++) {
+          const a = s.time * 9 + k * 2.1 + i;
+          g.fillStyle = `rgba(255,${120 + Math.sin(a) * 60},30,${0.7 + Math.sin(a * 1.7) * 0.2})`;
+          g.beginPath();
+          g.arc(car.x + Math.cos(a) * 0.8, car.y + Math.sin(a * 1.3) * 0.6, 0.9 + Math.sin(a * 2) * 0.3, 0, Math.PI * 2);
+          g.fill();
+        }
+        if (Math.random() < dt * 20) this.dust.push({ x: car.x, y: car.y, vx: (Math.random() - 0.5) * 1.5, vy: -1.5 - Math.random(), age: 0, life: 1.4, r: 1, dark: true });
+        continue;
+      }
       const spr = carSprite(car.def);
       const sw = spr.width / SPRITE_PPM;
       const sh = spr.height / SPRITE_PPM;
@@ -231,6 +333,24 @@ export class Renderer {
         g.restore();
       }
       g.drawImage(spr, -sw / 2, -sh / 2, sw, sh);
+      if (car.boosting > 0) {
+        // the nitro flame out of the back
+        const len = 1.6 + Math.random() * 1.4;
+        g.fillStyle = `rgba(120,200,255,0.85)`;
+        g.beginPath();
+        g.moveTo(-L / 2, -0.35);
+        g.lineTo(-L / 2 - len, 0);
+        g.lineTo(-L / 2, 0.35);
+        g.closePath();
+        g.fill();
+        g.fillStyle = 'rgba(255,255,255,0.9)';
+        g.beginPath();
+        g.moveTo(-L / 2, -0.15);
+        g.lineTo(-L / 2 - len * 0.5, 0);
+        g.lineTo(-L / 2, 0.15);
+        g.closePath();
+        g.fill();
+      }
       g.restore();
     }
 
@@ -287,14 +407,31 @@ export class Renderer {
         g.beginPath();
         g.arc(f.x, f.y, 0.8 + k * 3, 0, Math.PI * 2);
         g.fill();
-      } else {
-        g.fillStyle = `rgba(30,24,20,${(1 - k) * 0.5})`;
-        for (let i = 0; i < 5; i++) {
-          const a = i * 1.3 + f.x;
+      } else if (f.kind === 'spark') {
+        if (k > 0.35) continue;
+        g.strokeStyle = `rgba(255,230,140,${1 - k / 0.35})`;
+        g.lineWidth = 0.15;
+        for (let i = 0; i < 6; i++) {
+          const a = i * 1.05 + f.x * 3;
           g.beginPath();
-          g.arc(f.x + Math.cos(a) * k * 4, f.y + Math.sin(a) * k * 4, 0.5, 0, Math.PI * 2);
-          g.fill();
+          g.moveTo(f.x, f.y);
+          g.lineTo(f.x + Math.cos(a) * k * 9, f.y + Math.sin(a) * k * 9);
+          g.stroke();
         }
+      } else if (f.kind === 'flash') {
+        g.strokeStyle = f.colour ?? '#fff';
+        g.globalAlpha = (1 - k) * 0.8;
+        g.lineWidth = 0.4;
+        g.beginPath();
+        g.arc(f.x, f.y, 1 + k * 4, 0, Math.PI * 2);
+        g.stroke();
+        g.globalAlpha = 1;
+      } else {
+        // cash: the sign rises
+        g.fillStyle = `rgba(255,216,112,${1 - k})`;
+        g.font = 'bold 2.4px sans-serif';
+        g.textAlign = 'center';
+        g.fillText('$', f.x, f.y - k * 4);
       }
     }
 
@@ -313,10 +450,42 @@ export class Renderer {
     this.drawMinimap(s);
   }
 
+  /** Two lines a car, from the rear wheels, while it slides, brakes hard or sits on grass. */
+  private layMarks(s: SimState): void {
+    const g = this.marksG;
+    if (!g) return;
+    const b = s.track.bounds;
+    s.cars.forEach((c, i) => {
+      const last = (this.lastWheel[i] ??= []);
+      const marking = c.wreck <= 0 && (c.sliding || c.handbrake || !c.onRoad) && Math.hypot(c.vx, c.vy) > 3;
+      const fx = Math.cos(c.heading);
+      const fy = Math.sin(c.heading);
+      const back = -c.def.length * 0.3;
+      const half = c.def.width * 0.42;
+      for (let w = 0; w < 2; w++) {
+        const side = w ? half : -half;
+        const x = c.x + fx * back - fy * side;
+        const y = c.y + fy * back + fx * side;
+        const prev = last[w];
+        if (marking && prev && Math.hypot(x - prev.x, y - prev.y) < 3) {
+          g.strokeStyle = c.onRoad ? 'rgba(60,45,30,0.35)' : 'rgba(40,60,25,0.45)';
+          g.lineWidth = 0.32 * MARK_PPM;
+          g.lineCap = 'round';
+          g.beginPath();
+          g.moveTo((prev.x - b.minX) * MARK_PPM, (prev.y - b.minY) * MARK_PPM);
+          g.lineTo((x - b.minX) * MARK_PPM, (y - b.minY) * MARK_PPM);
+          g.stroke();
+        }
+        last[w] = { x, y };
+      }
+    });
+  }
+
   private stepDust(s: SimState, dt: number): void {
     for (const c of s.cars) {
+      if (c.wreck > 0) continue;
       const spd = Math.hypot(c.vx, c.vy);
-      const want = s.hold > 0 ? 0 : (c.onRoad ? Math.abs(c.slip) * 0.8 + spd * 0.06 : spd * 0.25) * dt * 8;
+      const want = s.hold > 0 ? 0 : (c.onRoad ? Math.abs(c.slip) * 1.2 + spd * 0.06 + (c.sliding ? 6 : 0) : spd * 0.25 + 3) * dt * 8;
       let n = Math.floor(want);
       if (Math.random() < want - n) n++;
       for (let i = 0; i < n && this.dust.length < 240; i++) {

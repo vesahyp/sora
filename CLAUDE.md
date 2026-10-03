@@ -7,10 +7,11 @@ design: what the game is meant to become.
 
 ## What this is
 
-**Sora** is a top-down arcade racer in the shape of Super Cars II, with a
-career in the shape of Gran Turismo, for the browser, phones first. One
-thumb steers; the throttle is always on; a second finger brakes. Finnish
-gravel roads, nineties cars. Two tracks, three cars in three classes, a field of
+**Sora** is a top-down combat racer in the shape of Death Rally and
+Super Cars II, with a career in the shape of Gran Turismo, for the
+browser, phones first. One thumb steers, a tap is nitro, the pedal
+brakes and swings the tail; the guns fire themselves. Cars slide, ram,
+wreck each other and come back. Finnish gravel roads, nineties cars. Two tracks, three cars in three classes, a field of
 four with the bot driving the other three, missiles and oil slicks with
 damage that costs a repair, and a career: credits from results, a parts
 shop, an armoury, a dealer, and licence tests that gate the classes.
@@ -25,8 +26,9 @@ The Räkkä architecture, copied from `hoyry`:
 - **Canvas 2D** for the game view. No engine. Sprites are drawn once with
   canvas paths and cached (`src/render/sprites.ts`). The road is one
   stroked path at road width. See `docs/adr/0001-canvas-2d.md`.
-- **No physics library.** The car is a heading and a velocity with an
-  arcade slip model (`src/game/sim.ts`). The track is a smoothed closed
+- **No physics library.** The car is a heading, a velocity and a yaw
+  rate; the tyres pull the slide back up to a grip limit and past it the
+  car slides (`src/game/sim.ts`). The track is a smoothed closed
   polyline with a width (`src/game/track.ts`), queried by arc length.
 
 ## Where things live
@@ -36,8 +38,8 @@ src/
   game/               the simulation, no DOM anywhere in here
     types.ts          CarInput, TrackDef, CarDef
     state.ts          SimState, Car, Driver, createState (the grid), standings
-    sim.ts            step(): the car model, car contact, grass, trees, lap counting,
-                        missiles and slicks, damage, spins
+    sim.ts            step(): the tyre model, nitro, the automatic guns, bullets,
+                        missiles, mines, pickups, ramming, wrecks and respawns, lap counting
     track.ts          Track: smoothing, locate(x, y) -> (s, d), at(s), the forest
     rng.ts            seeded RNG and hashes
     content/
@@ -45,14 +47,16 @@ src/
       parts.ts        the shop: four parts, three levels, tuned(car, parts)
       events.ts       the calendar: class, track, laps, prizes, how built the field is
       licences.ts     the tests: one lap under a target, read off make balance
-      weapons.ts      the armoury: prices, damage numbers, missile and slick constants
+      weapons.ts      combat: the armoury's prices, damage, gun, missile, mine, boost and ram numbers
+      pickups.ts      what lies on the road, how far apart, how fast it grows back
       drivers.ts      the opponents: a name, a colour, a skill for the bot
       tracks.ts       the tracks: a centreline in metres, a width, a surface
   career/save.ts      the save: credits, cars owned with parts, licences; one object in localStorage
   render/
-    renderer.ts       camera, grass, road, dust, car, trees, minimap
+    renderer.ts       camera and shake, grass, road, skid marks, pickups, mines, tracers,
+                        sights, cars and wrecks, nitro flame, bursts, trees, minimap
     sprites.ts        procedural sprite cache: three car bodies (hatch, coupe, rally), trees
-  input/input.ts      one thumb (drag to steer, tap to fire), the pedal, the weapon buttons, keyboard
+  input/input.ts      one thumb (drag to steer, tap for nitro), the pedal, keyboard
   ui/                 React: Game (loop + HUD), Screens (title, result), Garage (garage, races, shop, dealer, licences)
   records.ts          localStorage best lap and best race; the tracker shim
   audio.ts            Web Audio synth: the engine note and the event beeps

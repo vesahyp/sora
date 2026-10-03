@@ -6,33 +6,27 @@ import { type CarInput } from '../game/types';
  * Touch: the throttle is on. A touch anywhere on the play field is the
  * wheel: the car steers by how far the thumb has moved sideways from
  * where it landed, full lock at `lock` css px. Lift and the wheel
- * centres. A tap (lifted quickly, without moving) fires a missile. A
- * touch that starts on the brake pedal is the brake, and so is a second
- * finger anywhere. Held at a standstill, the brake reverses. The two
- * weapon buttons are circles the HUD lays out: a touch on one fires or
- * drops. Elements marked `data-ui` are left to React.
+ * centres. A tap (lifted quickly, without a slide) lights the nitro. A
+ * touch that starts on the pedal is the pedal, and so is a second
+ * finger anywhere: it brakes and loosens the rear, and held at a
+ * standstill it reverses. The guns fire themselves. Elements marked
+ * `data-ui` are left to React.
  *
- * Keyboard: left and right (or A and D) steer, down, S or space brakes,
- * X or up fires, C or shift drops oil.
+ * Keyboard: left and right (or A and D) steer, down, S or space is the
+ * pedal, X, up or W is the nitro.
  */
 export class InputController {
   readonly lock = 70;
   /** the steering touch, for the on-screen wheel ghost */
   wheel = { active: false, x0: 0, y0: 0, x: 0 };
   private wheelId: number | null = null;
+  private wheelAt = 0;
   private brakeIds = new Set<number>();
   /** the pedal's centre and radius, css px; set by the HUD layout */
   pedal = { x: -999, y: -999, r: 0 };
-  /** the brake is down, for the pedal's look */
+  /** the pedal is down, for its look */
   braking = false;
-  /** the weapon buttons, css px; set by the HUD layout */
-  fireBtn = { x: -999, y: -999, r: 0 };
-  dropBtn = { x: -999, y: -999, r: 0 };
-  private fireEdge = false;
-  private dropEdge = false;
-  private wheelAt = 0;
-  private keyFire = false;
-  private keyDrop = false;
+  private boostEdge = false;
   private keys = new Set<string>();
   usedTouch = false;
   private el: HTMLElement | null = null;
@@ -40,10 +34,7 @@ export class InputController {
   private onKey = (e: KeyboardEvent) => {
     const k = e.key.toLowerCase();
     if (e.type === 'keydown') {
-      if (!this.keys.has(k)) {
-        if (k === 'x' || k === 'arrowup' || k === 'w') this.fireEdge = true;
-        if (k === 'c' || k === 'shift') this.dropEdge = true;
-      }
+      if (!this.keys.has(k) && (k === 'x' || k === 'arrowup' || k === 'w')) this.boostEdge = true;
       this.keys.add(k);
     } else this.keys.delete(k);
     if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
@@ -54,16 +45,8 @@ export class InputController {
     e.preventDefault();
     this.usedTouch = true;
     for (const t of Array.from(e.changedTouches)) {
-      const on = (b: { x: number; y: number; r: number }) => Math.hypot(t.clientX - b.x, t.clientY - b.y) < b.r;
-      if (on(this.fireBtn)) {
-        this.fireEdge = true;
-        continue;
-      }
-      if (on(this.dropBtn)) {
-        this.dropEdge = true;
-        continue;
-      }
-      if (this.wheelId === null && !on(this.pedal)) {
+      const onPedal = Math.hypot(t.clientX - this.pedal.x, t.clientY - this.pedal.y) < this.pedal.r;
+      if (this.wheelId === null && !onPedal) {
         this.wheelId = t.identifier;
         this.wheel = { active: true, x0: t.clientX, y0: t.clientY, x: t.clientX };
         this.wheelAt = performance.now();
@@ -90,7 +73,7 @@ export class InputController {
         this.wheelId = null;
         this.wheel.active = false;
         // a tap: down and up within 180 ms without a slide
-        if (performance.now() - this.wheelAt < 180 && Math.abs(this.wheel.x - this.wheel.x0) < 10) this.fireEdge = true;
+        if (performance.now() - this.wheelAt < 180 && Math.abs(this.wheel.x - this.wheel.x0) < 10) this.boostEdge = true;
       }
       this.brakeIds.delete(t.identifier);
     }
@@ -128,10 +111,9 @@ export class InputController {
     if (k.has('arrowright') || k.has('d')) steer += 1;
     if (k.has('arrowdown') || k.has('s') || k.has(' ')) brake = 1;
     this.braking = brake > 0;
-    const fire = this.fireEdge || this.keyFire;
-    const drop = this.dropEdge || this.keyDrop;
-    this.fireEdge = this.dropEdge = this.keyFire = this.keyDrop = false;
+    const boost = this.boostEdge;
+    this.boostEdge = false;
     // the foot comes off the gas while braking
-    return { steer: Math.max(-1, Math.min(1, steer)), throttle: brake ? 0 : 1, brake, fire, drop };
+    return { steer: Math.max(-1, Math.min(1, steer)), throttle: brake ? 0 : 1, brake, boost };
   }
 }

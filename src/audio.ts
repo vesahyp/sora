@@ -97,7 +97,10 @@ class Audio {
         beep(880, 0.12, 0.12);
         beep(1100, 0.24, 0.35);
         break;
-      case 'fire': {
+      case 'gun':
+        beep(1400 + Math.random() * 400, 0, 0.05, 'square', 0.07);
+        break;
+      case 'missile': {
         const o = c.createOscillator();
         const g = c.createGain();
         o.type = 'sawtooth';
@@ -110,8 +113,12 @@ class Audio {
         o.stop(t + 0.4);
         break;
       }
-      case 'boom': {
-        const len = 0.5;
+      case 'mine':
+        beep(260, 0, 0.12, 'square', 0.12);
+        break;
+      case 'boom':
+      case 'wreck': {
+        const len = name === 'wreck' ? 0.9 : 0.5;
         const buf = c.createBuffer(1, c.sampleRate * len, c.sampleRate);
         const d = buf.getChannelData(0);
         for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
@@ -120,16 +127,42 @@ class Audio {
         const f = c.createBiquadFilter();
         f.type = 'lowpass';
         f.frequency.setValueAtTime(1200, t);
-        f.frequency.exponentialRampToValueAtTime(120, t + len);
+        f.frequency.exponentialRampToValueAtTime(100, t + len);
         const g = c.createGain();
-        g.gain.value = 0.5;
+        g.gain.value = name === 'wreck' ? 0.7 : 0.5;
         src.connect(f).connect(g).connect(c.destination);
         src.start(t);
         break;
       }
-      case 'splash':
-        beep(220, 0, 0.2, 'triangle', 0.2);
-        beep(160, 0.08, 0.25, 'triangle', 0.2);
+      case 'crunch': {
+        const len = 0.25;
+        const buf = c.createBuffer(1, c.sampleRate * len, c.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3);
+        const src = c.createBufferSource();
+        src.buffer = buf;
+        const g = c.createGain();
+        g.gain.value = 0.4;
+        src.connect(g).connect(c.destination);
+        src.start(t);
+        break;
+      }
+      case 'nitro':
+        beep(300, 0, 0.3, 'sawtooth', 0.12);
+        beep(600, 0.05, 0.35, 'sawtooth', 0.1);
+        break;
+      case 'cash':
+        beep(1320, 0, 0.08, 'square', 0.1);
+        beep(1760, 0.08, 0.14, 'square', 0.1);
+        break;
+      case 'pickup':
+        beep(880, 0, 0.08, 'triangle', 0.14);
+        beep(1100, 0.07, 0.12, 'triangle', 0.14);
+        break;
+      case 'respawn':
+        beep(440, 0, 0.1, 'triangle', 0.12);
+        beep(660, 0.1, 0.1, 'triangle', 0.12);
+        beep(880, 0.2, 0.2, 'triangle', 0.12);
         break;
       case 'spin':
         beep(300, 0, 0.1, 'square', 0.1);

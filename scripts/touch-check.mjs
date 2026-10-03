@@ -1,4 +1,4 @@
-// Drives the race with touches on an emulated phone, the way a thumb does:
+// Drives a licence lap with touches on an emulated phone, the way a thumb does:
 // a drag to the right must turn the car right, a drag to the left must
 // turn it left, a second finger must slow it, and the pause menu must
 // open and close by tap. Run with `make touch-check`; needs `make shots-setup`.
@@ -16,6 +16,21 @@ const check = (ok, what) => {
   if (!ok) failed = true;
 };
 const sim = (expr) => page.evaluate(expr);
+// put the car on the start straight at speed, pointing down the road, so a
+// drag is measured from the same place every time
+const place = () =>
+  page.evaluate(() => {
+    const s = window.__sim;
+    const c = s.cars[0];
+    const p = s.track.at(20);
+    c.x = p.x;
+    c.y = p.y;
+    c.heading = Math.atan2(p.ty, p.tx);
+    c.vx = p.tx * 14;
+    c.vy = p.ty * 14;
+    c.yaw = 0;
+    c.spin = 0;
+  });
 // a tap: down and straight up, through CDP like every other touch here,
 // because Playwright's own tap after a raw CDP touch reads as a second finger
 const tap = async (x, y) => {
@@ -36,9 +51,10 @@ const touch = async (x, y, x2, hold) => {
 };
 try {
   await page.goto(`http://localhost:${port}/?lang=en`);
+  // a licence test: one car on the road, so nothing rams the car mid-check
   await page.getByRole('button', { name: 'Drive', exact: true }).tap();
-  await page.getByRole('button', { name: 'Races', exact: true }).tap();
-  await page.locator('.card.event').first().tap();
+  await page.getByRole('button', { name: /Licences/ }).tap();
+  await page.locator('.card.licence').first().tap();
   await page.waitForFunction(() => window.__sim && window.__sim.hold <= 0 && window.__sim.time > 4, null, { timeout: 20000 });
   // the brake first, on the start straight, while the car is still fast
   const cdp = await page.context().newCDPSession(page);
@@ -63,27 +79,25 @@ try {
   await cdp2.detach();
   check(vr < -1 && rev === 1, `holding the pedal at a standstill reverses (${(vr * 3.6).toFixed(0)} km/h, R shown)`);
   await page.waitForTimeout(1500);
-  // a tap fires a missile, the oil button drops a slick
-  const m0 = await sim('window.__sim.cars[0].missiles');
+  // a tap lights the nitro
+  await page.waitForFunction(() => window.__sim.cars[0].speed > 8, null, { timeout: 10000 });
+  const b0 = await sim('window.__sim.cars[0].boost');
   await tap(200, 400);
   await page.waitForTimeout(150);
-  const m1 = await sim('window.__sim.cars[0].missiles');
-  const flying = await sim('window.__sim.missiles.length');
-  check(m1 === m0 - 1 && flying >= 1, `a tap fires a missile (${m0} -> ${m1}, ${flying} in the air)`);
-  const drop = await page.locator('.weapon.drop').boundingBox();
-  const o0 = await sim('window.__sim.cars[0].oil');
-  await tap(drop.x + drop.width / 2, drop.y + drop.height / 2);
-  await page.waitForTimeout(150);
-  const o1 = await sim('window.__sim.cars[0].oil');
-  check(o1 === o0 - 1, `the oil button drops a slick (${o0} -> ${o1})`);
-  await page.waitForTimeout(400);
+  const burst = await sim('window.__sim.cars[0].boosting');
+  check(burst > 0, `a tap lights the nitro (tank ${b0.toFixed(2)}, burst ${burst.toFixed(2)} s)`);
+  await place();
+  await page.waitForTimeout(100);
   const h0 = await sim('window.__sim.cars[0].heading');
   await touch(200, 600, 300, 250);
   const h1 = await sim('window.__sim.cars[0].heading');
   check(h1 > h0 + 0.2, `a drag to the right turns the car right (${(h1 - h0).toFixed(2)} rad)`);
+  await place();
+  await page.waitForTimeout(100);
+  const h1b = await sim('window.__sim.cars[0].heading');
   await touch(200, 600, 100, 250);
   const h2 = await sim('window.__sim.cars[0].heading');
-  check(h2 < h1 - 0.2, `a drag to the left turns the car left (${(h2 - h1).toFixed(2)} rad)`);
+  check(h2 < h1b - 0.2, `a drag to the left turns the car left (${(h2 - h1b).toFixed(2)} rad)`);
   const steer = await sim('window.__sim.cars[0].steer');
   await page.waitForTimeout(300);
   const steer2 = await sim('window.__sim.cars[0].steer');

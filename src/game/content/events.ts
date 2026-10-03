@@ -1,6 +1,6 @@
 import { L, type Text } from '../../i18n';
 import type { CarClass } from '../types';
-import type { Parts } from './parts';
+import { STOCK, type Parts } from './parts';
 
 /**
  * The calendar. An event is a track, a lap count, a class, and the
@@ -19,9 +19,9 @@ export interface EventDef {
   fieldParts: Parts;
 }
 
-const stock: Parts = { tyres: 0, weight: 0, engine: 0, brakes: 0 };
-const some: Parts = { tyres: 1, weight: 1, engine: 0, brakes: 0 };
-const built: Parts = { tyres: 2, weight: 2, engine: 2, brakes: 1 };
+const stock: Parts = { ...STOCK };
+const some: Parts = { ...STOCK, tyres: 1, weight: 1, gun: 1 };
+const built: Parts = { ...STOCK, tyres: 2, weight: 2, engine: 2, brakes: 1, armour: 1, gun: 2 };
 
 export const EVENTS: EventDef[] = [
   { id: 'c-kiviaho', name: L('Kiviahon sprintti', 'Kiviaho Sprint'), cls: 'C', trackId: 'kiviaho', laps: 3, prizes: [400, 220, 120, 60], fieldParts: stock },

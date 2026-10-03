@@ -48,7 +48,7 @@ function Stat({ label, v, max, up }: { label: string; v: number; max: number; up
   );
 }
 
-const MAX = { topSpeed: 72, accel: 34, grip: 8.2, brake: 50 };
+const MAX = { topSpeed: 72, accel: 34, grip: 17, brake: 50 };
 
 export function CarStats({ car, next }: { car: CarDef; next?: CarDef }) {
   return (
@@ -108,7 +108,7 @@ export function Garage({ save, onEvents, onShop, onDealer, onLicences, onArmoury
         <button className="btn" onClick={onArmoury}>
           {tr('Asevarasto', 'Armoury')}
           <small>
-            🚀 {save.missiles} · 🛢️ {save.oil}
+            🚀 {save.missiles} · 💣 {save.mines}
           </small>
         </button>
         <button className="btn" onClick={onDealer}>
@@ -123,7 +123,7 @@ export function Garage({ save, onEvents, onShop, onDealer, onLicences, onArmoury
         </button>
       </div>
       <div className="small">
-        {tr('Kisoja', 'Races')} {save.races} · {tr('voittoja', 'wins')} {save.wins}
+        {tr('Kisoja', 'Races')} {save.races} · {tr('voittoja', 'wins')} {save.wins} · {tr('romutettuja', 'wrecked')} {save.wrecks ?? 0}
       </div>
     </div>
   );
@@ -262,10 +262,10 @@ export function Armoury({ save, onBuy, onBack }: { save: Save; onBuy: (w: Weapon
   return (
     <div className="screen list">
       <Top save={save} title={tr('Asevarasto', 'Armoury')} onBack={onBack} />
-      <p className="help">{tr('Ostetaan kappaleittain, ja mitä jää, se jää seuraavaan kisaan. Napautus ruutuun ampuu, nappi oikealla alhaalla pudottaa öljyn.', 'Bought by the shot; what is left stays for the next race. A tap on the screen fires, the button at the bottom right drops oil.')}</p>
+      <p className="help">{tr('Ostetaan kappaleittain, ja mitä jää, se jää seuraavaan kisaan. Aseet laukeavat itsestään: ohjus kun auto on pysynyt tähtäimessä, miina kun auto on ihan takana. Konekivääri on osakaupan osa.', 'Bought by the shot; what is left stays for the next race. Weapons fire themselves: the missile once a car has sat in the sights, the mine when a car is right behind. The machine gun is a part in the shop.')}</p>
       <div className="cards">
         {WEAPONS.map((w) => {
-          const have = w.id === 'missile' ? save.missiles : save.oil;
+          const have = w.id === 'missile' ? save.missiles : save.mines;
           const full = have >= w.max;
           const can = !full && w.price <= save.credits;
           return (
@@ -276,7 +276,7 @@ export function Armoury({ save, onBuy, onBack }: { save: Save; onBuy: (w: Weapon
               </div>
               <div className="body">
                 <div className="name">
-                  {w.id === 'missile' ? '🚀 ' : '🛢️ '}
+                  {w.id === 'missile' ? '🚀 ' : '💣 '}
                   {t(w.name)}
                   <span className="lvl">{full ? tr('Täynnä', 'Full') : `${cr(w.price)} / ${tr('kpl', 'each')}`}</span>
                 </div>

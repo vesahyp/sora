@@ -8,10 +8,10 @@ import type { CarDef } from '../types';
  * who has learned to use them. Prices are a fraction of the car's price,
  * so the same shop fits every class.
  */
-export type PartKind = 'tyres' | 'weight' | 'engine' | 'brakes';
-export const PART_KINDS: PartKind[] = ['tyres', 'weight', 'engine', 'brakes'];
+export type PartKind = 'tyres' | 'weight' | 'engine' | 'brakes' | 'armour' | 'gun';
+export const PART_KINDS: PartKind[] = ['tyres', 'weight', 'engine', 'brakes', 'armour', 'gun'];
 export type Parts = Record<PartKind, number>;
-export const STOCK: Parts = { tyres: 0, weight: 0, engine: 0, brakes: 0 };
+export const STOCK: Parts = { tyres: 0, weight: 0, engine: 0, brakes: 0, armour: 0, gun: 0 };
 
 export interface PartDef {
   kind: PartKind;
@@ -52,6 +52,20 @@ export const PARTS: PartDef[] = [
     cost: [0.08, 0.14, 0.22],
     levels: [L('Urheilupalat', 'Sport pads'), L('Isot levyt', 'Big discs'), L('Kilpajarrut', 'Race brakes')],
   },
+  {
+    kind: 'armour',
+    name: L('Panssari', 'Armour'),
+    effect: L('kestää osumia, painaa kolarissa', 'takes hits, weighs in a shunt'),
+    cost: [0.12, 0.22, 0.36],
+    levels: [L('Pellit ja puskuri', 'Plates and a bumper'), L('Piikkipuskuri', 'Spiked bumper'), L('Aurat ja häkki', 'Ploughs and a cage')],
+  },
+  {
+    kind: 'gun',
+    name: L('Konekivääri', 'Machine gun'),
+    effect: L('tulinopeus ja teho', 'rate and punch'),
+    cost: [0.14, 0.25, 0.4],
+    levels: [L('Toinen piippu', 'A second barrel'), L('Isompi kaliiperi', 'Bigger calibre'), L('Pyörivä tykki', 'Rotary cannon')],
+  },
 ];
 
 export const PART_BY_KIND: Record<PartKind, PartDef> = Object.fromEntries(PARTS.map((p) => [p.kind, p])) as Record<PartKind, PartDef>;
@@ -69,15 +83,20 @@ export function tuned(car: CarDef, parts: Parts): CarDef {
   const w = parts.weight;
   const e = parts.engine;
   const b = parts.brakes;
+  const a = parts.armour;
+  const g = parts.gun;
   return {
     ...car,
     grip: car.grip * (1 + 0.1 * t),
     turnRate: car.turnRate * (1 + 0.04 * t),
-    accel: car.accel * (1 + 0.07 * w + 0.09 * e),
+    accel: car.accel * (1 + 0.07 * w + 0.09 * e - 0.03 * a),
     topSpeed: car.topSpeed * (1 + 0.06 * e),
     brake: car.brake * (1 + 0.05 * w + 0.12 * b),
+    mass: car.mass * (1 - 0.06 * w + 0.12 * a),
+    armour: a,
+    gun: g,
   };
 }
 
 /** Everything fitted, for the balance tool and the opponents of a tough event. */
-export const FULL: Parts = { tyres: 3, weight: 3, engine: 3, brakes: 3 };
+export const FULL: Parts = { tyres: 3, weight: 3, engine: 3, brakes: 3, armour: 3, gun: 3 };
