@@ -4,14 +4,14 @@ import { Title, Result } from './ui/Screens';
 import { Garage, Events, Shop, Dealer, Licences } from './ui/Garage';
 import { loadRecords, saveRace, recordKey, track, type Records } from './records';
 import { ErrorBoundary } from './ui/ErrorBoundary';
-import { loadSave, store, playerCar, currentCar, type Save } from './career/save';
+import { loadSave, store, playerCar, currentCar, CLASS_RANK, type Save } from './career/save';
 import { OPPONENTS } from './game/content/drivers';
 import { EVENT_BY_ID, type EventDef } from './game/content/events';
 import { LICENCE_BY_CLASS, type LicenceDef } from './game/content/licences';
 import { CARS, CAR_BY_ID } from './game/content/cars';
 import { partPrice, tuned, STOCK, type PartKind } from './game/content/parts';
 import type { Entry } from './game/state';
-import type { CarClass, CarDef } from './game/types';
+import type { CarClass, CarDef, CarShape } from './game/types';
 
 /** What the race was for: an event with prize money, or a licence test. */
 export type Purpose = { kind: 'event'; id: string } | { kind: 'licence'; cls: CarClass };
@@ -50,7 +50,9 @@ function Screens() {
 
   const enter = (e: EventDef) => {
     const fieldCar = CARS.find((c) => c.cls === e.cls)!;
-    const field: Entry[] = OPPONENTS.map((driver) => ({ driver, car: tuned(fieldCar, e.fieldParts) }));
+    // the class car's numbers under the other bodies, so the pack is not four of a kind
+    const shapes: CarShape[] = ['coupe', 'rally', 'hatch'];
+    const field: Entry[] = OPPONENTS.map((driver, i) => ({ driver, car: { ...tuned(fieldCar, e.fieldParts), shape: shapes[(i + CLASS_RANK[e.cls]) % 3] } }));
     setScreen({ kind: 'race', purpose: { kind: 'event', id: e.id }, trackId: e.trackId, car: playerCar(save), field, laps: e.laps });
   };
   const take = (l: LicenceDef) => {

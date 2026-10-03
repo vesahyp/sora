@@ -6,8 +6,9 @@ import { type CarInput } from '../game/types';
  * Touch: the throttle is on. A touch anywhere on the play field is the
  * wheel: the car steers by how far the thumb has moved sideways from
  * where it landed, full lock at `lock` css px. Lift and the wheel
- * centres. A second finger anywhere is the brake. Elements marked
- * `data-ui` are left to React.
+ * centres. A touch that starts on the brake pedal is the brake, and so
+ * is a second finger anywhere. Held at a standstill, the brake reverses.
+ * Elements marked `data-ui` are left to React.
  *
  * Keyboard: left and right (or A and D) steer, down, S or space brakes.
  * Up and W are accepted and do nothing: the throttle is on.
@@ -18,6 +19,10 @@ export class InputController {
   wheel = { active: false, x0: 0, y0: 0, x: 0 };
   private wheelId: number | null = null;
   private brakeIds = new Set<number>();
+  /** the pedal's centre and radius, css px; set by the HUD layout */
+  pedal = { x: -999, y: -999, r: 0 };
+  /** the brake is down, for the pedal's look */
+  braking = false;
   private keys = new Set<string>();
   usedTouch = false;
   private el: HTMLElement | null = null;
@@ -34,7 +39,8 @@ export class InputController {
     e.preventDefault();
     this.usedTouch = true;
     for (const t of Array.from(e.changedTouches)) {
-      if (this.wheelId === null) {
+      const onPedal = Math.hypot(t.clientX - this.pedal.x, t.clientY - this.pedal.y) < this.pedal.r;
+      if (this.wheelId === null && !onPedal) {
         this.wheelId = t.identifier;
         this.wheel = { active: true, x0: t.clientX, y0: t.clientY, x: t.clientX };
       } else this.brakeIds.add(t.identifier);

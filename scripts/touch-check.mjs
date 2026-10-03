@@ -44,7 +44,17 @@ try {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await cdp.detach();
   check(v0 > 5 && v1 < v0 - 2, `a second finger brakes (${(v0 * 3.6).toFixed(0)} -> ${(v1 * 3.6).toFixed(0)} km/h, input ${JSON.stringify(read)})`);
-  await page.waitForTimeout(800);
+  // the pedal: a tap on it brakes, held at a standstill it reverses
+  const pedal = await page.locator('.pedal').boundingBox();
+  const cdp2 = await page.context().newCDPSession(page);
+  await cdp2.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: pedal.x + pedal.width / 2, y: pedal.y + pedal.height / 2, id: 3 }] });
+  await page.waitForTimeout(2500);
+  const vr = await sim('window.__sim.cars[0].speed');
+  const rev = await page.locator('.pedal.rev').count();
+  await cdp2.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp2.detach();
+  check(vr < -1 && rev === 1, `holding the pedal at a standstill reverses (${(vr * 3.6).toFixed(0)} km/h, R shown)`);
+  await page.waitForTimeout(1500);
   const h0 = await sim('window.__sim.cars[0].heading');
   await touch(200, 600, 300, 250);
   const h1 = await sim('window.__sim.cars[0].heading');

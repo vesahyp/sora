@@ -13,10 +13,12 @@ game follows your browser's language.*
 
 **Puhelimella:** kaasu on aina pohjassa. Paina peukalo ruudulle mihin
 tahansa ja vedä sivulle: auto kääntyy sen verran kuin peukalo on siirtynyt.
-Nosta peukalo, niin ratti suoristuu. Toinen sormi missä tahansa jarruttaa.
+Nosta peukalo, niin ratti suoristuu. Vasemmassa alakulmassa on jarrupoljin;
+toinen sormi missä tahansa jarruttaa myös. Kun auto on pysähtynyt ja pidät
+jarrua pohjassa, auto peruuttaa: näin pääset irti puusta.
 
 **Näppäimistöllä:** nuolet tai A ja D kääntävät, alas, S tai välilyönti
-jarruttaa.
+jarruttaa ja pysähdyksissä peruuttaa.
 
 ## Kisa
 

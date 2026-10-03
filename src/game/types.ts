@@ -25,10 +25,14 @@ export interface TrackDef {
   points: [number, number][];
 }
 
+/** The body the sprite draws: a boxy hatchback, a low coupe, a winged rally car. */
+export type CarShape = 'hatch' | 'coupe' | 'rally';
+
 export interface CarDef {
   id: string;
   name: Text;
   cls: CarClass;
+  shape: CarShape;
   /** credits at the dealer */
   price: number;
   /** one line at the dealer */

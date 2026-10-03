@@ -32,6 +32,10 @@ try {
   await page.waitForTimeout(300);
   await shot('02b-shop');
   await page.getByRole('button', { name: say('Talli', 'Garage') }).click();
+  await page.getByRole('button', { name: say('Autokauppa', 'Dealer') }).click();
+  await page.waitForTimeout(300);
+  await shot('02d-dealer');
+  await page.getByRole('button', { name: say('Talli', 'Garage') }).click();
   await page.getByRole('button', { name: say('Kisat', 'Races'), exact: true }).click();
   await page.waitForTimeout(300);
   await shot('02c-events');

@@ -48,8 +48,8 @@ src/
   career/save.ts      the save: credits, cars owned with parts, licences; one object in localStorage
   render/
     renderer.ts       camera, grass, road, dust, car, trees, minimap
-    sprites.ts        procedural sprite cache
-  input/input.ts      one thumb (drag sideways to steer, second finger brakes) and keyboard
+    sprites.ts        procedural sprite cache: three car bodies (hatch, coupe, rally), trees
+  input/input.ts      one thumb (drag sideways to steer), the brake pedal or a second finger, keyboard
   ui/                 React: Game (loop + HUD), Screens (title, result), Garage (garage, races, shop, dealer, licences)
   records.ts          localStorage best lap and best race; the tracker shim
   audio.ts            Web Audio synth: the engine note and the event beeps

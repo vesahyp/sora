@@ -46,6 +46,7 @@ export function Game({ trackId, car, field, laps, onEnd, onQuit }: { trackId: st
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const wheelRef = useRef<HTMLDivElement>(null);
+  const pedalRef = useRef<HTMLDivElement>(null);
   const simRef = useRef<SimState | null>(null);
   const [hud, setHud] = useState<Hud | null>(null);
   const [paused, setPaused] = useState(false);
@@ -72,12 +73,20 @@ export function Game({ trackId, car, field, laps, onEnd, onQuit }: { trackId: st
     const nav = navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void> }> } };
     nav.wakeLock?.request('screen').then((l) => (wake = l)).catch(() => undefined);
 
+    const layoutPedal = () => {
+      const el = pedalRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      input.pedal = { x: r.left + r.width / 2, y: r.top + r.height / 2, r: r.width / 2 + 8 };
+    };
     const onResize = () => {
       renderer.resize();
       s.view = renderer.view();
+      layoutPedal();
     };
     window.addEventListener('resize', onResize);
     window.visualViewport?.addEventListener('resize', onResize);
+    layoutPedal();
 
     const params = new URLSearchParams(location.search);
     const bot = params.get('bot') === '1';
@@ -165,6 +174,11 @@ export function Game({ trackId, car, field, laps, onEnd, onQuit }: { trackId: st
           (w.firstElementChild as HTMLElement).style.transform = `translate(calc(-50% + ${Math.max(-input.lock, Math.min(input.lock, input.wheel.x - input.wheel.x0))}px), -50%)`;
         } else w.style.display = 'none';
       }
+      const pd = pedalRef.current;
+      if (pd) {
+        pd.classList.toggle('on', input.braking);
+        pd.classList.toggle('rev', s.cars[0].speed < -0.3);
+      }
       if (now - hudAt > 50) {
         hudAt = now;
         publishHud();
@@ -202,6 +216,10 @@ export function Game({ trackId, car, field, laps, onEnd, onQuit }: { trackId: st
       <canvas ref={canvasRef} />
       <div className="wheel" ref={wheelRef}>
         <div />
+      </div>
+      <div className="pedal" ref={pedalRef}>
+        <span>{tr('JARRU', 'BRAKE')}</span>
+        <small>{tr('pidä: peruuta', 'hold: reverse')}</small>
       </div>
       {hud && (
         <div className="hud">

@@ -6,6 +6,8 @@ export const DT = 1 / 60;
 /** Grass: the top speed the surface allows and the extra drag it adds. */
 const GRASS_TOP = 16;
 const GRASS_DRAG = 2.2;
+/** m/s backwards, held brake at a standstill */
+const REVERSE_TOP = 5;
 /** a car is a circle of this radius when two meet */
 const CAR_R = 1.5;
 
@@ -61,7 +63,11 @@ function moveCar(s: SimState, c: Car, input: CarInput, dt: number): void {
   else vf -= (vf - top) * 2 * dt;
   if (!onRoad) vf -= vf * GRASS_DRAG * dt * 0.5;
   vf -= vf * 0.12 * dt;
-  if (brake > 0) vf = vf > 0 ? Math.max(0, vf - def.brake * brake * dt) : Math.min(0, vf + def.brake * brake * dt);
+  // the brake: stops the car, and held at a standstill backs it up, slowly
+  if (brake > 0) {
+    if (vf > 0.3) vf = Math.max(0, vf - def.brake * brake * dt);
+    else if (vf > -REVERSE_TOP) vf -= def.accel * 0.5 * brake * dt;
+  } else if (vf < 0) vf = Math.min(0, vf + def.brake * 0.5 * dt);
   vl *= Math.exp(-grip * dt);
 
   const bite = clamp(vf / 8, -1, 1) * (1 - 0.45 * Math.min(1, Math.abs(vf) / def.topSpeed));
