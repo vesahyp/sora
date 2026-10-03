@@ -12,6 +12,7 @@
 #   make shots-en      # the same in English, into shots/en/
 #   make icon          # render public/icon.svg to the PNG icons
 #   make touch-check   # drives the race by touch on an emulated phone
+#   make drive-log     # set pieces by touch on a phone, the physics logged (PHYSICS=old for the old model)
 #   make pwa-check     # manifest, icons, service worker, offline (URL ?= the live site)
 #   make plan          # terraform plan for the pixel infra (no changes)
 #   make apply         # terraform apply (creates AWS resources), then make env
@@ -25,7 +26,7 @@ PROFILE ?= personal
 AWS      = AWS_PROFILE=$(PROFILE) aws
 TF       = AWS_PROFILE=$(PROFILE) terraform -chdir=infra
 
-.PHONY: dev build preview check balance shots-setup shots shots-en icon touch-check pwa-check plan apply outputs env deploy-pixel
+.PHONY: dev build preview check balance shots-setup shots shots-en icon touch-check drive-log pwa-check plan apply outputs env deploy-pixel
 
 dev:
 	npm run dev
@@ -60,6 +61,10 @@ icon:
 
 touch-check:
 	node scripts/touch-check.mjs
+
+PHYSICS ?= new
+drive-log:
+	node scripts/drive-log.mjs $(PHYSICS)
 
 URL ?= https://vesahyp.github.io/sora/
 pwa-check:
