@@ -3,7 +3,10 @@
 Guidance for AI agents working in this repo. `README.md` is the player page:
 what the game is and how to play it. Code, architecture and process notes
 live here. `ROADMAP.md` is forward-looking only. `docs/design.md` is the
-design: what the game is meant to become.
+design: what the game is meant to become. `docs/research/` holds what
+was read before building: the mechanics people love in combat racers,
+and the car physics model and how it is tuned. Read them before
+changing the race or the car.
 
 ## What this is
 
