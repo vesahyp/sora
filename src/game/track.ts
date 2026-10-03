@@ -92,13 +92,21 @@ export class Track {
       const list = this.grid.get(key);
       if (list) list.push(i); else this.grid.set(key, [i]);
     }
-    this.plantTrees();
     const nt = Math.ceil(this.length / TILE);
     for (let k = 0; k < nt; k++) this.tiles.push([]);
     for (const p of def.patches ?? []) {
       for (let a = p.s; a < p.to; a += TILE) this.tiles[Math.floor((((a % this.length) + this.length) % this.length) / TILE)].push(p);
-      this.tiles[Math.floor((((p.to - 0.01) % this.length) + this.length) % this.length / TILE)].push(p);
+      const last = this.tiles[Math.floor((((p.to - 0.01) % this.length) + this.length) % this.length / TILE)];
+      if (!last.includes(p)) last.push(p);
     }
+    this.plantTrees();
+  }
+
+  /** In a river that crosses the road, between the tree lines: nothing grows or stands there. */
+  inRiver(x: number, y: number): boolean {
+    if (!this.def.patches?.some((p) => p.surface === 'water' && !p.d)) return false;
+    const loc = this.locate(x, y);
+    return Math.abs(loc.d) < this.width / 2 + this.verge && this.surfaceAt(loc.s, loc.d) === 'water';
   }
 
   /** The surface at (s, d): a patch if one covers the spot, else the road's surface on it and grass off it. */
@@ -228,6 +236,8 @@ export class Track {
 
 /** metres of lap per tile of the surface lookup */
 const TILE = 4;
+/** how far past the tree line a river is drawn, metres: it runs on under the trees, which stay the wall */
+export const RIVER_REACH = 24;
 
 function inSpan(s: number, from: number, to: number, length: number): boolean {
   const a = ((s - from) % length + length) % length;

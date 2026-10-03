@@ -1,4 +1,4 @@
-import type { Track } from '../game/track';
+import { RIVER_REACH, type Track } from '../game/track';
 import { hash32 } from '../game/rng';
 import type { Scenery } from './scenery';
 import { PAL, SHADOW_ALPHA, SHADOW_INK, SHADOW_PER_M, SHADOW_X, SHADOW_Y, faded } from './look';
@@ -646,6 +646,8 @@ export class Ground {
       });
     }
 
+    this.bakeFeatures(g, inChunk);
+
     // every static shadow as one path, all turning the same way so the fill is their
     // union: laid once at one alpha, overlaps never double
     const sh = this.shadows(cx, cy);
@@ -660,6 +662,135 @@ export class Ground {
 
     // what stands beyond the cars' reach: the barn, the power poles, the crowd
     this.bakeStanding(g, inChunk);
+  }
+
+  /**
+   * What the track puts on the road: a river where a water patch crosses
+   * it, out past the trees on both sides, the road's ruts showing through
+   * the shallows; and each jump's kicker, planks across the road rising to
+   * a lit lip, with the drop's shadow on the gravel past it.
+   */
+  private bakeFeatures(g: CanvasRenderingContext2D, inChunk: (x: number, y: number, m: number) => boolean): void {
+    const t = this.t;
+    const half = t.width / 2;
+    const P = (s: number, d: number) => {
+      const p = t.at(s);
+      return { x: p.x - p.ty * d, y: p.y + p.tx * d };
+    };
+    for (const patch of t.def.patches ?? []) {
+      if (patch.surface !== 'water' || patch.d) continue;
+      const reach = half + t.verge + RIVER_REACH;
+      const mid = P((patch.s + patch.to) / 2, 0);
+      if (!inChunk(mid.x, mid.y, reach + 4)) continue;
+      // the banks wander: each edge is a line across the road pushed along it by a slow wave
+      const bank = (s: number, sign: number, out: number) => {
+        const pts: { x: number; y: number }[] = [];
+        for (let d = -reach; d <= reach; d += 1) {
+          const w = Math.sin(d * 0.21 + s) * 0.7 + Math.sin(d * 0.53 + s * 2) * 0.35;
+          pts.push(P(s + sign * (out + w), d));
+        }
+        return pts;
+      };
+      const shape = (out: number) => {
+        const a = bank(patch.s, -1, out);
+        const b = bank(patch.to, 1, out).reverse();
+        const path = new Path2D();
+        [...a, ...b].forEach((q, i) => (i ? path.lineTo(q.x, q.y) : path.moveTo(q.x, q.y)));
+        path.closePath();
+        return path;
+      };
+      g.fillStyle = PAL.wetBank;
+      g.globalAlpha = 0.85;
+      g.fill(shape(1.6));
+      // deep off the road, shallow over it: the ruts show through where the cars cross
+      const water = shape(0);
+      const road = new Path2D();
+      [P(patch.s - 3, -half), P(patch.s - 3, half), P(patch.to + 3, half), P(patch.to + 3, -half)].forEach((q, i) => (i ? road.lineTo(q.x, q.y) : road.moveTo(q.x, q.y)));
+      road.closePath();
+      g.save();
+      g.clip(water);
+      g.fillStyle = PAL.water;
+      g.globalAlpha = 0.9;
+      const off = new Path2D();
+      off.addPath(water);
+      off.addPath(road);
+      g.fill(off, 'evenodd');
+      g.fillStyle = PAL.waterLit;
+      g.globalAlpha = 0.45;
+      g.fill(road);
+      g.restore();
+      // the current: pale streaks running with the river, across the road
+      const flow = new Path2D();
+      for (let k = 0; k < 40; k++) {
+        const h = hash32(k * 7919 + Math.round(patch.s * 13));
+        const s = patch.s + 0.8 + ((h & 0xff) / 255) * (patch.to - patch.s - 1.6);
+        const d = ((((h >>> 8) & 0xffff) / 0xffff) - 0.5) * 2 * reach;
+        const l = 1.2 + (((h >>> 24) & 0xff) / 255) * 3;
+        const a = P(s, d);
+        const b = P(s, d + l);
+        flow.moveTo(a.x, a.y);
+        flow.lineTo(b.x, b.y);
+      }
+      g.globalAlpha = 0.35;
+      g.strokeStyle = PAL.waterLit;
+      g.lineWidth = 0.12;
+      g.lineCap = 'round';
+      g.stroke(flow);
+      // foam where the water meets each bank
+      g.globalAlpha = 0.5;
+      g.strokeStyle = PAL.foam;
+      g.lineWidth = 0.14;
+      for (const [s, sign] of [[patch.s, -1], [patch.to, 1]] as const) {
+        const line = new Path2D();
+        bank(s, sign, 0).forEach((q, i) => (i ? line.lineTo(q.x, q.y) : line.moveTo(q.x, q.y)));
+        g.stroke(line);
+      }
+      g.globalAlpha = 1;
+    }
+    for (const j of t.def.jumps ?? []) {
+      const lip = P(j.s, 0);
+      if (!inChunk(lip.x, lip.y, half + j.len + 4)) continue;
+      const w = half + 0.8;
+      const quad = (s0: number, s1: number) => {
+        const path = new Path2D();
+        [P(s0, -w), P(s0, w), P(s1, w), P(s1, -w)].forEach((q, i) => (i ? path.lineTo(q.x, q.y) : path.moveTo(q.x, q.y)));
+        path.closePath();
+        return path;
+      };
+      // the drop's shadow on the gravel past the lip, as long as the sun makes the height
+      g.globalAlpha = SHADOW_ALPHA;
+      g.fillStyle = SHADOW_INK;
+      g.fill(quad(j.s, j.s + j.h * SHADOW_PER_M * 0.8));
+      // the planks, darker at the foot and lit toward the lip
+      const steps = 8;
+      for (let k = 0; k < steps; k++) {
+        g.globalAlpha = 1;
+        g.fillStyle = k / steps < 0.5 ? PAL.plankDark : PAL.plank;
+        g.fill(quad(j.s - j.len + (k * j.len) / steps, j.s - j.len + ((k + 1) * j.len) / steps));
+      }
+      const seams = new Path2D();
+      for (let a = j.s - j.len; a < j.s; a += 0.3) {
+        const p0 = P(a, -w);
+        const p1 = P(a, w);
+        seams.moveTo(p0.x, p0.y);
+        seams.lineTo(p1.x, p1.y);
+      }
+      g.strokeStyle = PAL.ditchBottom;
+      g.globalAlpha = 0.5;
+      g.lineWidth = 0.04;
+      g.stroke(seams);
+      // the lip, worn pale by the tyres
+      const l0 = P(j.s, -w);
+      const l1 = P(j.s, w);
+      g.globalAlpha = 0.9;
+      g.strokeStyle = PAL.gravelPale;
+      g.lineWidth = 0.14;
+      g.beginPath();
+      g.moveTo(l0.x, l0.y);
+      g.lineTo(l1.x, l1.y);
+      g.stroke();
+      g.globalAlpha = 1;
+    }
   }
 
   private shadows(cx: number, cy: number): Path2D {

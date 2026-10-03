@@ -200,7 +200,7 @@ export function buildScenery(t: Track): Scenery {
       const rock = roll < 14;
       const d = sign * (half + (rock ? 6.2 : 4.4) + (((h >>> 8) & 0xff) / 255) * 2.6);
       const q = side(s + (((h >>> 16) & 0xff) / 255 - 0.5) * 2, d);
-      if (clear.some((c) => (q.x - c.x) ** 2 + (q.y - c.y) ** 2 < c.r * c.r)) continue;
+      if (clear.some((c) => (q.x - c.x) ** 2 + (q.y - c.y) ** 2 < c.r * c.r) || t.inRiver(q.x, q.y)) continue;
       shrubs.push({ x: q.x, y: q.y, r: rock ? 0.35 + ((h >>> 24) & 0xff) / 255 * 0.6 : 0.4 + ((h >>> 24) & 0xff) / 255 * 0.5, rock, v: (h >>> 4) & 7 });
     }
   }
@@ -216,7 +216,7 @@ export function buildScenery(t: Track): Scenery {
       const rock = !tuft && roll < 52;
       const d = sign * (half + 3.5 + (((h >>> 8) & 0xff) / 255) * 2.2);
       const q = side(s + (((h >>> 16) & 0xff) / 255 - 0.5) * 1.4, d);
-      if (clear.some((c) => (q.x - c.x) ** 2 + (q.y - c.y) ** 2 < c.r * c.r)) continue;
+      if (clear.some((c) => (q.x - c.x) ** 2 + (q.y - c.y) ** 2 < c.r * c.r) || t.inRiver(q.x, q.y)) continue;
       const k = ((h >>> 24) & 0xff) / 255;
       shrubs.push({ x: q.x, y: q.y, r: tuft ? 0.3 + k * 0.25 : rock ? 0.18 + k * 0.28 : 0.25 + k * 0.2, rock, tuft, v: (h >>> 4) & 7 });
     }
@@ -237,5 +237,5 @@ export function buildScenery(t: Track): Scenery {
   }
   // the taller drawn last, so a crown never sits under a smaller one
   trees.sort((p, q) => p.h - q.h);
-  return { props, crowd, tape, poles, barn, trees, shrubs };
+  return { props: props.filter((p) => !t.inRiver(p.x, p.y)), crowd, tape, poles, barn, trees, shrubs };
 }

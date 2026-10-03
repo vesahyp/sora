@@ -2,7 +2,8 @@ import { L } from '../../i18n';
 import type { TrackDef } from '../types';
 
 /**
- * The tracks. A track is its centreline in metres, a width and a surface;
+ * The tracks. A track is its centreline in metres, a width and a surface,
+ * with jumps and patches of another surface (a ford, mud, ice) by arc length;
  * track.ts smooths the line and the renderer draws the road from it, so a
  * new track is a new list of points and nothing else. Points run
  * clockwise on screen (y grows downward). The first point is the start
@@ -17,7 +18,10 @@ export const TRACKS: TrackDef[] = [
     width: 6,
     surface: 'gravel',
     // The first track: about 600 m, a long straight, two hairpins and a
-    // sweeper. Under half a minute a lap.
+    // sweeper. Under half a minute a lap. A kicker on the start straight
+    // throws the field on the first lap, and a ford crosses the sweeper.
+    jumps: [{ s: 45, len: 6, h: 0.6 }],
+    patches: [{ surface: 'water', s: 340, to: 349 }],
     points: [
       [0, 0],
       [72, 0],

@@ -55,6 +55,10 @@ nousee, auto oikaisee itsensä. Poljin mutkassa heittää perän ympäri
 hiusneulaa varten. Puurivi ei pysäytä: viistossa osumassa auto liukuu
 puiden vartta ja jatkaa. Autot tönivät toisiaan oikeasti: osuma toisen
 takakulmaan pyöräyttää sen, ja painavampi auto siirtää kevyempää.
+Kiviahon lähtösuoralla on **hyppyri**: ilmassa auto ei ohjaa, joten
+linja valitaan ennen reunaa, ja vinossa alastulo maksaa vauhtia.
+Pitkässä mutkassa tie ylittää **kahlaamon**: vesi jarruttaa, roiskuu ja
+liukastaa, joten sen ylittää suoraan ja lyhyesti.
 Vanhan ajomallin voi vielä yhden version ajan kokeilla osoitteessa
 https://vesahyp.github.io/sora/?physics=old.
 

@@ -45,11 +45,13 @@ The design is in `docs/design.md`.
 What to put on the roads next, each one data in `tracks.ts` on the
 surfaces and the height the car model already has (ADR 0003):
 
-- **Jumps.** A kicker across the road (`TrackDef.jumps`): take it
+- **Jumps** on every track (Kiviaho's start straight has the first).
+  A kicker across the road (`TrackDef.jumps`): take it
   straight and fast and you fly far and land clean, take it crooked
   and the landing scrubs your speed; no steering in the air, so the
   line is chosen before the lip.
-- **Fords.** A stretch of shallow water (`patches`, `water`): heavy
+- **Fords** on every track (Kiviaho's sweeper has the first). A
+  stretch of shallow water (`patches`, `water`): heavy
   drag and a splash, less grip, so the fast line crosses it short and
   straight and a car that drifts into it loses the race there.
 - **Bridges.** A narrow deck over the river, a car and a half wide,

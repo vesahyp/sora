@@ -71,7 +71,8 @@ src/
     look.ts           the one light: a low sun from the upper left; shadow direction and
                         length, the palette, the warm grade. Every other render file reads it
     ground.ts         the ground baked in 16 m chunks ahead of the camera: straw, ditch, verge,
-                        gravel with ruts and stones, static shadows, skid marks stamped in
+                        gravel with ruts and stones, a river where a ford crosses, a jump's
+                        kicker, static shadows, skid marks stamped in
     scenery.ts        the roadside computed from the track: spruce, birch, juniper, boulders,
                         posts, bales, a barn, a power line, the crowds. Cosmetic, never in the sim
     renderer.ts       camera and shake, ground chunks, pickups, mines, tracers, sights, cars
