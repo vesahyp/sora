@@ -17,7 +17,7 @@ export interface PickupDef {
 }
 
 export const PICKUPS: Record<PickupKind, PickupDef> = {
-  cash: { kind: 'cash', name: L('Rahaa', 'Cash'), colour: '#ffd870', amount: 60 },
+  cash: { kind: 'cash', name: L('Rahaa', 'Cash'), colour: '#ffd870', amount: 30 },
   nitro: { kind: 'nitro', name: L('Nitro', 'Nitro'), colour: '#6ad0ff', amount: 0.5 },
   wrench: { kind: 'wrench', name: L('Korjaus', 'Repair'), colour: '#8ae070', amount: 25 },
   missile: { kind: 'missile', name: L('Ohjus', 'Missile'), colour: '#ff8a3a', amount: 1 },
@@ -37,5 +37,8 @@ export const PICKUP_OFFSET = 0.6;
 export const PICKUP_OFFSET_CASH = 0.85;
 export const PICKUP_REACH = 1.5;
 export const PICKUP_RESPAWN = 9;
-/** the rotation of kinds along the lap */
-export const PICKUP_ORDER: PickupKind[] = ['cash', 'nitro', 'cash', 'wrench', 'missile', 'nitro', 'cash', 'mine'];
+/**
+ * The rotation of kinds along the lap. Cash is two in eight and small: the
+ * road tops the purse up, the fight is where the money is (WRECK_BOUNTY).
+ */
+export const PICKUP_ORDER: PickupKind[] = ['cash', 'nitro', 'wrench', 'missile', 'nitro', 'cash', 'mine', 'nitro'];

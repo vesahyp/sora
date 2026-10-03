@@ -29,10 +29,20 @@ on poljin, X tai ylös on nitro.
 ## Kisa
 
 Kolme kierrosta, neljä autoa, ja kaikki yrittävät romuttaa toisensa.
-**Lähdet viimeisenä**: kisa on nousu kentän läpi. Jorma ajaa kovaa,
-Marko lähes yhtä kovaa, Tapsa on kuski jonka ohitat ensin. Kaikki
-nojaavat viereiseen autoon. Kenttä pysyy lähelläsi: edellä ajava
-hiljentää ja takana tuleva painaa, joten johtaja on aina maalitaulu.
+**Lähdet viimeisenä**: kisa on nousu kentän läpi. Jorma ajaa kovaa ja
+kylmästi, Marko on tappelija, Tapsa on arka kuski jonka ohitat ensin.
+Kaikki nojaavat viereiseen autoon. Kenttä pysyy lähelläsi: edellä ajava
+hiljentää ja takana tuleva painaa.
+
+**Kenttä kantaa kaunaa.** Kun töytäiset, ammut tai romutat jonkun, hän
+muistaa sen: nojaa sinuun kovemmin, työntää perästä, ampuu sinua ensin
+ja tukkii linjasi, kun tulet takaa. Edellä ajava kaunainen kuski jopa
+hiljentää, jotta pääsee kostamaan. Marko muistaa kaiken, Tapsa unohtaa
+pian, ja kauna haihtuu noin kierroksessa.
+
+**Johtaja saa osumat.** Kaikki ampuvat ja tönivät ensin sitä, joka ajaa
+kärjessä, ja sinun edelläsi ajavat tukkivat linjan. Kärkeen kannattaa
+mennä vasta, kun sen jaksaa pitää.
 
 Tie on kapea, kolmen auton levyinen. Ohi pääsee, mutta ei ilman
 kylkiä.
@@ -42,11 +52,13 @@ kylkiä.
 - **Törmäys** sattuu siihen, johon osutaan. Painavampi ja panssaroitu
   auto voittaa. Kova töytäisy pyöräyttää.
 - **Vauriot** hidastavat autoa. Sadassa auto on **romu**: se palaa
-  hetken ja palaa sitten tielle puolikuntoisena. Romuttajalle maksetaan
-  palkkio heti.
+  hetken ja palaa sitten tielle puolikuntoisena.
+- **Romuttaminen maksaa.** Romuttaja saa palkkion heti, ja töytäisy,
+  joka pyöräyttää toisen, tuo pienen summan. Tappelu maksaa enemmän
+  kuin tieltä kerätty raha.
 - **Tiellä on tavaraa:** rahaa, nitroa, korjausta, ohjuksia ja miinoja.
-  Ne ovat tien laidoilla, eivät ajolinjalla: haku maksaa linjan. Raha
-  on aivan reunassa. Otettu kasvaa takaisin hetken päästä.
+  Ne ovat tien laidoilla, eivät ajolinjalla: haku maksaa linjan. Rahaa
+  on vähän, ja se on aivan reunassa. Otettu kasvaa takaisin hetken päästä.
 - Nurmi on liukas, metsä pysäyttää. Maalissa korjaus maksaa osan
   palkinnosta.
 

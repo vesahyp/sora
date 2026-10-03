@@ -40,7 +40,7 @@ The Räkkä architecture, copied from `hoyry`:
 src/
   game/               the simulation, no DOM anywhere in here
     types.ts          CarInput, TrackDef, CarDef
-    state.ts          SimState, Car, Driver, createState (the grid), standings
+    state.ts          SimState, Car (with its grudges and the race's credits), Driver, createState (the grid), standings
     sim.ts            step(): the bicycle model, nitro, the automatic guns, bullets,
                         missiles, mines, pickups, ramming, wrecks and respawns, lap counting
     track.ts          Track: smoothing, locate(x, y) -> (s, d), at(s), the forest
@@ -50,10 +50,12 @@ src/
       parts.ts        the shop: four parts, three levels, tuned(car, parts)
       events.ts       the calendar: class, track, laps, prizes, how built the field is
       licences.ts     the tests: one lap under a target, read off make balance
-      weapons.ts      combat: the armoury's prices, damage, gun, missile, mine, boost and ram numbers
+      weapons.ts      combat: the armoury's prices, damage, gun, missile, mine, boost and ram numbers,
+                        the wreck bounty and the ram credit
       pickups.ts      what lies on the road, how far apart, how fast it grows back
-      drivers.ts      the opponents: a name, a colour, a skill for the bot; PACING, Death Rally's catch-up:
-                        sim.ts scales an opponent's engine by its gap to the player, the bot its corners
+      drivers.ts      the opponents: a name, a colour, a skill and an aggression for the bot; PACING, Death Rally's catch-up:
+                        sim.ts scales an opponent's engine by its gap to the player, the bot its corners;
+                        GRUDGE, Burnout's hostility: what a ram, shot or wreck costs and how the bot uses it
       tracks.ts       the tracks: a centreline in metres, a width, a surface
   career/save.ts      the save: credits, cars owned with parts, licences; one object in localStorage
   render/
@@ -68,9 +70,11 @@ src/
   i18n.ts             the language: fi or en, tr() and t(), picked from the browser
 tools/
   autoplayer.ts       the bot driver: yaw-rate steering through the wheelbase, braking to
-                        the speed a bend allows, a running-wide reflex, leaning on neighbours
+                        the speed a bend allows, a running-wide reflex, leaning on neighbours,
+                        blocking, punting and waiting for whoever it holds a grudge against
   sim-check.ts        npm run sim-check: the bot laps every track in every car, asserts;
-                        asserts the field is on the player's screen and in the sights
+                        asserts the field is on the player's screen and in the sights, and that
+                        aggression pays the player more than the road
   balance.ts          npm run balance: lap times per car, side by side
 scripts/
   shots.mjs           phone screenshots with Playwright, the bot driving

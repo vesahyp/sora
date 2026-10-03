@@ -37,8 +37,14 @@ export const SPIN_TIME = 1.0;
 /** a wreck burns this long, then comes back on the centreline with this much damage */
 export const WRECK_TIME = 3;
 export const RESPAWN_DAMAGE = 55;
-/** credits for wrecking a car, per class rank + 1 */
-export const WRECK_BOUNTY = 120;
+/**
+ * Credits for wrecking a car and for a ram that spins one, per class
+ * rank + 1, paid on the spot with a toast. Death Rally pays for the
+ * fight in the race, and a race driven at the field has to pay more
+ * than one driven round it picking up cash (sim-check measures it).
+ */
+export const WRECK_BOUNTY = 200;
+export const RAM_CREDIT = 25;
 /** the repair after a race: this share of the car's price at 100 damage */
 export const REPAIR_SHARE = 0.1;
 /** boost: full meter seconds of nitro, the pull and top speed it adds, what fills it */

@@ -7,6 +7,8 @@ export interface Driver {
   name: Text;
   /** 0..1: how hard the bot drives this car. 1 is the bot's own ceiling. */
   skill: number;
+  /** how fast a grudge builds and how hard the bot leans and blocks, about 0.5..1.5; 1 is the middle */
+  aggression: number;
   colour: string;
 }
 
@@ -75,11 +77,23 @@ export interface Car {
   spin: number;
   /** seconds the car has been near standstill with the throttle down; the bot reverses on it */
   stall: number;
-  /** the race's tally */
+  /** the race's tally: wrecks dealt and taken, rams dealt and taken above RAM.minClosing */
   wrecks: number;
   wrecked: number;
+  rams: number;
+  rammed: number;
+  /** credits earned in the race: off the road, wreck bounties, rams that spun someone */
   cash: number;
+  bounty: number;
+  ramCash: number;
   shots: number;
+  /**
+   * Burnout's hostility arrow: this car's grudge toward each car by index,
+   * 0..GRUDGE.max. Raised when that car rams, shoots or wrecks this one,
+   * decaying slowly. The bot leans on, blocks and aims at whoever it holds
+   * the most against. The player's car keeps one too, for the HUD.
+   */
+  grudge: number[];
   /** index of the last car that hurt this one, for the bounty */
   lastHitBy: number;
 }
@@ -158,7 +172,7 @@ export interface SimState {
   view: { w: number; h: number };
 }
 
-export const PLAYER: Driver = { name: { fi: 'Sinä', en: 'You' }, skill: 1, colour: '#c8352a' };
+export const PLAYER: Driver = { name: { fi: 'Sinä', en: 'You' }, skill: 1, aggression: 1, colour: '#c8352a' };
 
 /** One car on the grid: who drives it, what it is, what is in the boot. */
 export interface Entry {
@@ -224,8 +238,13 @@ export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: nu
       stall: 0,
       wrecks: 0,
       wrecked: 0,
+      rams: 0,
+      rammed: 0,
       cash: 0,
+      bounty: 0,
+      ramCash: 0,
       shots: 0,
+      grudge: entries.map(() => 0),
       lastHitBy: -1,
     };
   });

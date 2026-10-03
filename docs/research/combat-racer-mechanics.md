@@ -117,7 +117,10 @@ so.
 - Wrecks burn and respawn half fixed; a bounty on the spot.
 - Pickups on the road, respawning, constant count.
 - Guns off for three seconds after the lights.
-- Not taken yet: hostility per rival, the harpoon, sabotage and loans,
+- Hostility per rival (Burnout's arrow) as a grudge per car, raised by
+  rams, shots and wrecks; the bot leans on, blocks and aims at whoever
+  it holds it against, and everyone goes for the leader.
+- Not taken yet: the harpoon, sabotage and loans,
   acceleration zones, a league that moves on its own, same-screen
   two-player.
 

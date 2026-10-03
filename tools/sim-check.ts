@@ -10,6 +10,7 @@ import { TRACKS } from '../src/game/content/tracks';
 import { CARS } from '../src/game/content/cars';
 import { botInput } from './autoplayer';
 import { OPPONENTS } from '../src/game/content/drivers';
+import { PICKUPS } from '../src/game/content/pickups';
 import { standings } from '../src/game/state';
 
 /**
@@ -19,8 +20,9 @@ import { standings } from '../src/game/state';
  * a target must be in the sights, averaged over three races. The
  * on-screen floor is where the race landed once the opponents' engines
  * were paced to the player (PACING in drivers.ts): 39 to 51% across the
- * tracks and cars. The target is a half, and rivals that fight
- * (blocking, grudges) are what should raise it.
+ * tracks and cars. Grudges and blocking (GRUDGE) did not move it on
+ * average: Kiviaho rose to 38 to 57%, Hirvisuo fell to 31 to 33%, so the
+ * floors stay. The target is still a half.
  */
 const VIEW = { w: 17, h: 37 };
 const ON_SCREEN_MIN = 0.3;
@@ -69,6 +71,9 @@ for (const track of TRACKS) {
     let onScreen = 0;
     let inSights = 0;
     let playerWrecks = 0;
+    let playerRams = 0;
+    let fightCredits = 0;
+    let roadCredits = 0;
     for (let rot = 0; rot < 3; rot++) {
       const field = OPPONENTS.map((_, k) => OPPONENTS[(k + rot) % OPPONENTS.length]);
       const race = createState(track, car, 3, field.map((driver) => ({ driver, car, missiles: 2, mines: 2 })), { missiles: 2, mines: 2 });
@@ -88,7 +93,11 @@ for (const track of TRACKS) {
         if (race.cars.some((o) => o !== me && o.wreck <= 0 && Math.abs(o.x - me.x) < VIEW.w / 2 && Math.abs(o.y - me.y) < VIEW.h / 2)) onScreen++;
         if (me.target >= 0) inSights++;
       }
-      playerWrecks += race.cars[0].wrecks;
+      const me = race.cars[0];
+      playerWrecks += me.wrecks;
+      playerRams += me.rams + me.rammed;
+      fightCredits += me.bounty + me.ramCash;
+      roadCredits += me.cash;
       const shots = race.cars.reduce((a, c) => a + c.shots, 0);
       const wrecks = race.cars.reduce((a, c) => a + c.wrecked, 0);
       const cash = race.cars.reduce((a, c) => a + c.cash, 0);
@@ -102,6 +111,16 @@ for (const track of TRACKS) {
     const seen = onScreen / Math.max(1, racing);
     const aimed = inSights / Math.max(1, racing);
     console.log(`  view:  another car on screen ${(seen * 100).toFixed(0)}% of the race, a target in the sights ${(aimed * 100).toFixed(0)}%, the player wrecked ${playerWrecks} in three races`);
+    // aggression against the road, the player's own, per race: wrecking and ramming must pay more
+    // than driving over cash, or the race teaches the player to drive round the fight. The bot
+    // drives the line and rarely takes cash, so it is also held against a race that takes every
+    // cash pickup on every lap (they grow back faster than a lap)
+    const fight = fightCredits / 3;
+    const road = roadCredits / 3;
+    const allCash = createState(track, car, 3).pickups.filter((p) => p.kind === 'cash').length * PICKUPS.cash.amount * 3;
+    console.log(`  fight: per race the player rams or is rammed ${(playerRams / 3).toFixed(1)} times, wrecks ${(playerWrecks / 3).toFixed(1)}, earns ${Math.round(fight)} cr from aggression and ${Math.round(road)} cr off the road (every cash: ${allCash})`);
+    assert(fight > road, `${track.id}/${car.id}: aggression pays more than the road (${Math.round(fight)} > ${Math.round(road)} cr)`);
+    assert(fight > allCash, `${track.id}/${car.id}: aggression pays more than taking every cash (${Math.round(fight)} > ${allCash} cr)`);
     assert(seen > ON_SCREEN_MIN, `${track.id}/${car.id}: the race happens on screen (${(seen * 100).toFixed(0)}% > ${ON_SCREEN_MIN * 100}%)`);
     assert(aimed > IN_SIGHTS_MIN, `${track.id}/${car.id}: the player has someone to shoot at (${(aimed * 100).toFixed(0)}% > ${IN_SIGHTS_MIN * 100}%)`);
     // unarmed the cars still lean on each other, so the order is not skill's alone; everyone must still get home

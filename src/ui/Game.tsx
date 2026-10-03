@@ -22,10 +22,12 @@ export interface RaceResult {
   /** what is left in the boot */
   missiles: number;
   mines: number;
-  /** the race's tally */
+  /** the race's tally; credits off the road, from wreck bounties and from rams that spun someone */
   wrecks: number;
   wrecked: number;
   cash: number;
+  bounty: number;
+  ramCash: number;
   /** 1-based finishing place */
   place: number;
   /** the field in finishing order; time is -1 for a car still out */
@@ -158,6 +160,8 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
         wrecks: me.wrecks,
         wrecked: me.wrecked,
         cash: me.cash,
+        bounty: me.bounty,
+        ramCash: me.ramCash,
         place,
         order: standings(s).map((c) => ({ name: c.driver.name, colour: c.def.colour, time: c.finishedAt, player: c === me })),
       };

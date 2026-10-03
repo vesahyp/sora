@@ -14,10 +14,8 @@ The design is in `docs/design.md`.
   (lock and yaw inertia), through the bend (grip and the rear's share),
   or on the throttle out (the rear's cost in the friction circle). Each
   is a different number, and `tools/dbg/handling.ts` measures it.
-- Opponent aggression as a per-driver number (Burnout's arrow): the
-  leader is leaned on more than the tail.
-- The bounty and the pickups against the prize table: a race should pay
-  more for driving well than for driving over cash.
+- Show the grudge on the HUD: Burnout's arrow over a car that has it in
+  for you. The number is in state (`Car.grudge`).
 
 ## Later
 

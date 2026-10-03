@@ -1,9 +1,9 @@
 import type { Car, SimState } from './state';
 import type { CarInput } from './types';
-import { BOOST, DAMAGE, DAMAGE_PACE, GUN, MINE, MISSILE, RAM, RESPAWN_DAMAGE, SPIN_TIME, WRECK_BOUNTY, WRECK_TIME } from './content/weapons';
+import { BOOST, DAMAGE, DAMAGE_PACE, GUN, MINE, MISSILE, RAM, RAM_CREDIT, RESPAWN_DAMAGE, SPIN_TIME, WRECK_BOUNTY, WRECK_TIME } from './content/weapons';
 import { PICKUPS, PICKUP_REACH, PICKUP_RESPAWN } from './content/pickups';
 import { CLASS_RANK } from './types';
-import { enginePace } from './content/drivers';
+import { GRUDGE, enginePace, hostility, leaderOf } from './content/drivers';
 
 export const DT = 1 / 60;
 
@@ -52,6 +52,8 @@ export function step(s: SimState, inputs: CarInput[], dt: number): void {
   // keeps counting past zero: the HUD shows GO for a moment, and the guns stay quiet for a few seconds
   if (s.hold > -(GUN.holdOff + 1)) s.hold -= dt;
 
+  // grudges fade, slowly
+  for (const c of s.cars) for (let k = 0; k < c.grudge.length; k++) if (c.grudge[k] > 0) c.grudge[k] = Math.max(0, c.grudge[k] - GRUDGE.decay * dt);
   for (let i = 0; i < s.cars.length; i++) {
     const c = s.cars[i];
     const input = inputs[i] ?? { steer: 0, throttle: 0, brake: 1, boost: false };
@@ -201,9 +203,12 @@ function guns(s: SimState, c: Car, i: number, dt: number): void {
   const g = c.def.gun;
   if (c.missileWait > 0) c.missileWait -= dt;
   if (c.mineWait > 0) c.mineWait -= dt;
-  // the sights: the nearest living car in the cone ahead
+  // the sights: the nearest living car in the cone ahead, a grudge or the lead making a car
+  // look nearer than it is, so the guns go for whoever this car has it in for
   let target = -1;
   let targetD = GUN.range;
+  let best = Infinity;
+  const leader = leaderOf(s);
   for (let k = 0; k < s.cars.length; k++) {
     if (k === i) continue;
     const o = s.cars[k];
@@ -211,11 +216,13 @@ function guns(s: SimState, c: Car, i: number, dt: number): void {
     const dx = o.x - c.x;
     const dy = o.y - c.y;
     const d = Math.hypot(dx, dy);
-    if (d >= targetD) continue;
+    if (d >= GUN.range) continue;
     const a = wrap(Math.atan2(dy, dx) - c.heading);
-    if (Math.abs(a) < GUN.cone) {
+    const score = d / (1 + GRUDGE.aim * hostility(s, c, k, leader));
+    if (Math.abs(a) < GUN.cone && score < best) {
       target = k;
       targetD = d;
+      best = score;
     }
   }
   c.lockTime = target >= 0 && target === c.target ? c.lockTime + dt : 0;
@@ -297,6 +304,7 @@ function flyBullets(s: SimState, dt: number): void {
         gone = true;
         const shooter = s.cars[b.owner];
         hurt(s, c, DAMAGE.bullet * (1 + 0.3 * shooter.def.gun), b.owner);
+        anger(s, c, b.owner, GRUDGE.bullet);
         s.fx.push({ kind: 'spark', x: b.x, y: b.y, age: 0 });
         if (k === 0) s.shake = Math.max(s.shake, 0.15);
       }
@@ -331,6 +339,7 @@ function flyMissiles(s: SimState, dt: number): void {
       if (Math.hypot(c.x - m.x, c.y - m.y) < 2.2) {
         gone = true;
         hurt(s, c, DAMAGE.missile, m.owner);
+        anger(s, c, m.owner, GRUDGE.blast);
         spin(s, c, 0.5);
         c.vx += Math.cos(m.heading) * 4;
         c.vy += Math.sin(m.heading) * 4;
@@ -352,6 +361,7 @@ function mines(s: SimState, dt: number): void {
       if (Math.hypot(c.x - m.x, c.y - m.y) < MINE.r + 0.9) {
         gone = true;
         hurt(s, c, DAMAGE.mine, m.owner);
+        anger(s, c, m.owner, GRUDGE.blast);
         spin(s, c, 0.6);
         boom(s, m.x, m.y, k === 0 ? 0.7 : 0.3);
       }
@@ -405,6 +415,12 @@ function hurt(s: SimState, c: Car, dmg: number, by: number): void {
   if (by >= 0 && by !== s.cars.indexOf(c)) c.lastHitBy = by;
 }
 
+/** The victim holds it against the one who did it, the more the hotter its driver. */
+function anger(s: SimState, c: Car, by: number, amount: number): void {
+  if (by < 0 || s.cars[by] === c) return;
+  c.grudge[by] = Math.min(GRUDGE.max, c.grudge[by] + amount * c.driver.aggression);
+}
+
 function spin(s: SimState, c: Car, k: number): void {
   c.spin = SPIN_TIME;
   c.vx *= k;
@@ -431,10 +447,11 @@ function wreck(s: SimState, c: Car): void {
   s.sounds.push('wreck');
   const by = c.lastHitBy >= 0 ? s.cars[c.lastHitBy] : null;
   if (by) {
+    anger(s, c, c.lastHitBy, GRUDGE.wreck);
     by.wrecks++;
     by.boost = Math.min(1, by.boost + BOOST.perWreck);
     const bounty = WRECK_BOUNTY * (CLASS_RANK[c.def.cls] + 1);
-    by.cash += bounty;
+    by.bounty += bounty;
     if (by === s.cars[0]) s.toasts.push({ text: { fi: `${c.driver.name.fi} romuna! +${bounty} cr`, en: `${c.driver.name.en} wrecked! +${bounty} cr` }, colour: '#ff8a3a', age: 0 });
     else if (c === s.cars[0]) s.toasts.push({ text: { fi: `${by.driver.name.fi} romutti sinut`, en: `${by.driver.name.en} wrecked you` }, colour: '#ff4a3a', age: 0 });
   } else if (c === s.cars[0]) s.toasts.push({ text: { fi: 'Romuna', en: 'Wrecked' }, colour: '#ff4a3a', age: 0 });
@@ -499,8 +516,18 @@ function collide(s: SimState): void {
       const force = (closing - RAM.minClosing) * DAMAGE.ram;
       hurt(s, victim, force * (rammer.def.mass / victim.def.mass) * (1 + 0.35 * rammer.def.armour), ri);
       hurt(s, rammer, force * 0.35 * (victim.def.mass / rammer.def.mass), vi);
+      rammer.rams++;
+      victim.rammed++;
+      anger(s, victim, ri, GRUDGE.ram);
       rammer.boost = Math.min(1, rammer.boost + BOOST.perRam);
-      if (closing > RAM.spinClosing) spin(s, victim, 0.8);
+      if (closing > RAM.spinClosing) {
+        spin(s, victim, 0.8);
+        anger(s, victim, ri, GRUDGE.spin);
+        // a shove that spins someone pays on the spot, the small change of a wreck's bounty
+        const credit = RAM_CREDIT * (CLASS_RANK[victim.def.cls] + 1);
+        rammer.ramCash += credit;
+        if (rammer === s.cars[0]) s.toasts.push({ text: { fi: `${victim.driver.name.fi} pyörähti! +${credit} cr`, en: `${victim.driver.name.en} spun! +${credit} cr` }, colour: '#ffd870', age: 0 });
+      }
       s.fx.push({ kind: 'spark', x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, age: 0 });
       if (i === 0 || j === 0) {
         s.sounds.push(closing > RAM.spinClosing ? 'crunch' : 'bump');

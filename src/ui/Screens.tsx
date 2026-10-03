@@ -79,10 +79,13 @@ export function Result({ r, purpose, prize, repair, passed, set, records, onAgai
             </tbody>
           </table>
           <div className="tally">
-            {tr('Romutit', 'You wrecked')} <b>{r.wrecks}</b> · {tr('romuna', 'wrecked')} <b>{r.wrecked}</b> · {tr('tieltä', 'from the road')} <b>{cr(r.cash)}</b>
+            {tr('Romutit', 'You wrecked')} <b>{r.wrecks}</b> · {tr('romuna', 'wrecked')} <b>{r.wrecked}</b>
+          </div>
+          <div className="tally">
+            {tr('romutuksista', 'wrecks')} <b>+{cr(r.bounty)}</b> · {tr('töytäisyistä', 'rams')} <b>+{cr(r.ramCash)}</b> · {tr('tieltä', 'road')} <b>+{cr(r.cash)}</b>
           </div>
           <div className="prize">
-            + {cr(prize + r.cash)}
+            + {cr(prize + r.bounty + r.ramCash + r.cash)}
             {repair > 0 && (
               <small>
                 {' '}

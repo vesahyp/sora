@@ -1,7 +1,7 @@
 import type { Car, SimState } from '../src/game/state';
 import type { CarInput } from '../src/game/types';
 import { steeringLock, wheelbase } from '../src/game/sim';
-import { PACING, enginePace, paceToPlayer } from '../src/game/content/drivers';
+import { GRUDGE, PACING, enginePace, hostility, leaderOf, paceToPlayer } from '../src/game/content/drivers';
 
 /**
  * The bot driver. It aims at a point on the centreline a little ahead,
@@ -13,7 +13,10 @@ import { PACING, enginePace, paceToPlayer } from '../src/game/content/drivers';
  * pushes, it leans on a car alongside, lights the nitro on a straight,
  * and when it is stuck against a tree it backs out. An opponent is paced
  * to the player (`PACING`): it eases off ahead of you and pushes behind. The guns fire
- * themselves, so it has nothing to decide there.
+ * themselves, so it has nothing to decide there. It holds grudges (`GRUDGE`): a car that
+ * hurt it, or the leader, gets leaned on harder, punted from behind instead of passed,
+ * and blocked when it comes up behind, and a bot with it in for the player waits for
+ * them; a driver's `aggression` scales it all.
  */
 export interface BotTuning {
   look: number;
@@ -45,15 +48,41 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
   const turn = t.curvatureAhead(c.s, look + 20);
   let inside = Math.max(-1, Math.min(1, turn * 1.5)) * (t.width * tune.inside);
   let ramSteer = 0;
-  for (const o of s.cars) {
+  const aggression = c.driver.aggression;
+  const leader = leaderOf(s);
+  const aheadOfPlayer = c !== s.cars[0] && c.progress > s.cars[0].progress;
+  // the one car this bot blocks: the keenest of those close behind it
+  let blockD = 0;
+  let blockKeen = 0;
+  for (let k = 0; k < s.cars.length; k++) {
+    const o = s.cars[k];
     if (o === c || o.wreck > 0) continue;
     let gap = o.s - c.s;
     if (gap < -t.length / 2) gap += t.length;
     if (gap > t.length / 2) gap -= t.length;
-    // a car just ahead and on this line: move over to pass it
-    if (gap > 0 && gap < 14 && Math.abs(o.d - c.d) < 2.6) inside += (o.d >= c.d ? -1 : 1) * t.width * 0.3;
-    // a car alongside: lean on it, the keener the better the driver
-    if (Math.abs(gap) < 4 && Math.abs(o.d - c.d) < 4.5 && Math.abs(o.d - c.d) > 1.2) ramSteer += (o.d > c.d ? 1 : -1) * 0.5 * skill;
+    const keen = hostility(s, c, k, leader) * aggression;
+    const side = Math.abs(o.d - c.d);
+    // a car just ahead and on this line: move over to pass it, or, holding a grudge
+    // against it or with it leading, aim at its bumper and shove
+    if (gap > 0 && gap < 14 && side < 2.6) {
+      if (keen > GRUDGE.punt && gap < 9) inside = o.d;
+      else inside += (o.d >= c.d ? -1 : 1) * t.width * 0.3;
+    }
+    // a car alongside: lean on it, the keener the better the driver and the more it is owed
+    if (Math.abs(gap) < 4 && side < 4.5 && side > 1.2) ramSteer += (o.d > c.d ? 1 : -1) * 0.5 * skill * (0.6 + 0.4 * aggression) * (1 + GRUDGE.lean * keen);
+    // a car close behind and near this line: get in front of it if this bot is ahead of the
+    // player (the player has to fight through) or has it in for that car
+    if (gap < -2 && gap > -GRUDGE.blockReach && side < 3.5) {
+      const want = (aheadOfPlayer ? GRUDGE.blockAhead : 0) + keen;
+      if (want > blockKeen) {
+        blockKeen = want;
+        blockD = o.d;
+      }
+    }
+  }
+  if (blockKeen > 0) {
+    const w = Math.min(0.8, GRUDGE.block * blockKeen);
+    inside += (blockD - inside) * w;
   }
   const tx = target.x + -target.ty * inside;
   const ty = target.y + target.tx * inside;
@@ -85,7 +114,13 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
   // the sim gives its paced engine
   const pace = paceToPlayer(s, c);
   const margin = tune.margin * (0.75 + 0.25 * skill) * (1 + pace * (pace > 0 ? PACING.corner.push : PACING.corner.ease));
-  const allowed = Math.min(Math.sqrt(c.def.grip * margin * radius) * (onRoadFactor(c)), c.def.topSpeed * (0.7 + 0.3 * skill) * enginePace(s, c));
+  // a grudge against the player, who is a little way behind: lift and let them come, the
+  // settling of it is the point (Burnout's rivals turn on you)
+  const me = s.cars[0];
+  const lead = c.progress - me.progress;
+  const owed = c === me ? 0 : c.grudge[0] * aggression;
+  const wait = owed > 0 && lead > 0 && lead < GRUDGE.waitRange ? 1 - Math.min(GRUDGE.waitMax, GRUDGE.wait * owed) : 1;
+  const allowed = Math.min(Math.sqrt(c.def.grip * margin * radius) * (onRoadFactor(c)), c.def.topSpeed * (0.7 + 0.3 * skill) * enginePace(s, c)) * wait;
   // nose in the trees: slow at the forest's edge and pointing away from the road. The tree
   // wall bounces the car, so the stall clock never runs long enough; back out on this instead
   const edge = t.width / 2 + t.verge - 1;

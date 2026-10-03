@@ -154,11 +154,13 @@ function Screens() {
             let passed = false;
             // the boot comes back as it was left, and the car gets fixed
             const repair = Math.round((CAR_BY_ID[r.carId].price * REPAIR_SHARE * (r.damage / 100)) / 10) * 10;
+            // what the race paid on the road: cash pickups, wreck bounties, rams
+            const earned = r.cash + r.bounty + r.ramCash;
             if (purpose.kind === 'event') {
               const e = EVENT_BY_ID[purpose.id];
               prize = e.prizes[r.place - 1] ?? 0;
               update((s) => {
-                s.credits += prize + r.cash - repair;
+                s.credits += prize + earned - repair;
                 s.missiles = r.missiles;
                 s.mines = r.mines;
                 s.races++;
@@ -170,7 +172,7 @@ function Screens() {
               const l = LICENCE_BY_CLASS[purpose.cls]!;
               passed = r.time >= 0 && r.time <= l.target;
               update((s) => {
-                s.credits += r.cash - repair;
+                s.credits += earned - repair;
                 s.missiles = r.missiles;
                 s.mines = r.mines;
                 if (passed && !s.licences.includes(l.cls)) s.licences = [...s.licences, l.cls];
