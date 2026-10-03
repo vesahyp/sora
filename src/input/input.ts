@@ -5,7 +5,10 @@ import { type CarInput } from '../game/types';
  *
  * Touch: the throttle is on. A touch anywhere on the play field is the
  * wheel: the car steers by how far the thumb has moved sideways from
- * where it landed, full lock at `lock` css px. Lift and the wheel
+ * where it landed, full lock at `lock` css px. The response is a curve
+ * (`CURVE`), not a line: the first few px are a dead zone and a small
+ * move is a small correction, so a thumb can hold the car straight; the
+ * lock is still there at the end of the swing. Lift and the wheel
  * centres. A tap (lifted quickly, without a slide) lights the nitro. A
  * touch that starts on the pedal is the pedal, and so is a second
  * finger anywhere: it brakes and loosens the rear, and held at a
@@ -15,8 +18,19 @@ import { type CarInput } from '../game/types';
  * Keyboard: left and right (or A and D) steer, down, S or space is the
  * pedal, X, up or W is the nitro.
  */
+/** px of thumb travel that do nothing, so a resting thumb does not wander the car */
+const DEAD = 4;
+/** the response curve's power: 1 is linear, higher makes the centre finer and the ends steeper */
+const CURVE = 1.7;
+
+/** thumb travel in css px to a steer of -1..1 */
+export function thumbToSteer(dx: number, lock: number): number {
+  const a = Math.min(1, Math.max(0, (Math.abs(dx) - DEAD) / (lock - DEAD)));
+  return Math.sign(dx) * Math.pow(a, CURVE);
+}
+
 export class InputController {
-  readonly lock = 70;
+  readonly lock = 110;
   /** the steering touch, for the on-screen wheel ghost */
   wheel = { active: false, x0: 0, y0: 0, x: 0 };
   private wheelId: number | null = null;
@@ -104,7 +118,7 @@ export class InputController {
   read(): CarInput {
     let steer = 0;
     let brake = 0;
-    if (this.wheel.active) steer = Math.max(-1, Math.min(1, (this.wheel.x - this.wheel.x0) / this.lock));
+    if (this.wheel.active) steer = thumbToSteer(this.wheel.x - this.wheel.x0, this.lock);
     if (this.brakeIds.size) brake = 1;
     const k = this.keys;
     if (k.has('arrowleft') || k.has('a')) steer -= 1;

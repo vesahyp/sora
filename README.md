@@ -13,6 +13,7 @@ game follows your browser's language.*
 
 **Puhelimella:** kaasu on aina pohjassa. Paina peukalo ruudulle mihin
 tahansa ja vedä sivulle: auto kääntyy sen verran kuin peukalo on siirtynyt.
+Pieni liike on pieni korjaus, täysi käännös vaatii kunnon vedon.
 Nosta peukalo, niin ratti suoristuu. Napautus sytyttää **nitron**.
 Vasemmassa alakulmassa on **poljin**, ja toinen sormi missä tahansa on
 sama poljin: se jarruttaa ja irrottaa perän, eli jarrutus mutkaan heittää

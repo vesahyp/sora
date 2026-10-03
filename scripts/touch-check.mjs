@@ -98,6 +98,13 @@ try {
   await touch(200, 600, 100, 250);
   const h2 = await sim('window.__sim.cars[0].heading');
   check(h2 < h1b - 0.2, `a drag to the left turns the car left (${(h2 - h1b).toFixed(2)} rad)`);
+  // the response curve: a nudge is a correction, not a turn
+  await place();
+  await page.waitForTimeout(100);
+  const h2b = await sim('window.__sim.cars[0].heading');
+  await touch(200, 600, 220, 250);
+  const h3 = await sim('window.__sim.cars[0].heading');
+  check(Math.abs(h3 - h2b) < 0.08, `a 20 px nudge is a small correction (${(h3 - h2b).toFixed(3)} rad)`);
   const steer = await sim('window.__sim.cars[0].steer');
   await page.waitForTimeout(300);
   const steer2 = await sim('window.__sim.cars[0].steer');
