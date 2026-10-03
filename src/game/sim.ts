@@ -22,7 +22,7 @@ const REAR_GRIP = 0.9;
 const CG_OVER_L = 0.18;
 /** steering lock at rest, radians per unit of turnRate, and the speed that halves it */
 const LOCK = 0.17;
-const LOCK_FADE = 32;
+const LOCK_FADE = 50;
 
 /**
  * One fixed step. The car is the bicycle model (Marco Monster, "Car
@@ -143,7 +143,7 @@ function moveCar(s: SimState, c: Car, input: CarInput, dt: number): void {
 
   // the friction circle: what the tyres spend lengthwise they do not have sideways.
   // The rear drives, so throttle loosens the rear; the brakes are mostly on the front.
-  const usedR = clamp((drive * 0.5 + braking * 0.4) / mu, 0, 0.95);
+  const usedR = clamp((drive * 0.8 + braking * 0.4) / mu, 0, 0.95);
   const usedF = clamp((braking * 0.6) / mu, 0, 0.95);
   const circleR = Math.sqrt(1 - usedR * usedR);
   const circleF = Math.sqrt(1 - usedF * usedF);

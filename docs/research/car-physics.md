@@ -110,8 +110,13 @@ speeds and steers):
 - The throttle's cost in the friction circle lands on the rear only, the
   brakes' mostly on the front: power loosens the rear, braking loads the
   nose and brings the tail.
-- Grip 12.5 to 15.5 m/s² by class, above real gravel, because the
-  corners were drawn for a two-g car.
+- Grip 20 to 26 m/s² by class: about two g, arcade, after 1.25 g still
+  read as "mental understeer" on the phone. The limit, not the balance,
+  was the push: at 1.2 g a car at 72 km/h cannot turn tighter than 34 m
+  and the hairpins are 16 m. Death Rally cars turn on a dime; a real
+  model with arcade grip gives that without the donuts.
+- Steering lock halves at 50 m/s rather than 32, so there is wheel left
+  at speed.
 - The bot needs counter-steer to drive it: steer into a rear slip past
   the peak, hold a third throttle rather than brake while the tail is
   out. Without that it spun every car with a loose rear.

@@ -17,8 +17,8 @@ export interface LicenceDef {
 }
 
 export const LICENCES: LicenceDef[] = [
-  { cls: 'B', name: L('B-ajokortti', 'B licence'), trackId: 'kiviaho', target: 40, desc: L('Yksi kierros Kiviahoa alle 40 sekunnin.', 'One lap of Kiviaho under 40 seconds.') },
-  { cls: 'A', name: L('A-ajokortti', 'A licence'), trackId: 'hirvisuo', target: 53.5, desc: L('Yksi kierros Hirvisuota alle 53,5 sekunnin.', 'One lap of Hirvisuo under 53.5 seconds.') },
+  { cls: 'B', name: L('B-ajokortti', 'B licence'), trackId: 'kiviaho', target: 33, desc: L('Yksi kierros Kiviahoa alle 33 sekunnin.', 'One lap of Kiviaho under 33 seconds.') },
+  { cls: 'A', name: L('A-ajokortti', 'A licence'), trackId: 'hirvisuo', target: 42.5, desc: L('Yksi kierros Hirvisuota alle 42,5 sekunnin.', 'One lap of Hirvisuo under 42.5 seconds.') },
 ];
 
 export const LICENCE_BY_CLASS: Partial<Record<CarClass, LicenceDef>> = Object.fromEntries(LICENCES.map((l) => [l.cls, l]));

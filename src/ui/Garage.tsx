@@ -48,7 +48,7 @@ function Stat({ label, v, max, up }: { label: string; v: number; max: number; up
   );
 }
 
-const MAX = { topSpeed: 72, accel: 34, grip: 19, brake: 20 };
+const MAX = { topSpeed: 72, accel: 34, grip: 32, brake: 28 };
 
 export function CarStats({ car, next }: { car: CarDef; next?: CarDef }) {
   return (

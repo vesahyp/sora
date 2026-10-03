@@ -11,11 +11,6 @@ The design is in `docs/design.md`.
   enough to matter, and do the guns read as yours. The knobs are in
   `cars.ts` (grip, lock), `sim.ts` (the constants at the top) and
   `weapons.ts`.
-- The bot in the Kiila runs wide on Hirvisuo's sweepers more than in the
-  other cars; the off-road bar in `sim-check` is 15% for that. Give the
-  bot's margin a feel for power and mass, and bring the bar back to 8%.
-- The hairpins on Kiviaho were drawn for a two-g car. Open them a little
-  so a lap is nearer 35 s than 41.
 - Opponent aggression as a per-driver number (Burnout's arrow): the
   leader is leaned on more than the tail.
 - The bounty and the pickups against the prize table: a race should pay

@@ -30,10 +30,11 @@ blends to the kinematic bicycle, so rest is not a singularity.
 The tyre curve is linear to a peak slip angle and flat past it: no drop,
 so a slide is forgiving and never pumps itself.
 
-Grip is a touch over one g, above real gravel, because the tracks were
-drawn for the old car and the behaviour, not the absolute number, is
-what reads as real: a car that plows when asked too much, a tail that
-comes round under braking, a slide that settles.
+Grip is about two g, arcade, well above real gravel: at 1.2 g the car
+read as understeering on the phone, because its limit was the push,
+not its balance. The behaviour, not the absolute number, is what reads
+as real: a car that plows when asked too much, a tail that comes round
+under braking, a slide that settles.
 
 ## Consequences
 
@@ -43,9 +44,8 @@ comes round under braking, a slide that settles.
   through the wheelbase, and brakes to the speed a bend allows from grip
   and radius. It also brakes when it is running wide. It drives at the
   limit of a model it only approximates, so the off-road bar in
-  `sim-check` is 15% for now.
-- Laps are about a third longer than before. The licence targets were
-  re-read off `make balance`.
+  `sim-check` is 10%.
+- The licence targets were re-read off `make balance`.
 - `turnRate` on a car is the steering lock now, `grip` the tyres'
   acceleration limit, `brake` capped by grip; the `tools/dbg/trace.ts`
   step-response trace is how a change to the model is read.
