@@ -177,7 +177,8 @@ export class Track {
 
   /** Deterministic forest outside the verge; the renderer culls by view. */
   private plantTrees(): void {
-    const step = 9;
+    // dense enough that the forest reads as forest, not a park
+    const step = 4.5;
     const { minX, minY, maxX, maxY } = this.bounds;
     const edge = this.width / 2 + this.verge;
     for (let gx = Math.floor(minX / step); gx * step < maxX; gx++) {
@@ -188,7 +189,7 @@ export class Track {
         const y = gy * step + ((h >>> 16) & 0xff) / 255 * step;
         const near = this.locate(x, y);
         if (Math.abs(near.d) < edge + 1) continue;
-        this.trees.push({ x, y, r: 2.6 + ((h >>> 24) & 0xff) / 255 * 2.4, kind: (h >>> 4) & 3 });
+        this.trees.push({ x, y, r: 1.8 + ((h >>> 24) & 0xff) / 255 * 1.6, kind: (h >>> 4) & 3 });
       }
     }
   }

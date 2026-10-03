@@ -59,9 +59,16 @@ src/
       tracks.ts       the tracks: a centreline in metres, a width, a surface
   career/save.ts      the save: credits, cars owned with parts, licences; one object in localStorage
   render/
-    renderer.ts       camera and shake, grass, road, skid marks, pickups, mines, tracers,
-                        sights, cars and wrecks, nitro flame, bursts, trees, minimap
-    sprites.ts        procedural sprite cache: three car bodies (hatch, coupe, rally), trees
+    look.ts           the one light: a low sun from the upper left; shadow direction and
+                        length, the palette, the warm grade. Every other render file reads it
+    ground.ts         the ground baked in 16 m chunks ahead of the camera: straw, ditch, verge,
+                        gravel with ruts and stones, static shadows, skid marks stamped in
+    scenery.ts        the roadside computed from the track: spruce, birch, juniper, boulders,
+                        posts, bales, a barn, a power line, the crowds. Cosmetic, never in the sim
+    renderer.ts       camera and shake, ground chunks, pickups, mines, tracers, sights, cars
+                        with damage and shadows, wrecks, nitro, dust and haze, minimap
+    sprites.ts        procedural sprite cache: car bodies lit per heading, liveries, damage
+                        stages, shadows, trees and roadside objects
   input/input.ts      one thumb (drag to steer, tap for nitro), the pedal, keyboard
   ui/                 React: Game (loop + HUD), Screens (title, result), Garage (garage, races, shop, dealer, licences)
   records.ts          localStorage best lap and best race; the tracker shim
