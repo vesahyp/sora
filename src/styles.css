@@ -79,8 +79,9 @@ table.laps .total td { border-bottom: 0; color: var(--sand); font-weight: 800; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 /* update banner */
-.update { position: absolute; left: 50%; top: calc(var(--sat) + 60px); transform: translateX(-50%); display: flex; align-items: center; gap: 10px; background: var(--panel); border: 2px solid var(--sand); border-radius: 12px; padding: 8px 10px 8px 14px; z-index: 10; font-size: 13px; }
-.update .btn { min-width: 0; padding: 8px 14px; font-size: 15px; margin: 0; }
+.update { position: absolute; left: 50%; top: calc(var(--sat) + 60px); transform: translateX(-50%); width: min(calc(100% - 24px), 360px); display: flex; align-items: center; gap: 10px; background: var(--panel); border: 2px solid var(--sand); border-radius: 12px; padding: 8px 10px 8px 14px; z-index: 10; font-size: 13px; text-align: left; }
+.update > span { flex: 1; min-width: 0; }
+.update .btn { flex: none; white-space: nowrap; min-width: 0; padding: 8px 14px; font-size: 15px; margin: 0; }
 .update small { color: var(--muted); }
 
 /* the garage and its shops */
