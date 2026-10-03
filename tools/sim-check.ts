@@ -11,6 +11,7 @@ import { CARS } from '../src/game/content/cars';
 import { botInput } from './autoplayer';
 import { OPPONENTS } from '../src/game/content/drivers';
 import { standings } from '../src/game/state';
+import { SPIN_TIME } from '../src/game/content/weapons';
 
 declare const process: { argv: string[]; exitCode?: number };
 
@@ -49,13 +50,25 @@ for (const track of TRACKS) {
       assert(hits < 30, `${track.id}/${car.id}: the bot rarely meets a tree (${hits} steps)`);
     }
     // then the race: four bots, everyone must finish and the order must follow skill
-    const race = createState(track, car, 3, OPPONENTS.map((driver) => ({ driver, car })));
-    while (race.cars.some((c) => c.finishedAt < 0) && race.time < 900) step(race, race.cars.map((c) => botInput(race, c)), DT);
+    // armed: everyone has a few missiles and a slick, so the race is tested with the guns in
+    const race = createState(track, car, 3, OPPONENTS.map((driver) => ({ driver, car, missiles: 3, oil: 2 })), { missiles: 3, oil: 2 });
+    let shots = 0;
+    let spins = 0;
+    while (race.cars.some((c) => c.finishedAt < 0) && race.time < 900) {
+      step(race, race.cars.map((c) => botInput(race, c)), DT);
+      for (const c of race.cars) if (c.spin > SPIN_TIME - DT / 2) spins++;
+    }
+    shots = race.cars.reduce((a, c) => a + c.shots, 0);
+    console.log(`  guns:  ${shots} fired, ${spins} spins, damage ${race.cars.map((c) => Math.round(c.damage)).join('/')}`);
+    assert(shots > 0, `${track.id}/${car.id}: the bots use their guns (${shots} shots)`);
     const order = standings(race);
     console.log(`  race:  ${order.map((c) => `${c.driver.name.en} ${c.finishedAt >= 0 ? c.finishedAt.toFixed(1) : 'DNF'}`).join('  ')}`);
-    assert(race.cars.every((c) => c.finishedAt >= 0), `${track.id}/${car.id}: the whole field finishes`);
-    const skills = order.map((c) => c.driver.skill);
-    assert(skills.every((k, i) => i === 0 || k <= skills[i - 1] + 0.1), `${track.id}/${car.id}: the order follows skill (${skills.join(' > ')})`);
+    assert(race.cars.every((c) => c.finishedAt >= 0), `${track.id}/${car.id}: the whole field finishes, guns and all`);
+    // unarmed, the order must follow skill
+    const clean = createState(track, car, 3, OPPONENTS.map((driver) => ({ driver, car })));
+    while (clean.cars.some((c) => c.finishedAt < 0) && clean.time < 900) step(clean, clean.cars.map((c) => botInput(clean, c)), DT);
+    const skills = standings(clean).map((c) => c.driver.skill);
+    assert(clean.cars.every((c) => c.finishedAt >= 0) && skills.every((k, i) => i === 0 || k <= skills[i - 1] + 0.1), `${track.id}/${car.id}: unarmed, the order follows skill (${skills.join(' > ')})`);
   }
 }
 

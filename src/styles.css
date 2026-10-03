@@ -62,11 +62,30 @@ table.laps .total td { border-bottom: 0; color: var(--sand); font-weight: 800; }
 .clock { font-size: 30px; font-weight: 900; line-height: 1.05; }
 .times { display: flex; gap: 12px; font-size: 13px; color: var(--sand); }
 .times b { color: #fff; }
-.speedo { position: fixed; right: calc(var(--sar) + 14px); bottom: calc(var(--sab) + 14px); font-size: 14px; color: var(--sand); }
+.speedo { position: fixed; right: calc(var(--sar) + 14px); bottom: calc(var(--sab) + 112px); font-size: 14px; color: var(--sand); }
 .speedo b { font-size: 34px; color: #fff; font-weight: 900; }
 .iconbtn { position: absolute; top: calc(var(--sat) + 8px); width: 42px; height: 42px; border-radius: 10px; background: rgba(10,14,6,0.55); border: 1px solid rgba(241,236,220,0.3); font-size: 16px; font-weight: 900; cursor: pointer; z-index: 2; }
 .iconbtn.pause { right: calc(var(--sar) + 10px); }
 .iconbtn.mute { right: calc(var(--sar) + 58px); }
+/* damage, under the lap times */
+.damage { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--sand); margin-top: 3px; width: 150px; }
+.damage .bar { flex: 1; height: 6px; border-radius: 3px; background: rgba(0,0,0,0.5); overflow: hidden; }
+.damage .bar > div { height: 100%; background: linear-gradient(90deg, #ffd870, #e0503a); }
+.damage.bad span { color: #ff7a6a; font-weight: 900; }
+/* the steering wheel, bottom centre: turns with the wheel so the thumb's work is visible */
+.steerwheel { position: absolute; left: 50%; bottom: calc(var(--sab) + 22px); width: 76px; height: 76px; border-radius: 50%; border: 9px solid rgba(241,236,220,0.55); background: radial-gradient(circle, rgba(10,14,6,0.55) 30%, transparent 32%); transform: translateX(-50%); pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.5), inset 0 0 0 2px rgba(0,0,0,0.35); }
+.steerwheel i { position: absolute; left: 50%; top: 50%; width: 9px; height: 42px; margin: -42px 0 0 -4.5px; border-radius: 4px; background: rgba(241,236,220,0.55); }
+.steerwheel::before { content: ''; position: absolute; left: 50%; top: 50%; width: 50px; height: 9px; margin: -4.5px 0 0 -25px; border-radius: 4px; background: rgba(241,236,220,0.55); }
+.steerwheel::after { content: ''; position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: rgba(241,236,220,0.85); }
+.steerwheel.held { border-color: #fff; }
+.steerwheel.held i, .steerwheel.held::before { background: #fff; }
+/* the weapon buttons, bottom right, the thumb that steers reaches them with a tap */
+.weapon { position: absolute; right: calc(var(--sar) + 14px); width: 68px; height: 68px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(10,14,6,0.55); border: 3px solid rgba(241,236,220,0.4); pointer-events: none; }
+.weapon.fire { bottom: calc(var(--sab) + 14px); }
+.weapon.drop { bottom: calc(var(--sab) + 14px); right: calc(var(--sar) + 92px); }
+.weapon span { font-size: 22px; line-height: 1; }
+.weapon b { font-size: 14px; color: #fff; text-shadow: 0 1px 3px #000; margin-top: 1px; }
+.weapon.empty { opacity: 0.35; }
 /* the brake pedal, bottom left, under the thumb that is not steering */
 .pedal { position: absolute; left: calc(var(--sal) + 14px); bottom: calc(var(--sab) + 14px); width: 92px; height: 92px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(10,14,6,0.55); border: 3px solid rgba(241,236,220,0.4); pointer-events: none; color: var(--ink); text-shadow: 0 1px 3px #000; }
 .pedal span { font-size: 16px; font-weight: 900; letter-spacing: 0.04em; }

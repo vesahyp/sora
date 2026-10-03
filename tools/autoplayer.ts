@@ -57,7 +57,26 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
   // grippier tyres carry more speed through a bend: the Kortteli's stock grip is the baseline
   const cornerSpeed = tune.cornerSpeed * (0.6 + 0.4 * skill) * Math.sqrt(c.def.grip / 4.5);
   const allowed = Math.min(sharpest < 0.05 ? Infinity : cornerSpeed / sharpest, c.def.topSpeed * (0.7 + 0.3 * skill));
-  const brake = speed > allowed + 2 ? 1 : 0;
-  const throttle = brake ? 0 : speed > allowed ? 0.3 : 1;
-  return { steer, throttle, brake };
+  let brake = speed > allowed + 2 ? 1 : 0;
+  let throttle = brake ? 0 : speed > allowed ? 0.3 : 1;
+  // stuck against something: back out for a moment, wheel the other way, then try again
+  if (c.stall > 0.8 && c.stall < 2.0) {
+    brake = 1;
+    throttle = 0;
+  }
+
+  // the guns: a missile at a car ahead on the road, oil for a car close behind
+  let fire = false;
+  let drop = false;
+  if (s.hold <= 0 && c.spin <= 0) {
+    for (const o of s.cars) {
+      if (o === c) continue;
+      let gap = o.s - c.s;
+      if (gap < -t.length / 2) gap += t.length;
+      if (gap > t.length / 2) gap -= t.length;
+      if (c.missiles > 0 && gap > 6 && gap < 35 && Math.abs(o.d - c.d) < 4 && c.fireWait <= 0) fire = true;
+      if (c.oil > 0 && gap < -3 && gap > -14 && Math.abs(o.d - c.d) < 2.5 && c.dropWait <= 0) drop = true;
+    }
+  }
+  return { steer: c.stall > 0.8 && c.stall < 2.0 ? -steer : steer, throttle, brake, fire, drop };
 }

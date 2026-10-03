@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Game, type RaceResult } from './ui/Game';
 import { Title, Result } from './ui/Screens';
-import { Garage, Events, Shop, Dealer, Licences } from './ui/Garage';
+import { Garage, Events, Shop, Dealer, Licences, Armoury } from './ui/Garage';
 import { loadRecords, saveRace, recordKey, track, type Records } from './records';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { loadSave, store, playerCar, currentCar, CLASS_RANK, type Save } from './career/save';
@@ -10,6 +10,7 @@ import { EVENT_BY_ID, type EventDef } from './game/content/events';
 import { LICENCE_BY_CLASS, type LicenceDef } from './game/content/licences';
 import { CARS, CAR_BY_ID } from './game/content/cars';
 import { partPrice, tuned, STOCK, type PartKind } from './game/content/parts';
+import { REPAIR_SHARE, type WeaponDef } from './game/content/weapons';
 import type { Entry } from './game/state';
 import type { CarClass, CarDef, CarShape } from './game/types';
 
@@ -23,8 +24,9 @@ type Screen =
   | { kind: 'shop' }
   | { kind: 'dealer' }
   | { kind: 'licences' }
+  | { kind: 'armoury' }
   | { kind: 'race'; purpose: Purpose; trackId: string; car: CarDef; field: Entry[]; laps: number }
-  | { kind: 'result'; purpose: Purpose; r: RaceResult; set: { lap: boolean; race: boolean }; prize: number; passed: boolean };
+  | { kind: 'result'; purpose: Purpose; r: RaceResult; set: { lap: boolean; race: boolean }; prize: number; repair: number; passed: boolean };
 
 export default function App() {
   return (
@@ -52,7 +54,9 @@ function Screens() {
     const fieldCar = CARS.find((c) => c.cls === e.cls)!;
     // the class car's numbers under the other bodies, so the pack is not four of a kind
     const shapes: CarShape[] = ['coupe', 'rally', 'hatch'];
-    const field: Entry[] = OPPONENTS.map((driver, i) => ({ driver, car: { ...tuned(fieldCar, e.fieldParts), shape: shapes[(i + CLASS_RANK[e.cls]) % 3] } }));
+    // the field shoots back from the second event of a class on, more as the cars get built
+    const built = Object.values(e.fieldParts).reduce((a, b) => a + b, 0);
+    const field: Entry[] = OPPONENTS.map((driver, i) => ({ driver, car: { ...tuned(fieldCar, e.fieldParts), shape: shapes[(i + CLASS_RANK[e.cls]) % 3] }, missiles: Math.round(built / 3), oil: Math.round(built / 4) }));
     setScreen({ kind: 'race', purpose: { kind: 'event', id: e.id }, trackId: e.trackId, car: playerCar(save), field, laps: e.laps });
   };
   const take = (l: LicenceDef) => {
@@ -74,6 +78,7 @@ function Screens() {
           onShop={() => setScreen({ kind: 'shop' })}
           onDealer={() => setScreen({ kind: 'dealer' })}
           onLicences={() => setScreen({ kind: 'licences' })}
+          onArmoury={() => setScreen({ kind: 'armoury' })}
           onPick={(i) => update((s) => (s.current = i))}
           onTitle={() => setScreen({ kind: 'title' })}
         />
@@ -115,6 +120,23 @@ function Screens() {
       );
     case 'licences':
       return <Licences save={save} onTake={take} onBack={() => setScreen({ kind: 'garage' })} />;
+    case 'armoury':
+      return (
+        <Armoury
+          save={save}
+          onBuy={(w: WeaponDef) =>
+            update((s) => {
+              const have = w.id === 'missile' ? s.missiles : s.oil;
+              if (have >= w.max || w.price > s.credits) return;
+              s.credits -= w.price;
+              if (w.id === 'missile') s.missiles++;
+              else s.oil++;
+              track('buy_ammo', { weapon: w.id, price: w.price });
+            })
+          }
+          onBack={() => setScreen({ kind: 'garage' })}
+        />
+      );
     case 'race':
       return (
         <Game
@@ -123,17 +145,22 @@ function Screens() {
           car={screen.car}
           field={screen.field}
           laps={screen.laps}
+          ammo={{ missiles: save.missiles, oil: save.oil }}
           onEnd={(r) => {
             const set = saveRace(records, recordKey(r.trackId, r.carId), r.laps);
             setRecords({ ...records });
             const purpose = screen.purpose;
             let prize = 0;
             let passed = false;
+            // the boot comes back as it was left, and the car gets fixed
+            const repair = Math.round((CAR_BY_ID[r.carId].price * REPAIR_SHARE * (r.damage / 100)) / 10) * 10;
             if (purpose.kind === 'event') {
               const e = EVENT_BY_ID[purpose.id];
               prize = e.prizes[r.place - 1] ?? 0;
               update((s) => {
-                s.credits += prize;
+                s.credits += prize - repair;
+                s.missiles = r.missiles;
+                s.oil = r.oil;
                 s.races++;
                 if (r.place === 1) s.wins++;
                 s.results = { ...s.results, [e.id]: Math.min(s.results[e.id] ?? 99, r.place) };
@@ -141,14 +168,17 @@ function Screens() {
             } else {
               const l = LICENCE_BY_CLASS[purpose.cls]!;
               passed = r.time >= 0 && r.time <= l.target;
-              if (passed && !save.licences.includes(l.cls)) update((s) => (s.licences = [...s.licences, l.cls]));
+              update((s) => {
+                s.credits -= repair;
+                if (passed && !s.licences.includes(l.cls)) s.licences = [...s.licences, l.cls];
+              });
             }
-            setScreen({ kind: 'result', purpose, r, set, prize, passed });
+            setScreen({ kind: 'result', purpose, r, set, prize, repair, passed });
           }}
           onQuit={() => setScreen({ kind: 'garage' })}
         />
       );
     case 'result':
-      return <Result r={screen.r} purpose={screen.purpose} prize={screen.prize} passed={screen.passed} set={screen.set} records={records} onAgain={() => again(screen.purpose)} onMenu={() => setScreen({ kind: 'garage' })} />;
+      return <Result r={screen.r} purpose={screen.purpose} prize={screen.prize} repair={screen.repair} passed={screen.passed} set={screen.set} records={records} onAgain={() => again(screen.purpose)} onMenu={() => setScreen({ kind: 'garage' })} />;
   }
 }

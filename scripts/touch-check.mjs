@@ -16,6 +16,14 @@ const check = (ok, what) => {
   if (!ok) failed = true;
 };
 const sim = (expr) => page.evaluate(expr);
+// a tap: down and straight up, through CDP like every other touch here,
+// because Playwright's own tap after a raw CDP touch reads as a second finger
+const tap = async (x, y) => {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y, id: 9 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+};
 // a thumb: down at (x, y), slide to x2 over a few events, hold
 const touch = async (x, y, x2, hold) => {
   const cdp = await page.context().newCDPSession(page);
@@ -55,6 +63,20 @@ try {
   await cdp2.detach();
   check(vr < -1 && rev === 1, `holding the pedal at a standstill reverses (${(vr * 3.6).toFixed(0)} km/h, R shown)`);
   await page.waitForTimeout(1500);
+  // a tap fires a missile, the oil button drops a slick
+  const m0 = await sim('window.__sim.cars[0].missiles');
+  await tap(200, 400);
+  await page.waitForTimeout(150);
+  const m1 = await sim('window.__sim.cars[0].missiles');
+  const flying = await sim('window.__sim.missiles.length');
+  check(m1 === m0 - 1 && flying >= 1, `a tap fires a missile (${m0} -> ${m1}, ${flying} in the air)`);
+  const drop = await page.locator('.weapon.drop').boundingBox();
+  const o0 = await sim('window.__sim.cars[0].oil');
+  await tap(drop.x + drop.width / 2, drop.y + drop.height / 2);
+  await page.waitForTimeout(150);
+  const o1 = await sim('window.__sim.cars[0].oil');
+  check(o1 === o0 - 1, `the oil button drops a slick (${o0} -> ${o1})`);
+  await page.waitForTimeout(400);
   const h0 = await sim('window.__sim.cars[0].heading');
   await touch(200, 600, 300, 250);
   const h1 = await sim('window.__sim.cars[0].heading');

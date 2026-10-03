@@ -11,8 +11,9 @@ design: what the game is meant to become.
 career in the shape of Gran Turismo, for the browser, phones first. One
 thumb steers; the throttle is always on; a second finger brakes. Finnish
 gravel roads, nineties cars. Two tracks, three cars in three classes, a field of
-four with the bot driving the other three, and a career: credits from
-results, a parts shop, a dealer, and licence tests that gate the classes.
+four with the bot driving the other three, missiles and oil slicks with
+damage that costs a repair, and a career: credits from results, a parts
+shop, an armoury, a dealer, and licence tests that gate the classes.
 Sora is Finnish for gravel.
 
 ## Stack
@@ -35,7 +36,8 @@ src/
   game/               the simulation, no DOM anywhere in here
     types.ts          CarInput, TrackDef, CarDef
     state.ts          SimState, Car, Driver, createState (the grid), standings
-    sim.ts            step(): the car model, car contact, grass, trees, lap counting
+    sim.ts            step(): the car model, car contact, grass, trees, lap counting,
+                        missiles and slicks, damage, spins
     track.ts          Track: smoothing, locate(x, y) -> (s, d), at(s), the forest
     rng.ts            seeded RNG and hashes
     content/
@@ -43,13 +45,14 @@ src/
       parts.ts        the shop: four parts, three levels, tuned(car, parts)
       events.ts       the calendar: class, track, laps, prizes, how built the field is
       licences.ts     the tests: one lap under a target, read off make balance
+      weapons.ts      the armoury: prices, damage numbers, missile and slick constants
       drivers.ts      the opponents: a name, a colour, a skill for the bot
       tracks.ts       the tracks: a centreline in metres, a width, a surface
   career/save.ts      the save: credits, cars owned with parts, licences; one object in localStorage
   render/
     renderer.ts       camera, grass, road, dust, car, trees, minimap
     sprites.ts        procedural sprite cache: three car bodies (hatch, coupe, rally), trees
-  input/input.ts      one thumb (drag sideways to steer), the brake pedal or a second finger, keyboard
+  input/input.ts      one thumb (drag to steer, tap to fire), the pedal, the weapon buttons, keyboard
   ui/                 React: Game (loop + HUD), Screens (title, result), Garage (garage, races, shop, dealer, licences)
   records.ts          localStorage best lap and best race; the tracker shim
   audio.ts            Web Audio synth: the engine note and the event beeps
@@ -79,8 +82,10 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
    new car is a `CarDef`, a new race an `EventDef`. Balance changes are
    number changes in `content/`. A part's effect is one line in `tuned()`.
 4. **The bot is the opponent.** `tools/autoplayer.ts` drives the checks,
-   the screenshots and, once there are opponents, the other cars. A change
-   to it changes the race, so keep it readable.
+   the screenshots and the other cars, guns included. A change to it
+   changes the race, so keep it readable. `sim-check` races it armed and
+   asserts everyone still finishes, then unarmed and asserts the order
+   follows skill.
 5. **Arc length is the coordinate.** The sim and the bot ask the track
    where a point is as `(s, d)`: metres along the lap and metres from the
    centreline. Anything that needs "ahead" or "off the road" uses those,

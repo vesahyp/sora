@@ -1,6 +1,6 @@
 import type { SimState } from '../game/state';
 import type { Track } from '../game/track';
-import { carSprite, treeSprite, SPRITE_PPM } from './sprites';
+import { carSprite, treeSprite, wheelLayout, SPRITE_PPM } from './sprites';
 import { hash32 } from '../game/rng';
 
 /**
@@ -17,6 +17,8 @@ interface Dust {
   age: number;
   life: number;
   r: number;
+  /** black smoke rather than dust */
+  dark?: boolean;
 }
 
 export class Renderer {
@@ -176,11 +178,25 @@ export class Renderer {
     }
     g.restore();
 
+    // oil on the road
+    for (const k of s.slicks) {
+      if (!visible(k.x, k.y)) continue;
+      const fade = Math.min(1, (25 - k.age) / 5);
+      g.fillStyle = `rgba(20,16,12,${0.75 * fade})`;
+      g.beginPath();
+      g.ellipse(k.x, k.y, k.r * 1.1, k.r * 0.85, k.x * 0.7, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = `rgba(120,110,160,${0.35 * fade})`;
+      g.beginPath();
+      g.ellipse(k.x - k.r * 0.3, k.y - k.r * 0.25, k.r * 0.45, k.r * 0.25, k.x * 0.7, 0, Math.PI * 2);
+      g.fill();
+    }
+
     // dust
     this.stepDust(s, dt);
     for (const d of this.dust) {
       const k = d.age / d.life;
-      g.fillStyle = `rgba(190,175,140,${(1 - k) * 0.55})`;
+      g.fillStyle = d.dark ? `rgba(40,36,34,${(1 - k) * 0.6})` : `rgba(190,175,140,${(1 - k) * 0.55})`;
       g.beginPath();
       g.arc(d.x, d.y, d.r * (0.6 + k * 1.6), 0, Math.PI * 2);
       g.fill();
@@ -199,8 +215,87 @@ export class Renderer {
       g.beginPath();
       g.ellipse(-0.1, 0.25, car.def.length * 0.5, car.def.width * 0.55, 0, 0, Math.PI * 2);
       g.fill();
+      // the front wheels, turned with the steering, under the body
+      const wh = wheelLayout(car.def);
+      const k = 1 / SPRITE_PPM;
+      const L = car.def.length;
+      const W = car.def.width;
+      const fx = wh.frontX * k + (wh.wl * k) / 2 - L / 2;
+      const ang = car.steer * 0.55;
+      g.fillStyle = '#1a1612';
+      for (const y of [-wh.out * k + (wh.ww * k) / 2 - W / 2, (W - wh.ww + wh.out) * k + (wh.ww * k) / 2 - W / 2]) {
+        g.save();
+        g.translate(fx, y);
+        g.rotate(ang);
+        g.fillRect((-wh.wl * k) / 2, (-wh.ww * k) / 2, wh.wl * k, wh.ww * k);
+        g.restore();
+      }
       g.drawImage(spr, -sw / 2, -sh / 2, sw, sh);
       g.restore();
+    }
+
+    // missiles: a dart with a flame
+    for (const m of s.missiles) {
+      g.save();
+      g.translate(m.x, m.y);
+      g.rotate(m.heading);
+      g.fillStyle = `rgba(255,${150 + Math.random() * 80},40,0.8)`;
+      g.beginPath();
+      g.moveTo(-0.9, 0);
+      g.lineTo(-2.2 - Math.random() * 0.8, 0.35);
+      g.lineTo(-2.2 - Math.random() * 0.8, -0.35);
+      g.closePath();
+      g.fill();
+      g.fillStyle = '#e8e4d8';
+      g.fillRect(-0.9, -0.22, 1.6, 0.44);
+      g.fillStyle = '#c8352a';
+      g.beginPath();
+      g.moveTo(0.7, -0.22);
+      g.lineTo(1.2, 0);
+      g.lineTo(0.7, 0.22);
+      g.closePath();
+      g.fill();
+      g.restore();
+    }
+
+    // smoke from a damaged car
+    for (const c of s.cars) {
+      if (c.damage < 40 || s.hold > 0) continue;
+      const n = c.damage > 75 ? 2 : 1;
+      for (let i = 0; i < n; i++) {
+        if (Math.random() > dt * 14) continue;
+        const back = -c.def.length * 0.3;
+        this.dust.push({ x: c.x + Math.cos(c.heading) * back, y: c.y + Math.sin(c.heading) * back, vx: (Math.random() - 0.5) * 1.5, vy: (Math.random() - 0.5) * 1.5 - 1, age: 0, life: 1.1, r: 0.7, dark: c.damage > 75 });
+      }
+    }
+
+    // bursts
+    for (const f of s.fx) {
+      const k = f.age;
+      if (f.kind === 'boom') {
+        g.fillStyle = `rgba(255,${200 - k * 150},40,${(1 - k) * 0.9})`;
+        g.beginPath();
+        g.arc(f.x, f.y, 1.5 + k * 6, 0, Math.PI * 2);
+        g.fill();
+        g.strokeStyle = `rgba(40,30,20,${(1 - k) * 0.7})`;
+        g.lineWidth = 0.6;
+        g.beginPath();
+        g.arc(f.x, f.y, 2 + k * 9, 0, Math.PI * 2);
+        g.stroke();
+      } else if (f.kind === 'puff') {
+        g.fillStyle = `rgba(230,220,200,${(1 - k) * 0.6})`;
+        g.beginPath();
+        g.arc(f.x, f.y, 0.8 + k * 3, 0, Math.PI * 2);
+        g.fill();
+      } else {
+        g.fillStyle = `rgba(30,24,20,${(1 - k) * 0.5})`;
+        for (let i = 0; i < 5; i++) {
+          const a = i * 1.3 + f.x;
+          g.beginPath();
+          g.arc(f.x + Math.cos(a) * k * 4, f.y + Math.sin(a) * k * 4, 0.5, 0, Math.PI * 2);
+          g.fill();
+        }
+      }
     }
 
     // trees over the car: they are taller

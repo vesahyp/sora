@@ -17,6 +17,11 @@ export interface RaceResult {
   laps: number[];
   /** race time at the flag */
   time: number;
+  /** 0..100 at the flag */
+  damage: number;
+  /** what is left in the boot */
+  missiles: number;
+  oil: number;
   /** 1-based finishing place */
   place: number;
   /** the field in finishing order; time is -1 for a car still out */
@@ -26,6 +31,9 @@ export interface RaceResult {
 interface Hud {
   place: number;
   field: number;
+  damage: number;
+  missiles: number;
+  oil: number;
   lap: number;
   total: number;
   time: number;
@@ -41,12 +49,15 @@ interface Hud {
  * `field` is the rest of the grid, empty for a licence test. The sim
  * runs here; React only draws the HUD and the overlays.
  */
-export function Game({ trackId, car, field, laps, onEnd, onQuit }: { trackId: string; car: CarDef; field: Entry[]; laps: number; onEnd: (r: RaceResult) => void; onQuit: () => void }) {
+export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { trackId: string; car: CarDef; field: Entry[]; laps: number; ammo: { missiles: number; oil: number }; onEnd: (r: RaceResult) => void; onQuit: () => void }) {
   const carId = car.id;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const wheelRef = useRef<HTMLDivElement>(null);
   const pedalRef = useRef<HTMLDivElement>(null);
+  const fireRef = useRef<HTMLDivElement>(null);
+  const steerRef = useRef<HTMLDivElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
   const simRef = useRef<SimState | null>(null);
   const [hud, setHud] = useState<Hud | null>(null);
   const [paused, setPaused] = useState(false);
@@ -57,7 +68,7 @@ export function Game({ trackId, car, field, laps, onEnd, onQuit }: { trackId: st
   useEffect(() => {
     const canvas = canvasRef.current!;
     const root = rootRef.current!;
-    const s = createState(TRACK_BY_ID[trackId], car, laps, field);
+    const s = createState(TRACK_BY_ID[trackId], car, laps, field, ammo);
     simRef.current = s;
     (window as unknown as { __sim: SimState }).__sim = s;
     const renderer = new Renderer(canvas);
@@ -73,11 +84,15 @@ export function Game({ trackId, car, field, laps, onEnd, onQuit }: { trackId: st
     const nav = navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void> }> } };
     nav.wakeLock?.request('screen').then((l) => (wake = l)).catch(() => undefined);
 
-    const layoutPedal = () => {
-      const el = pedalRef.current;
-      if (!el) return;
+    const circle = (el: HTMLElement | null) => {
+      if (!el) return { x: -999, y: -999, r: 0 };
       const r = el.getBoundingClientRect();
-      input.pedal = { x: r.left + r.width / 2, y: r.top + r.height / 2, r: r.width / 2 + 8 };
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2, r: r.width / 2 + 8 };
+    };
+    const layoutPedal = () => {
+      input.pedal = circle(pedalRef.current);
+      input.fireBtn = circle(fireRef.current);
+      input.dropBtn = circle(dropRef.current);
     };
     const onResize = () => {
       renderer.resize();
@@ -101,6 +116,9 @@ export function Game({ trackId, car, field, laps, onEnd, onQuit }: { trackId: st
       setHud({
         place: placeOf(s, me),
         field: s.cars.length,
+        damage: me.damage,
+        missiles: me.missiles,
+        oil: me.oil,
         lap: Math.min(me.lap, s.totalLaps),
         total: s.totalLaps,
         time: s.finished ? me.laps[me.laps.length - 1] : s.time - me.lapStart,
@@ -122,6 +140,9 @@ export function Game({ trackId, car, field, laps, onEnd, onQuit }: { trackId: st
         carId,
         laps: me.laps.slice(),
         time: me.finishedAt,
+        damage: me.damage,
+        missiles: me.missiles,
+        oil: me.oil,
         place,
         order: standings(s).map((c) => ({ name: c.driver.name, colour: c.def.colour, time: c.finishedAt, player: c === me })),
       };
@@ -144,7 +165,7 @@ export function Game({ trackId, car, field, laps, onEnd, onQuit }: { trackId: st
         step(s, inputs, DT);
         acc -= DT;
         n++;
-        for (const name of s.sounds) audio.play(name);
+        for (const name of s.sounds) if (name !== 'fire-far') audio.play(name);
         s.sounds.length = 0;
         const count = Math.ceil(s.hold);
         if (s.hold > 0 && count !== lastCount) {
@@ -179,6 +200,14 @@ export function Game({ trackId, car, field, laps, onEnd, onQuit }: { trackId: st
         pd.classList.toggle('on', input.braking);
         pd.classList.toggle('rev', s.cars[0].speed < -0.3);
       }
+      fireRef.current?.classList.toggle('empty', s.cars[0].missiles === 0);
+      // the steering wheel turns with the car's wheel, a quarter turn at full lock
+      const sw = steerRef.current;
+      if (sw) {
+        sw.style.transform = `translateX(-50%) rotate(${s.cars[0].steer * 90}deg)`;
+        sw.classList.toggle('held', input.wheel.active);
+      }
+      dropRef.current?.classList.toggle('empty', s.cars[0].oil === 0);
       if (now - hudAt > 50) {
         hudAt = now;
         publishHud();
@@ -199,7 +228,7 @@ export function Game({ trackId, car, field, laps, onEnd, onQuit }: { trackId: st
       window.visualViewport?.removeEventListener('resize', onResize);
       void wake?.release();
     };
-  }, [trackId, car, field, laps, onEnd]);
+  }, [trackId, car, field, laps, ammo, onEnd]);
 
   const pause = (p: boolean) => {
     pausedRef.current = p;
@@ -220,6 +249,17 @@ export function Game({ trackId, car, field, laps, onEnd, onQuit }: { trackId: st
       <div className="pedal" ref={pedalRef}>
         <span>{tr('JARRU', 'BRAKE')}</span>
         <small>{tr('pidä: peruuta', 'hold: reverse')}</small>
+      </div>
+      <div className="steerwheel" ref={steerRef}>
+        <i />
+      </div>
+      <div className="weapon fire" ref={fireRef}>
+        <span>🚀</span>
+        <b>{hud?.missiles ?? ammo.missiles}</b>
+      </div>
+      <div className="weapon drop" ref={dropRef}>
+        <span>🛢️</span>
+        <b>{hud?.oil ?? ammo.oil}</b>
       </div>
       {hud && (
         <div className="hud">
@@ -244,6 +284,12 @@ export function Game({ trackId, car, field, laps, onEnd, onQuit }: { trackId: st
           </div>
           <div className="speedo">
             <b>{Math.round(hud.speed * 3.6)}</b> km/h
+          </div>
+          <div className={`damage${hud.damage > 60 ? ' bad' : ''}`}>
+            <span>{tr('Vauriot', 'Damage')}</span>
+            <div className="bar">
+              <div style={{ width: `${hud.damage}%` }} />
+            </div>
           </div>
         </div>
       )}

@@ -5,9 +5,12 @@ export interface CarInput {
   steer: number;
   throttle: number;
   brake: number;
+  /** edges: true for the one step they are asked */
+  fire: boolean;
+  drop: boolean;
 }
 
-export const NO_INPUT: CarInput = { steer: 0, throttle: 0, brake: 0 };
+export const NO_INPUT: CarInput = { steer: 0, throttle: 0, brake: 0, fire: false, drop: false };
 
 export type Surface = 'gravel' | 'tarmac';
 

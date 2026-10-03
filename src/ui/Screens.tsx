@@ -39,7 +39,7 @@ export function Title({ save, onPlay }: { save: Save; onPlay: () => void }) {
   );
 }
 
-export function Result({ r, purpose, prize, passed, set, records, onAgain, onMenu }: { r: RaceResult; purpose: Purpose; prize: number; passed: boolean; set: { lap: boolean; race: boolean }; records: Records; onAgain: () => void; onMenu: () => void }) {
+export function Result({ r, purpose, prize, repair, passed, set, records, onAgain, onMenu }: { r: RaceResult; purpose: Purpose; prize: number; repair: number; passed: boolean; set: { lap: boolean; race: boolean }; records: Records; onAgain: () => void; onMenu: () => void }) {
   const key = recordKey(r.trackId, r.carId);
   const total = r.laps.reduce((a, b) => a + b, 0);
   const best = Math.min(...r.laps);
@@ -72,7 +72,15 @@ export function Result({ r, purpose, prize, passed, set, records, onAgain, onMen
               ))}
             </tbody>
           </table>
-          <div className="prize">+ {cr(prize)}</div>
+          <div className="prize">
+            + {cr(prize)}
+            {repair > 0 && (
+              <small>
+                {' '}
+                · {tr('korjaus', 'repair')} − {cr(repair)} ({Math.round(r.damage)}%)
+              </small>
+            )}
+          </div>
         </>
       )}
       <table className="laps">

@@ -12,6 +12,8 @@ The design is in `docs/design.md`.
   `make balance`.
 - Skid marks and a dust trail that reads the slide, so the slide is
   visible before it is felt.
+- The guns need a playtest: are three missiles a race too many or too
+  few, and does a spin at 1.1 s feel like a punishment or a pause.
 - The opponents are the bot with a skill knob. Watch for what they do
   wrong (bunching, a car parked across the road) and give them what a
   race needs: a touch of rubber banding so the field stays in view.
@@ -24,7 +26,8 @@ The design is in `docs/design.md`.
 - Sell a car back at the dealer; a used-car column with cheaper worn cars.
 - More tracks; tracks reused across classes with a different car.
 - Reverse layouts of the two tracks as cheap extra events.
-- Missiles, front and rear, and damage that costs money to repair.
+- Armour as a fifth part, so a built car shrugs off a missile.
+- Mines, and a rear missile: the Super Cars II set.
 - Two players on one phone, a thumb each, the Räkkä pattern.
 - The clavesa rollup of the pixel logs and the `?stats` board (Räkkä's
   `analytics/` and `StatsScreen`), then global lap records in DynamoDB

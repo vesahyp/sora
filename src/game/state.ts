@@ -41,6 +41,46 @@ export interface Car {
   finishedAt: number;
   /** lap * L + s, for the running order */
   progress: number;
+  /** 0..100; costs pace now and credits after */
+  damage: number;
+  missiles: number;
+  oil: number;
+  /** seconds left of being a passenger after a hit */
+  spin: number;
+  /** seconds left of no grip after a slick */
+  slick: number;
+  /** seconds the car has been near standstill with the throttle down; the bot reverses on it */
+  stall: number;
+  /** what this car has fired, for the result */
+  shots: number;
+  /** seconds until the next shot or drop is allowed */
+  fireWait: number;
+  dropWait: number;
+}
+
+export interface Missile {
+  x: number;
+  y: number;
+  heading: number;
+  speed: number;
+  age: number;
+  /** index of the car that fired it; it cannot hit its own */
+  owner: number;
+}
+
+export interface Slick {
+  x: number;
+  y: number;
+  r: number;
+  age: number;
+}
+
+/** A burst for the renderer: an explosion, a puff, a splash. */
+export interface Fx {
+  kind: 'boom' | 'puff' | 'splash';
+  x: number;
+  y: number;
+  age: number;
 }
 
 export interface SimState {
@@ -53,6 +93,9 @@ export interface SimState {
   finished: boolean;
   /** the countdown before the lights go, seconds; the cars are held while > 0 */
   hold: number;
+  missiles: Missile[];
+  slicks: Slick[];
+  fx: Fx[];
   /** names of sounds for the loop to drain */
   sounds: string[];
   /** world metres visible, set by the renderer; unused by the sim itself */
@@ -61,17 +104,19 @@ export interface SimState {
 
 export const PLAYER: Driver = { name: { fi: 'Sinä', en: 'You' }, skill: 1, colour: '#c8352a' };
 
-/** One car on the grid: who drives it and what it is. */
+/** One car on the grid: who drives it, what it is, what is in the boot. */
 export interface Entry {
   driver: Driver;
   car: CarDef;
+  missiles?: number;
+  oil?: number;
 }
 
-export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: number, opponents: Entry[] = []): SimState {
+export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: number, opponents: Entry[] = [], ammo: { missiles: number; oil: number } = { missiles: 0, oil: 0 }): SimState {
   const track = new Track(trackDef);
-  const entries: Entry[] = [{ driver: PLAYER, car: playerCar }, ...opponents];
+  const entries: Entry[] = [{ driver: PLAYER, car: playerCar, ...ammo }, ...opponents];
   // the grid: two abreast, the player on the front row, behind the line
-  const cars = entries.map(({ driver, car }, i) => {
+  const cars = entries.map(({ driver, car, missiles = 0, oil = 0 }, i) => {
     const row = Math.floor(i / 2);
     const side = i % 2 ? 1 : -1;
     const s = track.length - 7 - row * 7;
@@ -98,9 +143,18 @@ export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: nu
       laps: [],
       finishedAt: -1,
       progress: 0,
+      damage: 0,
+      missiles,
+      oil,
+      spin: 0,
+      slick: 0,
+      stall: 0,
+      shots: 0,
+      fireWait: 0,
+      dropWait: 0,
     };
   });
-  return { time: 0, track, cars, totalLaps, finished: false, hold: 2.5, sounds: [], view: { w: 40, h: 70 } };
+  return { time: 0, track, cars, totalLaps, finished: false, hold: 2.5, missiles: [], slicks: [], fx: [], sounds: [], view: { w: 40, h: 70 } };
 }
 
 /** The running order: finishers by flag time, then everyone by distance covered. */

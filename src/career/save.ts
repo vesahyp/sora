@@ -23,12 +23,15 @@ export interface Save {
   wins: number;
   /** the best place per event id */
   results: Record<string, number>;
+  /** in the boot, carried from race to race */
+  missiles: number;
+  oil: number;
 }
 
 const KEY = 'sora.career';
 
 export function newSave(): Save {
-  return { v: 1, credits: 600, cars: [{ carId: CARS[0].id, parts: { ...STOCK } }], current: 0, licences: [], races: 0, wins: 0, results: {} };
+  return { v: 1, credits: 600, cars: [{ carId: CARS[0].id, parts: { ...STOCK } }], current: 0, licences: [], races: 0, wins: 0, results: {}, missiles: 4, oil: 3 };
 }
 
 export function loadSave(): Save {
@@ -36,7 +39,8 @@ export function loadSave(): Save {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const s = JSON.parse(raw) as Save;
-      if (s.v === 1 && s.cars.length) return s;
+      // saves from before the armoury get the starter ammo
+      if (s.v === 1 && s.cars.length) return { ...s, missiles: s.missiles ?? 4, oil: s.oil ?? 3 };
     }
   } catch {
     /* no storage */

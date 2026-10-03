@@ -5,6 +5,7 @@ import { CARS, CAR_BY_ID } from '../game/content/cars';
 import { PARTS, partPrice, tuned, type PartKind } from '../game/content/parts';
 import { EVENTS, type EventDef } from '../game/content/events';
 import { LICENCES, type LicenceDef } from '../game/content/licences';
+import { WEAPONS, type WeaponDef } from '../game/content/weapons';
 import { TRACK_BY_ID } from '../game/content/tracks';
 import { carSprite } from '../render/sprites';
 import type { CarDef } from '../game/types';
@@ -76,7 +77,7 @@ function Top({ save, title, onBack }: { save: Save; title: string; onBack?: () =
   );
 }
 
-export function Garage({ save, onEvents, onShop, onDealer, onLicences, onPick, onTitle }: { save: Save; onEvents: () => void; onShop: () => void; onDealer: () => void; onLicences: () => void; onPick: (i: number) => void; onTitle: () => void }) {
+export function Garage({ save, onEvents, onShop, onDealer, onLicences, onArmoury, onPick, onTitle }: { save: Save; onEvents: () => void; onShop: () => void; onDealer: () => void; onLicences: () => void; onArmoury: () => void; onPick: (i: number) => void; onTitle: () => void }) {
   const car = playerCar(save);
   const owned = currentCar(save);
   return (
@@ -103,6 +104,12 @@ export function Garage({ save, onEvents, onShop, onDealer, onLicences, onPick, o
         <button className="btn" onClick={onShop}>
           {tr('Osakauppa', 'Parts shop')}
           <small>{Object.values(owned.parts).reduce((a, b) => a + b, 0)}/12</small>
+        </button>
+        <button className="btn" onClick={onArmoury}>
+          {tr('Asevarasto', 'Armoury')}
+          <small>
+            🚀 {save.missiles} · 🛢️ {save.oil}
+          </small>
         </button>
         <button className="btn" onClick={onDealer}>
           {tr('Autokauppa', 'Dealer')}
@@ -242,6 +249,38 @@ export function Licences({ save, onTake, onBack }: { save: Save; onTake: (l: Lic
                   <span className="lvl">{have ? tr('Suoritettu', 'Passed') : fmt(l.target)}</span>
                 </div>
                 <div className="desc">{t(l.desc)}</div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function Armoury({ save, onBuy, onBack }: { save: Save; onBuy: (w: WeaponDef) => void; onBack: () => void }) {
+  return (
+    <div className="screen list">
+      <Top save={save} title={tr('Asevarasto', 'Armoury')} onBack={onBack} />
+      <p className="help">{tr('Ostetaan kappaleittain, ja mitä jää, se jää seuraavaan kisaan. Napautus ruutuun ampuu, nappi oikealla alhaalla pudottaa öljyn.', 'Bought by the shot; what is left stays for the next race. A tap on the screen fires, the button at the bottom right drops oil.')}</p>
+      <div className="cards">
+        {WEAPONS.map((w) => {
+          const have = w.id === 'missile' ? save.missiles : save.oil;
+          const full = have >= w.max;
+          const can = !full && w.price <= save.credits;
+          return (
+            <button key={w.id} className={`card part${full ? ' done' : can ? '' : ' locked'}`} disabled={!can} onClick={() => onBuy(w)}>
+              <div className="ic">
+                {have}
+                <small>/{w.max}</small>
+              </div>
+              <div className="body">
+                <div className="name">
+                  {w.id === 'missile' ? '🚀 ' : '🛢️ '}
+                  {t(w.name)}
+                  <span className="lvl">{full ? tr('Täynnä', 'Full') : `${cr(w.price)} / ${tr('kpl', 'each')}`}</span>
+                </div>
+                <div className="desc">{t(w.desc)}</div>
               </div>
             </button>
           );

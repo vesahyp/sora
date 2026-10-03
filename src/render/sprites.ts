@@ -26,13 +26,12 @@ export function carSprite(def: CarDef): HTMLCanvasElement {
   g.translate(pad, pad);
   const shape = def.shape;
 
-  // wheels: the rally car's stick out and carry mud flaps
+  // rear wheels: the front pair turn with the steering, so the renderer
+  // draws them (wheelLayout says where). The rally car's stick out and
+  // carry mud flaps.
   g.fillStyle = '#1a1612';
-  const wl = L * (shape === 'coupe' ? 0.19 : 0.2);
-  const ww = W * (shape === 'rally' ? 0.3 : 0.22);
-  const out = shape === 'rally' ? ww * 0.6 : ww * 0.45;
-  const front = shape === 'coupe' ? 0.72 : 0.68;
-  for (const [x, y] of [[L * 0.12, -out], [L * 0.12, W - ww + out], [L * front, -out], [L * front, W - ww + out]]) {
+  const { wl, ww, out } = wheelLayout(def);
+  for (const [x, y] of [[L * 0.12, -out], [L * 0.12, W - ww + out]]) {
     rounded(g, x, y, wl, ww, 2);
     g.fill();
   }
@@ -154,6 +153,17 @@ export function carSprite(def: CarDef): HTMLCanvasElement {
   g.fillRect(0, W * 0.72, L * 0.04, W * 0.2);
   cache.set(key, c);
   return c;
+}
+
+/** Wheel size and where the front pair sit, in sprite pixels; the renderer scales by SPRITE_PPM. */
+export function wheelLayout(def: CarDef): { wl: number; ww: number; out: number; frontX: number } {
+  const L = def.length * SPRITE_PPM;
+  const W = def.width * SPRITE_PPM;
+  const wl = L * (def.shape === 'coupe' ? 0.19 : 0.2);
+  const ww = W * (def.shape === 'rally' ? 0.3 : 0.22);
+  const out = def.shape === 'rally' ? ww * 0.6 : ww * 0.45;
+  const frontX = L * (def.shape === 'coupe' ? 0.72 : 0.68);
+  return { wl, ww, out, frontX };
 }
 
 export function treeSprite(kind: number): HTMLCanvasElement {

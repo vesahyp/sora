@@ -97,6 +97,45 @@ class Audio {
         beep(880, 0.12, 0.12);
         beep(1100, 0.24, 0.35);
         break;
+      case 'fire': {
+        const o = c.createOscillator();
+        const g = c.createGain();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(900, t);
+        o.frequency.exponentialRampToValueAtTime(200, t + 0.35);
+        g.gain.setValueAtTime(0.18, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+        o.connect(g).connect(c.destination);
+        o.start(t);
+        o.stop(t + 0.4);
+        break;
+      }
+      case 'boom': {
+        const len = 0.5;
+        const buf = c.createBuffer(1, c.sampleRate * len, c.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
+        const src = c.createBufferSource();
+        src.buffer = buf;
+        const f = c.createBiquadFilter();
+        f.type = 'lowpass';
+        f.frequency.setValueAtTime(1200, t);
+        f.frequency.exponentialRampToValueAtTime(120, t + len);
+        const g = c.createGain();
+        g.gain.value = 0.5;
+        src.connect(f).connect(g).connect(c.destination);
+        src.start(t);
+        break;
+      }
+      case 'splash':
+        beep(220, 0, 0.2, 'triangle', 0.2);
+        beep(160, 0.08, 0.25, 'triangle', 0.2);
+        break;
+      case 'spin':
+        beep(300, 0, 0.1, 'square', 0.1);
+        beep(240, 0.1, 0.1, 'square', 0.1);
+        beep(180, 0.2, 0.2, 'square', 0.1);
+        break;
       case 'bump':
         beep(90, 0, 0.12, 'triangle', 0.3);
         break;
