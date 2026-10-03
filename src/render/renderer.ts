@@ -1,6 +1,6 @@
 import type { SimState } from '../game/state';
 import type { Track } from '../game/track';
-import { carSprite, treeSprite, wheelLayout, SPRITE_PPM } from './sprites';
+import { carSprite, treeSprite, wheelLayout, SPRITE_PPM, SPRITE_PX } from './sprites';
 import { hash32 } from '../game/rng';
 import { PICKUPS } from '../game/content/pickups';
 import { GUN } from '../game/content/weapons';
@@ -25,6 +25,17 @@ interface Dust {
 
 /** pixels per metre of the skid mark layer */
 const MARK_PPM = 3;
+/**
+ * The camera's scale: a car is about a tenth of the screen's short side,
+ * Death Rally's view, so the cars beside you and the gaps between them
+ * are the picture. A 1.7 m car, so the short side shows about 17 m.
+ */
+const CARS_ACROSS = 10;
+const CAR_WIDTH = 1.7;
+/** seconds of travel the camera looks ahead of the car */
+const LEAD = 0.35;
+/** the grass tile in pixels; it covers 8 m of ground */
+const GRASS_TILE = 384;
 
 export class Renderer {
   private g: CanvasRenderingContext2D;
@@ -59,9 +70,8 @@ export class Renderer {
     this.h = Math.max(1, Math.round(r.height));
     this.canvas.width = Math.round(this.w * this.dpr);
     this.canvas.height = Math.round(this.h * this.dpr);
-    // the road should be about a quarter of the short side
     const short = Math.min(this.w, this.h);
-    this.ppm = Math.max(8, Math.min(14, short / 36));
+    this.ppm = Math.max(16, Math.min(40, short / (CAR_WIDTH * CARS_ACROSS)));
   }
 
   view(): { w: number; h: number } {
@@ -109,8 +119,10 @@ export class Renderer {
   private ensureGrass(): void {
     if (this.grass) return;
     const c = document.createElement('canvas');
-    c.width = c.height = 96;
+    // the tile is 8 m of grass at GRASS_PX a metre, sharp under the close camera
+    c.width = c.height = GRASS_TILE;
     const g = c.getContext('2d')!;
+    g.scale(GRASS_TILE / 96, GRASS_TILE / 96);
     g.fillStyle = '#4c7a2e';
     g.fillRect(0, 0, 96, 96);
     for (let i = 0; i < 260; i++) {
@@ -130,10 +142,9 @@ export class Renderer {
     const t = s.track;
     this.ensureRoad(t);
     this.ensureGrass();
-    // camera: lead the car by half a second of travel
-    const lead = 0.55;
-    const tx = c.x + c.vx * lead;
-    const ty = c.y + c.vy * lead;
+    // camera: lead the car a little in the direction of travel
+    const tx = c.x + c.vx * LEAD;
+    const ty = c.y + c.vy * LEAD;
     if (!this.camInit) {
       this.camX = tx;
       this.camY = ty;
@@ -151,11 +162,11 @@ export class Renderer {
     g.translate(shakeX, shakeY);
     // grass, the whole screen
     g.save();
-    const ps = this.ppm / 12;
+    const ps = (this.ppm * 8) / GRASS_TILE;
     g.scale(ps, ps);
-    g.translate(((-this.camX * this.ppm + this.w / 2) / ps) % 96, ((-this.camY * this.ppm + this.h / 2) / ps) % 96);
+    g.translate(((-this.camX * this.ppm + this.w / 2) / ps) % GRASS_TILE, ((-this.camY * this.ppm + this.h / 2) / ps) % GRASS_TILE);
     g.fillStyle = this.grass!;
-    g.fillRect(-96, -96, this.w / ps + 192, this.h / ps + 192);
+    g.fillRect(-GRASS_TILE, -GRASS_TILE, this.w / ps + GRASS_TILE * 2, this.h / ps + GRASS_TILE * 2);
     g.restore();
 
     // world space
@@ -202,24 +213,25 @@ export class Renderer {
     this.layMarks(s);
     if (this.marks) g.drawImage(this.marks, t.bounds.minX, t.bounds.minY, this.marks.width / MARK_PPM, this.marks.height / MARK_PPM);
 
-    // pickups: a disc with a glyph, bobbing
+    // pickups: a disc with a glyph, bobbing, small enough to sit off the line on a 6 m road
+    const pr = 0.85;
     for (const p of s.pickups) {
       if (p.gone > 0 || !visible(p.x, p.y)) continue;
       const def = PICKUPS[p.kind];
-      const bob = Math.sin(s.time * 4 + p.x) * 0.15;
+      const bob = Math.sin(s.time * 4 + p.x) * 0.1;
       g.fillStyle = 'rgba(0,0,0,0.3)';
       g.beginPath();
-      g.arc(p.x, p.y + 0.4, 1.3, 0, Math.PI * 2);
+      g.arc(p.x, p.y + 0.3, pr, 0, Math.PI * 2);
       g.fill();
       g.fillStyle = def.colour;
       g.beginPath();
-      g.arc(p.x, p.y + bob, 1.3, 0, Math.PI * 2);
+      g.arc(p.x, p.y + bob, pr, 0, Math.PI * 2);
       g.fill();
       g.strokeStyle = 'rgba(0,0,0,0.5)';
-      g.lineWidth = 0.2;
+      g.lineWidth = 0.12;
       g.stroke();
       g.fillStyle = '#1a1612';
-      g.font = 'bold 1.6px sans-serif';
+      g.font = 'bold 1.1px sans-serif';
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       g.fillText({ cash: '$', nitro: 'N', wrench: '+', missile: '^', mine: 'o' }[p.kind], p.x, p.y + bob + 0.1);
@@ -293,7 +305,7 @@ export class Renderer {
         g.globalAlpha = 0.6;
         g.filter = 'brightness(0.35)';
         const w = carSprite(car.def);
-        g.drawImage(w, -w.width / SPRITE_PPM / 2, -w.height / SPRITE_PPM / 2, w.width / SPRITE_PPM, w.height / SPRITE_PPM);
+        g.drawImage(w, -w.width / SPRITE_PX / 2, -w.height / SPRITE_PX / 2, w.width / SPRITE_PX, w.height / SPRITE_PX);
         g.filter = 'none';
         g.globalAlpha = 1;
         g.restore();
@@ -308,8 +320,8 @@ export class Renderer {
         continue;
       }
       const spr = carSprite(car.def);
-      const sw = spr.width / SPRITE_PPM;
-      const sh = spr.height / SPRITE_PPM;
+      const sw = spr.width / SPRITE_PX;
+      const sh = spr.height / SPRITE_PX;
       g.save();
       g.translate(car.x, car.y);
       g.rotate(car.heading);

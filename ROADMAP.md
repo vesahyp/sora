@@ -18,9 +18,6 @@ The design is in `docs/design.md`.
   leader is leaned on more than the tail.
 - The bounty and the pickups against the prize table: a race should pay
   more for driving well than for driving over cash.
-- The bot drives at the limit of a model it only approximates; the
-  off-road bar in `sim-check` is 10%. Give its margin a feel for power
-  and mass (the Kiila is the one that runs wide) and bring it to 8%.
 
 ## Later
 

@@ -6,13 +6,15 @@ import type { TrackDef } from '../types';
  * track.ts smooths the line and the renderer draws the road from it, so a
  * new track is a new list of points and nothing else. Points run
  * clockwise on screen (y grows downward). The first point is the start
- * line and the first segment the start straight.
+ * line and the first segment the start straight. Roads are 6 m, about
+ * three cars abreast, the width of a Death Rally road: room to pass and
+ * no room to pass without a fight.
  */
 export const TRACKS: TrackDef[] = [
   {
     id: 'kiviaho',
     name: L('Kiviaho'),
-    width: 9,
+    width: 6,
     surface: 'gravel',
     // The first track: about 600 m, a long straight, two hairpins and a
     // sweeper. Under half a minute a lap.
@@ -38,7 +40,7 @@ export const TRACKS: TrackDef[] = [
   {
     id: 'hirvisuo',
     name: L('Hirvisuo'),
-    width: 9,
+    width: 6,
     surface: 'gravel',
     // About a kilometre: a long start straight, a hairpin, an esses
     // section, a fast sweeper home.

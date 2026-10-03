@@ -9,8 +9,16 @@ import type { CarDef } from '../game/types';
 
 const cache = new Map<string, HTMLCanvasElement>();
 
-/** pixels per metre inside the sprite; the renderer scales it to the view */
+/** drawing units per metre inside the sprite: the paths below are written in these */
 export const SPRITE_PPM = 24;
+/**
+ * Canvas pixels per drawing unit. The close camera puts about 33 css px,
+ * 66 device px, on a metre, so a sprite cached at 24 px a metre would be
+ * stretched and blurred; it is drawn at three times that instead.
+ */
+const SPRITE_RES = 3;
+/** canvas pixels per metre of a cached sprite: what the renderer divides by */
+export const SPRITE_PX = SPRITE_PPM * SPRITE_RES;
 
 export function carSprite(def: CarDef): HTMLCanvasElement {
   const key = `car:${def.shape}:${def.length}:${def.width}:${def.colour}`;
@@ -20,9 +28,10 @@ export function carSprite(def: CarDef): HTMLCanvasElement {
   const W = def.width * SPRITE_PPM;
   const pad = 8;
   const c = document.createElement('canvas');
-  c.width = Math.ceil(L + pad * 2);
-  c.height = Math.ceil(W + pad * 2);
+  c.width = Math.ceil((L + pad * 2) * SPRITE_RES);
+  c.height = Math.ceil((W + pad * 2) * SPRITE_RES);
   const g = c.getContext('2d')!;
+  g.scale(SPRITE_RES, SPRITE_RES);
   g.translate(pad, pad);
   const shape = def.shape;
 
@@ -172,8 +181,9 @@ export function treeSprite(kind: number): HTMLCanvasElement {
   if (hit) return hit;
   const R = 32;
   const c = document.createElement('canvas');
-  c.width = c.height = R * 2 + 4;
+  c.width = c.height = (R * 2 + 4) * SPRITE_RES;
   const g = c.getContext('2d')!;
+  g.scale(SPRITE_RES, SPRITE_RES);
   g.translate(R + 2, R + 2);
   const dark = ['#15301a', '#1a3a1c', '#10281a', '#1e3a22'][kind];
   const light = ['#2b5a2a', '#356a2c', '#245232', '#3a6a30'][kind];

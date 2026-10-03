@@ -29,8 +29,13 @@ on poljin, X tai ylös on nitro.
 ## Kisa
 
 Kolme kierrosta, neljä autoa, ja kaikki yrittävät romuttaa toisensa.
-Jorma ajaa kovaa, Marko lähes yhtä kovaa, Tapsa on kuski jonka ohitat
-ensin. Kaikki nojaavat viereiseen autoon.
+**Lähdet viimeisenä**: kisa on nousu kentän läpi. Jorma ajaa kovaa,
+Marko lähes yhtä kovaa, Tapsa on kuski jonka ohitat ensin. Kaikki
+nojaavat viereiseen autoon. Kenttä pysyy lähelläsi: edellä ajava
+hiljentää ja takana tuleva painaa, joten johtaja on aina maalitaulu.
+
+Tie on kapea, kolmen auton levyinen. Ohi pääsee, mutta ei ilman
+kylkiä.
 
 - **Sivuluisu** täyttää nitrotankkia. Niin täyttää myös töytäisy ja
   erityisesti toisen auton romuttaminen, joka täyttää tankin kerralla.
@@ -40,7 +45,8 @@ ensin. Kaikki nojaavat viereiseen autoon.
   hetken ja palaa sitten tielle puolikuntoisena. Romuttajalle maksetaan
   palkkio heti.
 - **Tiellä on tavaraa:** rahaa, nitroa, korjausta, ohjuksia ja miinoja.
-  Otettu kasvaa takaisin hetken päästä.
+  Ne ovat tien laidoilla, eivät ajolinjalla: haku maksaa linjan. Raha
+  on aivan reunassa. Otettu kasvaa takaisin hetken päästä.
 - Nurmi on liukas, metsä pysäyttää. Maalissa korjaus maksaa osan
   palkinnosta.
 

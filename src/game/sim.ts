@@ -1,8 +1,9 @@
 import type { Car, SimState } from './state';
 import type { CarInput } from './types';
 import { BOOST, DAMAGE, DAMAGE_PACE, GUN, MINE, MISSILE, RAM, RESPAWN_DAMAGE, SPIN_TIME, WRECK_BOUNTY, WRECK_TIME } from './content/weapons';
-import { PICKUPS, PICKUP_RESPAWN } from './content/pickups';
+import { PICKUPS, PICKUP_REACH, PICKUP_RESPAWN } from './content/pickups';
 import { CLASS_RANK } from './types';
+import { enginePace } from './content/drivers';
 
 export const DT = 1 / 60;
 
@@ -97,7 +98,8 @@ function moveCar(s: SimState, c: Car, input: CarInput, dt: number): void {
   let w = c.yaw;
 
   const onRoad = Math.abs(c.d) <= t.width / 2;
-  const pace = 1 - DAMAGE_PACE * (c.damage / 100);
+  // damage costs pull and top speed; an opponent's engine is also paced to the player (PACING)
+  const pace = (1 - DAMAGE_PACE * (c.damage / 100)) * enginePace(s, c);
   if (c.spin > 0) c.spin -= dt;
   const spinning = c.spin > 0;
 
@@ -366,7 +368,7 @@ function pickups(s: SimState, dt: number): void {
     }
     for (let k = 0; k < s.cars.length; k++) {
       const c = s.cars[k];
-      if (c.wreck > 0 || Math.hypot(c.x - p.x, c.y - p.y) > 2.3) continue;
+      if (c.wreck > 0 || Math.hypot(c.x - p.x, c.y - p.y) > PICKUP_REACH) continue;
       const def = PICKUPS[p.kind];
       p.gone = PICKUP_RESPAWN;
       switch (p.kind) {

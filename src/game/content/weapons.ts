@@ -24,9 +24,11 @@ export const WEAPONS: WeaponDef[] = [
 /** damage per thing (0..100 is a car) */
 export const DAMAGE = { bullet: 0.7, missile: 24, mine: 20, ram: 0.9, tree: 5 };
 /** the machine gun: cone half-angle, range, shots a second, seconds of fire before it overheats */
-export const GUN = { cone: 0.3, range: 36, rate: 9, heat: 2.0, cool: 1.6, holdOff: 3 };
+// reach is what the player can see: the camera shows about 18 m ahead of the car, so a gun that
+// hits further fires at cars that are not on the screen
+export const GUN = { cone: 0.3, range: 22, rate: 9, heat: 2.0, cool: 1.6, holdOff: 3 };
 /** the missile: lock time, range, cone, speed over the car's, life, turn rate */
-export const MISSILE = { lock: 0.5, range: 38, cone: 0.45, speed: 42, life: 2.2, turn: 3.5, every: 2.5 };
+export const MISSILE = { lock: 0.5, range: 24, cone: 0.45, speed: 42, life: 2.2, turn: 3.5, every: 2.5 };
 export const MINE = { behind: 14, every: 3.5, r: 1.6, life: 40 };
 /** at 100 damage the car has lost this much of its pull and top speed */
 export const DAMAGE_PACE = 0.25;

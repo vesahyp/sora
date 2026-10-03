@@ -1,7 +1,7 @@
 import type { CarDef, TrackDef } from './types';
 import { Track } from './track';
 import type { Text } from '../i18n';
-import { PICKUP_ORDER, PICKUP_SPACING, type PickupKind } from './content/pickups';
+import { PICKUP_OFFSET, PICKUP_OFFSET_CASH, PICKUP_ORDER, PICKUP_SPACING, type PickupKind } from './content/pickups';
 
 export interface Driver {
   name: Text;
@@ -171,13 +171,16 @@ export interface Entry {
 export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: number, opponents: Entry[] = [], ammo: { missiles: number; mines: number } = { missiles: 0, mines: 0 }): SimState {
   const track = new Track(trackDef);
   const entries: Entry[] = [{ driver: PLAYER, car: playerCar, ...ammo }, ...opponents];
-  // the grid: two abreast, the player on the front row, behind the line
+  // the grid: two abreast behind the line, the player in the last slot. Death Rally starts
+  // you last: the race is the climb through the field, and the field is where the fight is.
   const cars = entries.map(({ driver, car, missiles = 0, mines = 0 }, i) => {
-    const row = Math.floor(i / 2);
-    const side = i % 2 ? 1 : -1;
+    const slot = i === 0 ? entries.length - 1 : i - 1;
+    const row = Math.floor(slot / 2);
+    const side = slot % 2 ? 1 : -1;
     const s = track.length - 7 - row * 7;
     const p = track.at(s);
-    const d = side * trackDef.width * 0.22;
+    // far enough apart that two cars side by side do not touch on a narrow road
+    const d = side * Math.max(1.7, trackDef.width * 0.22);
     return {
       def: { ...car, colour: driver.colour },
       driver,
@@ -226,14 +229,15 @@ export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: nu
       lastHitBy: -1,
     };
   });
-  // pickups along the lap, alternating sides, the kinds in rotation
+  // pickups along the lap, off the line, alternating sides, the kinds in rotation
   const pickups: Pickup[] = [];
   const n = Math.floor(track.length / PICKUP_SPACING);
   for (let i = 0; i < n; i++) {
     const s = ((i + 0.5) * track.length) / n;
     const p = track.at(s);
-    const d = (i % 2 ? 1 : -1) * trackDef.width * 0.25;
-    pickups.push({ kind: PICKUP_ORDER[i % PICKUP_ORDER.length], x: p.x - p.ty * d, y: p.y + p.tx * d, gone: 0 });
+    const kind = PICKUP_ORDER[i % PICKUP_ORDER.length];
+    const d = (i % 2 ? 1 : -1) * (trackDef.width / 2) * (kind === 'cash' ? PICKUP_OFFSET_CASH : PICKUP_OFFSET);
+    pickups.push({ kind, x: p.x - p.ty * d, y: p.y + p.tx * d, gone: 0 });
   }
   return { time: 0, track, cars, totalLaps, finished: false, hold: 2.5, bullets: [], missiles: [], mines: [], pickups, fx: [], toasts: [], shake: 0, sounds: [], view: { w: 40, h: 70 } };
 }

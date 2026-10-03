@@ -26,6 +26,16 @@ export const PICKUPS: Record<PickupKind, PickupDef> = {
 
 /** metres between spawn points along the lap, and seconds until a taken one grows back */
 export const PICKUP_SPACING = 85;
+/**
+ * Off the line: a pickup sits this share of the half-width out from the
+ * centreline, sides alternating, cash furthest out. A car takes one when
+ * its centre comes within the reach, and the reach is less than the
+ * offset, so a car on the centreline drives past. Taking one is a line
+ * choice, which is the reason Death Rally put them on the road.
+ */
+export const PICKUP_OFFSET = 0.6;
+export const PICKUP_OFFSET_CASH = 0.85;
+export const PICKUP_REACH = 1.5;
 export const PICKUP_RESPAWN = 9;
 /** the rotation of kinds along the lap */
 export const PICKUP_ORDER: PickupKind[] = ['cash', 'nitro', 'cash', 'wrench', 'missile', 'nitro', 'cash', 'mine'];
