@@ -54,7 +54,8 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
     const k = Math.abs(t.curvatureAhead(c.s + a, 30));
     if (k > sharpest) sharpest = k;
   }
-  const cornerSpeed = tune.cornerSpeed * (0.6 + 0.4 * skill);
+  // grippier tyres carry more speed through a bend: the Kortteli's stock grip is the baseline
+  const cornerSpeed = tune.cornerSpeed * (0.6 + 0.4 * skill) * Math.sqrt(c.def.grip / 4.5);
   const allowed = Math.min(sharpest < 0.05 ? Infinity : cornerSpeed / sharpest, c.def.topSpeed * (0.7 + 0.3 * skill));
   const brake = speed > allowed + 2 ? 1 : 0;
   const throttle = brake ? 0 : speed > allowed ? 0.3 : 1;

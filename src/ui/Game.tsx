@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { createState, placeOf, standings, type SimState } from '../game/state';
-import { OPPONENTS } from '../game/content/drivers';
+import { createState, placeOf, standings, type Entry, type SimState } from '../game/state';
 import type { Text } from '../i18n';
+import type { CarDef } from '../game/types';
 import { step, DT } from '../game/sim';
 import { TRACK_BY_ID } from '../game/content/tracks';
-import { CAR_BY_ID } from '../game/content/cars';
 import { Renderer } from '../render/renderer';
 import { InputController } from '../input/input';
 import { audio } from '../audio';
@@ -16,6 +15,8 @@ export interface RaceResult {
   trackId: string;
   carId: string;
   laps: number[];
+  /** race time at the flag */
+  time: number;
   /** 1-based finishing place */
   place: number;
   /** the field in finishing order; time is -1 for a car still out */
@@ -35,7 +36,13 @@ interface Hud {
   finished: boolean;
 }
 
-export function Game({ trackId, carId, laps, onEnd, onQuit }: { trackId: string; carId: string; laps: number; onEnd: (r: RaceResult) => void; onQuit: () => void }) {
+/**
+ * The race screen. `car` is the player's car with its parts fitted;
+ * `field` is the rest of the grid, empty for a licence test. The sim
+ * runs here; React only draws the HUD and the overlays.
+ */
+export function Game({ trackId, car, field, laps, onEnd, onQuit }: { trackId: string; car: CarDef; field: Entry[]; laps: number; onEnd: (r: RaceResult) => void; onQuit: () => void }) {
+  const carId = car.id;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const wheelRef = useRef<HTMLDivElement>(null);
@@ -49,7 +56,7 @@ export function Game({ trackId, carId, laps, onEnd, onQuit }: { trackId: string;
   useEffect(() => {
     const canvas = canvasRef.current!;
     const root = rootRef.current!;
-    const s = createState(TRACK_BY_ID[trackId], CAR_BY_ID[carId], laps, OPPONENTS);
+    const s = createState(TRACK_BY_ID[trackId], car, laps, field);
     simRef.current = s;
     (window as unknown as { __sim: SimState }).__sim = s;
     const renderer = new Renderer(canvas);
@@ -105,6 +112,7 @@ export function Game({ trackId, carId, laps, onEnd, onQuit }: { trackId: string;
         trackId,
         carId,
         laps: me.laps.slice(),
+        time: me.finishedAt,
         place,
         order: standings(s).map((c) => ({ name: c.driver.name, colour: c.def.colour, time: c.finishedAt, player: c === me })),
       };
@@ -177,7 +185,7 @@ export function Game({ trackId, carId, laps, onEnd, onQuit }: { trackId: string;
       window.visualViewport?.removeEventListener('resize', onResize);
       void wake?.release();
     };
-  }, [trackId, carId, laps, onEnd]);
+  }, [trackId, car, field, laps, onEnd]);
 
   const pause = (p: boolean) => {
     pausedRef.current = p;

@@ -26,6 +26,16 @@ try {
   await page.goto(`http://localhost:${port}/?bot=1&speed=3&lang=${lang}`);
   await shot('01-title');
   await page.getByRole('button', { name: say('Aja', 'Drive'), exact: true }).click();
+  await page.waitForTimeout(300);
+  await shot('02-garage');
+  await page.getByRole('button', { name: say('Osakauppa', 'Parts shop') }).click();
+  await page.waitForTimeout(300);
+  await shot('02b-shop');
+  await page.getByRole('button', { name: say('Talli', 'Garage') }).click();
+  await page.getByRole('button', { name: say('Kisat', 'Races'), exact: true }).click();
+  await page.waitForTimeout(300);
+  await shot('02c-events');
+  await page.locator('.card.event').first().click();
   await page.waitForTimeout(400);
   await shot('02-start');
   const at = async (sec, name) => {
@@ -44,7 +54,9 @@ try {
   // Landscape, the way a thumb and a phone sideways hold it.
   await page.setViewportSize({ width: 844, height: 390 });
   await page.goto(`http://localhost:${port}/?bot=1&speed=3&lang=${lang}`);
-  await page.getByRole('button', { name: say('Aja', 'Drive'), exact: true }).click();
+  await page.getByRole('button', { name: say('Jatka', 'Continue'), exact: true }).click();
+  await page.getByRole('button', { name: say('Kisat', 'Races'), exact: true }).click();
+  await page.locator('.card.event').first().click();
   await page.waitForFunction(() => window.__sim && window.__sim.time >= 12, null, { timeout: 300000 });
   await shot('08-landscape');
   const perf = await page.evaluate(() => window.__perf);

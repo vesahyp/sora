@@ -11,6 +11,10 @@ export const NO_INPUT: CarInput = { steer: 0, throttle: 0, brake: 0 };
 
 export type Surface = 'gravel' | 'tarmac';
 
+/** The classes, slowest first. A car has one; an event is run in one. */
+export type CarClass = 'C' | 'B' | 'A';
+export const CLASSES: CarClass[] = ['C', 'B', 'A'];
+
 export interface TrackDef {
   id: string;
   name: Text;
@@ -24,6 +28,11 @@ export interface TrackDef {
 export interface CarDef {
   id: string;
   name: Text;
+  cls: CarClass;
+  /** credits at the dealer */
+  price: number;
+  /** one line at the dealer */
+  blurb: Text;
   /** m/s² at standstill; the push fades as the car nears its top speed */
   accel: number;
   /** m/s */

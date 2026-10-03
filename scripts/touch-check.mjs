@@ -29,6 +29,8 @@ const touch = async (x, y, x2, hold) => {
 try {
   await page.goto(`http://localhost:${port}/?lang=en`);
   await page.getByRole('button', { name: 'Drive', exact: true }).tap();
+  await page.getByRole('button', { name: 'Races', exact: true }).tap();
+  await page.locator('.card.event').first().tap();
   await page.waitForFunction(() => window.__sim && window.__sim.hold <= 0 && window.__sim.time > 4, null, { timeout: 20000 });
   // the brake first, on the start straight, while the car is still fast
   const cdp = await page.context().newCDPSession(page);
@@ -61,8 +63,13 @@ try {
   check((await page.locator('.overlay').count()) === 0, 'a tap on Resume closes the pause menu');
   await page.locator('.iconbtn.pause').tap();
   await page.getByRole('button', { name: 'Quit' }).tap();
-  await page.waitForSelector('.title', { timeout: 5000 });
-  check(true, 'a tap on Quit returns to the title');
+  await page.waitForSelector('.garage', { timeout: 5000 });
+  check(true, 'a tap on Quit returns to the garage');
+  await page.getByRole('button', { name: 'Parts shop' }).tap();
+  await page.locator('.card.part').first().tap();
+  await page.waitForTimeout(200);
+  const lvl = await page.locator('.card.part').first().locator('.ic').innerText();
+  check(lvl.startsWith('1'), `a tap in the shop buys tyres (level ${lvl.trim()})`);
 } catch (e) {
   check(false, String(e));
 } finally {

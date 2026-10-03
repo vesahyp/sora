@@ -10,8 +10,10 @@ design: what the game is meant to become.
 **Sora** is a top-down arcade racer in the shape of Super Cars II, with a
 career in the shape of Gran Turismo, for the browser, phones first. One
 thumb steers; the throttle is always on; a second finger brakes. Finnish
-gravel roads, nineties cars. Today it is one car, two tracks, and a field of
-four: the player and three cars the bot drives. Sora is Finnish for gravel.
+gravel roads, nineties cars. Two tracks, three cars in three classes, a field of
+four with the bot driving the other three, and a career: credits from
+results, a parts shop, a dealer, and licence tests that gate the classes.
+Sora is Finnish for gravel.
 
 ## Stack
 
@@ -37,14 +39,18 @@ src/
     track.ts          Track: smoothing, locate(x, y) -> (s, d), at(s), the forest
     rng.ts            seeded RNG and hashes
     content/
-      cars.ts         the cars: the balance knobs
+      cars.ts         the cars, one per class: the balance knobs, a price
+      parts.ts        the shop: four parts, three levels, tuned(car, parts)
+      events.ts       the calendar: class, track, laps, prizes, how built the field is
+      licences.ts     the tests: one lap under a target, read off make balance
       drivers.ts      the opponents: a name, a colour, a skill for the bot
       tracks.ts       the tracks: a centreline in metres, a width, a surface
+  career/save.ts      the save: credits, cars owned with parts, licences; one object in localStorage
   render/
     renderer.ts       camera, grass, road, dust, car, trees, minimap
     sprites.ts        procedural sprite cache
   input/input.ts      one thumb (drag sideways to steer, second finger brakes) and keyboard
-  ui/                 React: Game (loop + HUD), Screens (title, result)
+  ui/                 React: Game (loop + HUD), Screens (title, result), Garage (garage, races, shop, dealer, licences)
   records.ts          localStorage best lap and best race; the tracker shim
   audio.ts            Web Audio synth: the engine note and the event beeps
   version.ts          build id and the newer-build check behind the update banner
@@ -70,7 +76,8 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
    real time and calls `step` a whole number of times. Never pass a frame
    delta into `step`.
 3. **Content is data.** A new track is a list of points in `tracks.ts`. A
-   new car is a `CarDef`. Balance changes are number changes in `content/`.
+   new car is a `CarDef`, a new race an `EventDef`. Balance changes are
+   number changes in `content/`. A part's effect is one line in `tuned()`.
 4. **The bot is the opponent.** `tools/autoplayer.ts` drives the checks,
    the screenshots and, once there are opponents, the other cars. A change
    to it changes the race, so keep it readable.
@@ -89,9 +96,12 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
 - **Before committing:** `make check` (typecheck, build, sim-check) must
   pass. `sim-check` prints the bot's laps first; read them when you touched
   the car, the track or the bot.
-- **Balance with `make balance`.** The bot is a floor, not a player: a
-  human who looks through the corner beats it. A change that moves the
-  bot's lap moves the human's too, in the same direction.
+- **Balance with `make balance`.** It prints the bot's laps per car, stock
+  and fully built, per track. The bot is a floor, not a player: a human
+  who looks through the corner beats it. A change that moves the bot's
+  lap moves the human's too, in the same direction. The classes should
+  sit about 10% apart stock, and a full car should reach the next class's
+  stock pace. The licence targets are read off this table.
 - Deploy is automatic: every push to `main` builds and publishes to GitHub
   Pages (`.github/workflows/deploy.yml`) at https://vesahyp.github.io/sora/.
 - Screenshots come from `make shots` (Playwright, iPhone emulation, the

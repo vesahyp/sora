@@ -49,7 +49,7 @@ for (const track of TRACKS) {
       assert(hits < 30, `${track.id}/${car.id}: the bot rarely meets a tree (${hits} steps)`);
     }
     // then the race: four bots, everyone must finish and the order must follow skill
-    const race = createState(track, car, 3, OPPONENTS);
+    const race = createState(track, car, 3, OPPONENTS.map((driver) => ({ driver, car })));
     while (race.cars.some((c) => c.finishedAt < 0) && race.time < 900) step(race, race.cars.map((c) => botInput(race, c)), DT);
     const order = standings(race);
     console.log(`  race:  ${order.map((c) => `${c.driver.name.en} ${c.finishedAt >= 0 ? c.finishedAt.toFixed(1) : 'DNF'}`).join('  ')}`);

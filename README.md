@@ -30,9 +30,21 @@ paras kierros ja paras kisa jäävät muistiin tälle laitteelle.
 Kaksi rataa: **Kiviaho**, reilu puoli kilometriä ja alle puoli minuuttia
 kierros, ja **Hirvisuo**, kilometrin lenkki. Valitse rata aloitusruudusta.
 
-## Mitä tästä tulee
+## Ura
 
-Super Cars II:n kisa ja Gran Turismon ura: halpa auto, ansaitut rahat, osat,
-ajokortit, ja luokka kerrallaan ylöspäin. Suunnitelma on
-[`docs/design.md`](docs/design.md), seuraavat askeleet
+Ura alkaa tallista: Kortteli 1.3 ja 600 krediittiä. Kisat tuovat rahaa
+sijoituksen mukaan, ja raha menee kolmeen paikkaan:
+
+- **Osakauppa**: renkaat, kevennys, moottori ja jarrut, kolme tasoa
+  kukin. Renkaat ensin, se on paras raha.
+- **Autokauppa**: kolme autoa, luokat C, B ja A. Vanha auto jää talliin.
+  Täyteen rakennettu auto on lähes seuraavan luokan vakioauton veroinen.
+- **Ajokortit**: B- ja A-luokan kisoihin pitää ajaa kortti: yksi kierros
+  yksin omalla autolla alle rajan. Kello käy lähtövaloista.
+
+Kisat on jaettu luokkiin. Kentän autot ovat luokan autoja, ja saman luokan
+myöhemmät kisat ajetaan rakennetummilla autoilla. Luokan C kisoihin ei
+pääse B-autolla: se olisi liian helppoa.
+
+Suunnitelma on [`docs/design.md`](docs/design.md), seuraavat askeleet
 [`ROADMAP.md`](ROADMAP.md).

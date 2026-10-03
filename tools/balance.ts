@@ -8,6 +8,7 @@ import { step, DT } from '../src/game/sim';
 import { TRACKS } from '../src/game/content/tracks';
 import { CARS } from '../src/game/content/cars';
 import { botInput } from './autoplayer';
+import { tuned, FULL } from '../src/game/content/parts';
 import { Track } from '../src/game/track';
 
 declare const process: { argv: string[]; exitCode?: number };
@@ -19,11 +20,13 @@ for (const track of TRACKS) {
   if (only && track.id !== only) continue;
   console.log(`${track.id}  ${Math.round(new Track(track).length)} m`);
   for (const car of CARS) {
-    const s = createState(track, car, laps);
-    while (!s.finished && s.time < 1200) step(s, [botInput(s)], DT);
-    const me = s.cars[0];
-    const best = me.laps.length ? Math.min(...me.laps) : NaN;
-    const total = me.laps.reduce((a, b) => a + b, 0);
-    console.log(`  ${car.id.padEnd(12)} best ${best.toFixed(2)}  total ${total.toFixed(1)}  laps ${me.laps.map((l) => l.toFixed(1)).join(' ')}`);
+    for (const [label, def] of [['stock', car], ['full', tuned(car, FULL)]] as const) {
+      const s = createState(track, def, laps);
+      while (!s.finished && s.time < 1200) step(s, [botInput(s)], DT);
+      const me = s.cars[0];
+      const best = me.laps.length ? Math.min(...me.laps) : NaN;
+      const total = me.laps.reduce((a, b) => a + b, 0);
+      console.log(`  ${car.id.padEnd(10)} ${label.padEnd(5)} first ${me.laps[0]?.toFixed(2) ?? '-'}  best ${best.toFixed(2)}  total ${total.toFixed(1)}`);
+    }
   }
 }

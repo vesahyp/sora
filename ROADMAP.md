@@ -18,11 +18,12 @@ The design is in `docs/design.md`.
 
 ## Later
 
-- The garage: credits from results, parts in a fixed value order (tyres,
-  weight, engine), the first used car.
-- Licence tests: short exercises with a target time that gate the next
-  class.
+- Balance the career's length: how many races from the Kortteli to a
+  built Kiila. The prize table in `events.ts` and the prices in `cars.ts`
+  and `parts.ts` are the knobs; `make balance` gives the lap gaps.
+- Sell a car back at the dealer; a used-car column with cheaper worn cars.
 - More tracks; tracks reused across classes with a different car.
+- Reverse layouts of the two tracks as cheap extra events.
 - Missiles, front and rear, and damage that costs money to repair.
 - Two players on one phone, a thumb each, the Räkkä pattern.
 - The clavesa rollup of the pixel logs and the `?stats` board (Räkkä's

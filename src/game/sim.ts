@@ -22,7 +22,11 @@ export function step(s: SimState, inputs: CarInput[], dt: number): void {
   s.time += dt;
   if (s.hold > 0) {
     s.hold -= dt;
-    if (s.hold <= 0) s.sounds.push('go');
+    if (s.hold <= 0) {
+      s.sounds.push('go');
+      // the clock starts at the lights, not at the countdown
+      for (const c of s.cars) c.lapStart = s.time;
+    }
     return;
   }
   // keeps counting a little past zero, so the HUD can show GO for a moment

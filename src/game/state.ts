@@ -61,18 +61,24 @@ export interface SimState {
 
 export const PLAYER: Driver = { name: { fi: 'Sinä', en: 'You' }, skill: 1, colour: '#c8352a' };
 
-export function createState(trackDef: TrackDef, carDef: CarDef, totalLaps: number, opponents: Driver[] = []): SimState {
+/** One car on the grid: who drives it and what it is. */
+export interface Entry {
+  driver: Driver;
+  car: CarDef;
+}
+
+export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: number, opponents: Entry[] = []): SimState {
   const track = new Track(trackDef);
-  const drivers = [PLAYER, ...opponents];
+  const entries: Entry[] = [{ driver: PLAYER, car: playerCar }, ...opponents];
   // the grid: two abreast, the player on the front row, behind the line
-  const cars = drivers.map((driver, i) => {
+  const cars = entries.map(({ driver, car }, i) => {
     const row = Math.floor(i / 2);
     const side = i % 2 ? 1 : -1;
     const s = track.length - 7 - row * 7;
     const p = track.at(s);
     const d = side * trackDef.width * 0.22;
     return {
-      def: { ...carDef, colour: driver.colour },
+      def: { ...car, colour: driver.colour },
       driver,
       x: p.x - p.ty * d,
       y: p.y + p.tx * d,
