@@ -19,8 +19,10 @@ export interface Car {
   heading: number;
   vx: number;
   vy: number;
-  /** rad/s: the car keeps turning once it is sliding */
+  /** rad/s, the yaw rate */
   yaw: number;
+  /** last step's longitudinal acceleration, for the load shift */
+  ax: number;
   /** the wheel, smoothed from the input */
   steer: number;
   /** forward speed, m/s */
@@ -185,6 +187,7 @@ export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: nu
       vx: 0,
       vy: 0,
       yaw: 0,
+      ax: 0,
       steer: 0,
       speed: 0,
       slip: 0,

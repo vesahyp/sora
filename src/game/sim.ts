@@ -13,15 +13,26 @@ const GRASS_GRIP = 0.45;
 const REVERSE_TOP = 5;
 /** a car is a circle of this radius when two meet */
 const CAR_R = 1.5;
-/** how fast the tyres pull the slide back, 1/s, before the grip limit caps it */
-const TYRE_RATE = 7;
+const G = 9.81;
+/** radians of slip at which a tyre gives all it has; past it the force is flat */
+const ALPHA_PEAK = 0.12;
+/** the rear tyres against the front: above 1 the car understeers at the limit, as a road car does */
+const REAR_GRIP = 1.08;
+/** centre of gravity height over the wheelbase: how much braking unloads the rear */
+const CG_OVER_L = 0.18;
+/** steering lock at rest, radians per unit of turnRate, and the speed that halves it */
+const LOCK = 0.17;
+const LOCK_FADE = 32;
 
 /**
- * One fixed step. The car is a heading, a velocity and a yaw rate. The
- * engine pushes along the heading; the tyres pull the sideways part of
- * the velocity back at a rate the grip limit caps, so past the limit
- * the car slides and keeps turning on its yaw. The pedal brakes and
- * loosens the rear, so braking into a corner swings the tail; held at a
+ * One fixed step. The car is the bicycle model (Marco Monster, "Car
+ * Physics for Games"): velocity in the car's frame, a slip angle for
+ * each axle from the lateral velocity and the yaw rate, a cornering
+ * force per axle that grows with the slip angle and saturates at the
+ * tyre's grip times its load, and yaw from the torque the two axles
+ * make about the centre of gravity. Braking moves load to the front,
+ * so the rear lets go first: braking into a corner swings the tail.
+ * The pedal brakes, and at speed also locks the rear; held at a
  * standstill it reverses. A tap of nitro is a burst from a tank that
  * drifting, ramming and wrecking fill. Guns fire themselves. Cars push
  * each other, and a shunt hurts the one that was hit. At 100 damage a
@@ -73,14 +84,17 @@ function moveCar(s: SimState, c: Car, input: CarInput, dt: number): void {
   const t = s.track;
   const done = c.finishedAt >= 0;
 
+  // the wheel follows the thumb, quickly; the lock shrinks with speed, as on a real wheel at speed
   const want = clamp(input.steer, -1, 1);
   const rate = 9 * dt;
   c.steer += clamp(want - c.steer, -rate, rate);
 
+  // velocity in the car's frame: x forward, y to the right
   const fx = Math.cos(c.heading);
   const fy = Math.sin(c.heading);
-  let vf = c.vx * fx + c.vy * fy;
-  let vl = c.vx * -fy + c.vy * fx;
+  let vx = c.vx * fx + c.vy * fy;
+  let vy = c.vx * -fy + c.vy * fx;
+  let w = c.yaw;
 
   const onRoad = Math.abs(c.d) <= t.width / 2;
   const pace = 1 - DAMAGE_PACE * (c.damage / 100);
@@ -98,57 +112,83 @@ function moveCar(s: SimState, c: Car, input: CarInput, dt: number): void {
     c.boost = Math.max(0, c.boost - dt / BOOST.seconds);
   }
 
+  // the geometry: wheelbase, the centre of gravity in the middle, the yaw inertia of a box
+  const L = wheelbase(def);
+  const b = L * 0.5; // CG to the front axle
+  const cc = L - b; // CG to the rear axle
+  const k2 = (def.length * def.length + def.width * def.width) / 12; // yaw inertia over mass, m²
+  const delta = c.steer * steeringLock(def, vx);
+
+  // the tyres' grip on this surface, as an acceleration
+  let mu = def.grip * (onRoad ? 1 : GRASS_GRIP);
+  if (spinning) mu *= 0.3;
+
+  // longitudinal: the engine and the pedal, both capped by what the tyres can transmit
   const top = (onRoad ? def.topSpeed : GRASS_TOP) * pace * (boosting ? BOOST.top : 1);
   const throttle = done || spinning ? 0 : clamp(input.throttle, 0, 1);
   const pedal = done ? 1 : spinning ? 0 : clamp(input.brake, 0, 1);
-  if (vf < top) vf += def.accel * pace * (boosting ? BOOST.accel : 1) * throttle * Math.max(0, 1 - vf / top) * dt;
-  else vf -= (vf - top) * 2 * dt;
-  vf -= vf * 0.12 * dt;
-  // the pedal: a brake, and at a standstill the reverse
+  let drive = 0;
+  if (vx < top) drive = Math.min(def.accel * pace * (boosting ? BOOST.accel : 1) * throttle * Math.max(0, 1 - vx / top), mu * 1.15);
+  let ax = drive - vx * 0.12;
+  if (vx > top) ax -= (vx - top) * 2;
+  let braking = 0;
   c.handbrake = false;
   if (pedal > 0) {
-    if (vf > 0.4) {
-      vf = Math.max(0, vf - def.brake * pedal * dt);
-      c.handbrake = Math.abs(vf) > 4;
-    } else if (vf > -REVERSE_TOP) vf -= def.accel * 0.5 * pedal * dt;
-  } else if (vf < 0) vf = Math.min(0, vf + def.brake * 0.5 * dt);
+    if (vx > 0.4) {
+      braking = Math.min(def.brake * pedal, mu * 1.05, vx / dt);
+      c.handbrake = vx > 6;
+    } else if (vx > -REVERSE_TOP) ax -= Math.min(def.accel * 0.5 * pedal, mu);
+  } else if (vx < 0) ax += Math.min(def.brake * 0.5, -vx / dt);
+  ax -= braking;
 
-  // the tyres: pull the slide back, up to the grip limit; past it, the car slides
-  let limit = def.grip * (onRoad ? 1 : GRASS_GRIP);
-  if (c.handbrake) limit *= 0.42;
-  if (spinning) limit *= 0.15;
-  const angle = Math.abs(vf) > 1 ? Math.atan2(vl, Math.abs(vf)) : 0;
-  // past a wide angle the rear bites again, so a held drift settles instead of spinning out
-  if (Math.abs(angle) > 0.6 && !c.handbrake && !spinning) limit *= 1.7;
-  const wantLat = -vl * TYRE_RATE;
-  const lat = clamp(wantLat, -limit, limit);
-  c.sliding = Math.abs(wantLat) > limit && Math.abs(vf) > 2;
-  vl += lat * dt;
+  // the friction circle: what the tyres spend lengthwise they do not have sideways
+  const used = clamp((drive * 0.35 + braking) / mu, 0, 0.95);
+  const circle = Math.sqrt(1 - used * used);
 
-  // steering: nothing at rest, full at 8 m/s, fading toward the top end
-  const bite = clamp(vf / 8, -1, 1) * (1 - 0.4 * Math.min(1, Math.abs(vf) / def.topSpeed));
-  let yawWant = spinning ? 11 * (c.spin / SPIN_TIME) : c.steer * def.turnRate * bite;
-  // a sliding car rotates with its slide: the gravel swing
-  if (!spinning) yawWant += vl * (c.sliding ? 0.09 : 0.03);
-  const response = spinning ? 20 : c.sliding ? 4 : 8;
-  c.yaw += (yawWant - c.yaw) * Math.min(1, response * dt);
-  c.heading += c.yaw * dt;
-  // turning throws speed sideways: the slide the tyres have to catch
-  const thrown = c.yaw * vf * 0.35 * dt;
-  vl += thrown;
-  vf -= Math.abs(thrown) * 0.5;
+  // load per axle, shifted by the last step's longitudinal acceleration
+  const shift = clamp((CG_OVER_L * c.ax) / G, -0.25, 0.25);
+  const loadF = clamp(cc / L - shift, 0.15, 0.85);
+  const loadR = clamp(b / L + shift, 0.15, 0.85);
+  let muR = mu * REAR_GRIP;
+  // braking hard: the rear tyres, lightened and part locked, have less left sideways
+  if (c.handbrake) muR *= 0.8;
+  const capF = mu * loadF * circle;
+  const capR = muR * loadR * circle;
+  // slip angles; the denominator floors at walking pace so rest is not a singularity
+  const vxs = Math.max(Math.abs(vx), 3);
+  const alphaF = Math.atan2(vy + w * b, vxs) - delta;
+  const alphaR = Math.atan2(vy - w * cc, vxs);
+  const ayF = capF * clamp(-alphaF / ALPHA_PEAK, -1, 1);
+  const ayR = capR * clamp(-alphaR / ALPHA_PEAK, -1, 1);
+  c.sliding = (Math.abs(alphaR) > ALPHA_PEAK * 1.3 || Math.abs(alphaF) > ALPHA_PEAK * 1.3) && Math.abs(vx) > 2;
 
+  // the equations of motion in the car's frame
+  const ay = ayR + ayF * Math.cos(delta) - vx * w;
+  const axTotal = ax - ayF * Math.sin(delta) + vy * w;
+  const wdot = (ayF * Math.cos(delta) * b - ayR * cc) / k2;
+  // at walking pace the car steers like a bicycle rolling on rails
+  const wKin = (vx * Math.tan(delta)) / L;
+  const blend = clamp(Math.abs(vx) / 5, 0, 1);
+  w += wdot * dt;
+  w = wKin + (w - wKin) * blend;
+  vx += axTotal * dt;
+  vy += ay * dt;
+  vy *= 1 - (1 - blend) * 0.5; // and the slide dies off at rest
+  c.ax = ax;
+
+  c.yaw = w;
+  c.heading += w * dt;
   const nfx = Math.cos(c.heading);
   const nfy = Math.sin(c.heading);
-  c.vx = vf * nfx + vl * -nfy;
-  c.vy = vf * nfy + vl * nfx;
+  c.vx = vx * nfx + vy * -nfy;
+  c.vy = vx * nfy + vy * nfx;
   c.x += c.vx * dt;
   c.y += c.vy * dt;
   c.hit = 0;
   c.onRoad = onRoad;
-  c.slipAngle = angle;
+  c.slipAngle = Math.abs(vx) > 1 ? Math.atan2(vy, Math.abs(vx)) : 0;
   // drifting fills the tank
-  if (Math.abs(angle) > 0.28 && Math.abs(vf) > 9 && !spinning) c.boost = Math.min(1, c.boost + BOOST.perDriftSecond * dt);
+  if (Math.abs(c.slipAngle) > 0.2 && Math.abs(vx) > 9 && !spinning) c.boost = Math.min(1, c.boost + BOOST.perDriftSecond * dt);
 }
 
 /** Target, machine gun, missile lock, mine drop: all automatic. */
@@ -364,6 +404,8 @@ function spin(s: SimState, c: Car, k: number): void {
   c.spin = SPIN_TIME;
   c.vx *= k;
   c.vy *= k;
+  // a kick on the yaw; the tyres have little grip for a moment, then catch it
+  c.yaw += (Math.sin(s.time * 13 + c.x) >= 0 ? 1 : -1) * 5;
   if (c === s.cars[0]) s.sounds.push('spin');
 }
 
@@ -483,7 +525,7 @@ function settle(s: SimState, c: Car, player: boolean): void {
     const v = Math.hypot(c.vx, c.vy);
     c.vx *= 0.6;
     c.vy *= 0.6;
-    c.yaw *= 0.5;
+    c.yaw *= 0.3;
     c.hit = 1;
     if (v > 6) {
       hurt(s, c, DAMAGE.tree * Math.min(1, v / 20), c.lastHitBy);
@@ -525,6 +567,15 @@ function settle(s: SimState, c: Car, player: boolean): void {
   c.progress = c.finishedAt >= 0 ? s.totalLaps * L + 1e6 - c.finishedAt : (c.lap - 1) * L + lapS;
   if (s.hold <= 0 && c.finishedAt < 0 && Math.abs(c.speed) < 0.8) c.stall += DT;
   else c.stall = 0;
+}
+
+export function wheelbase(def: Car['def']): number {
+  return def.length * 0.62;
+}
+
+/** Radians of wheel angle at full lock, at this speed: the lock shrinks as the car goes faster. */
+export function steeringLock(def: Car['def'], v: number): number {
+  return (def.turnRate * LOCK) / (1 + Math.abs(v) / LOCK_FADE);
 }
 
 function clamp(x: number, a: number, b: number): number {

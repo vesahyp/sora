@@ -26,9 +26,9 @@ The Räkkä architecture, copied from `hoyry`:
 - **Canvas 2D** for the game view. No engine. Sprites are drawn once with
   canvas paths and cached (`src/render/sprites.ts`). The road is one
   stroked path at road width. See `docs/adr/0001-canvas-2d.md`.
-- **No physics library.** The car is a heading, a velocity and a yaw
-  rate; the tyres pull the slide back up to a grip limit and past it the
-  car slides (`src/game/sim.ts`). The track is a smoothed closed
+- **No physics library.** The car is the bicycle model with saturating
+  tyres, weight transfer and a friction circle (`src/game/sim.ts`,
+  `docs/adr/0002-bicycle-model.md`). The track is a smoothed closed
   polyline with a width (`src/game/track.ts`), queried by arc length.
 
 ## Where things live
@@ -38,7 +38,7 @@ src/
   game/               the simulation, no DOM anywhere in here
     types.ts          CarInput, TrackDef, CarDef
     state.ts          SimState, Car, Driver, createState (the grid), standings
-    sim.ts            step(): the tyre model, nitro, the automatic guns, bullets,
+    sim.ts            step(): the bicycle model, nitro, the automatic guns, bullets,
                         missiles, mines, pickups, ramming, wrecks and respawns, lap counting
     track.ts          Track: smoothing, locate(x, y) -> (s, d), at(s), the forest
     rng.ts            seeded RNG and hashes
@@ -63,7 +63,8 @@ src/
   version.ts          build id and the newer-build check behind the update banner
   i18n.ts             the language: fi or en, tr() and t(), picked from the browser
 tools/
-  autoplayer.ts       the bot driver: lookahead steering, braking for corners
+  autoplayer.ts       the bot driver: yaw-rate steering through the wheelbase, braking to
+                        the speed a bend allows, a running-wide reflex, leaning on neighbours
   sim-check.ts        npm run sim-check: the bot laps every track in every car, asserts
   balance.ts          npm run balance: lap times per car, side by side
 scripts/
@@ -105,6 +106,10 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
 - **Before committing:** `make check` (typecheck, build, sim-check) must
   pass. `sim-check` prints the bot's laps first; read them when you touched
   the car, the track or the bot.
+- **Physics changes are read off `tools/dbg/trace.ts`** (gitignored, see
+  the ADR): a step response at constant steer, then the bot's lap with
+  the moments it leaves the road. Build it like the tools:
+  `npx vite build --ssr tools/dbg/trace.ts --outDir .sim-check && node .sim-check/trace.js`.
 - **Balance with `make balance`.** It prints the bot's laps per car, stock
   and fully built, per track. The bot is a floor, not a player: a human
   who looks through the corner beats it. A change that moves the bot's

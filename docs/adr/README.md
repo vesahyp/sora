@@ -3,3 +3,4 @@
 | # | Title | Status |
 |---|-------|--------|
 | [0001](0001-canvas-2d.md) | The Räkkä architecture: Canvas 2D, headless sim, the bot drives the checks | Accepted |
+| [0002](0002-bicycle-model.md) | The car is a bicycle model with saturating tyres | Accepted |

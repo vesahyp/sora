@@ -1,5 +1,6 @@
 import type { Car, SimState } from '../src/game/state';
 import type { CarInput } from '../src/game/types';
+import { steeringLock, wheelbase } from '../src/game/sim';
 
 /**
  * The bot driver. It aims at a point on the centreline a little ahead,
@@ -16,11 +17,16 @@ export interface BotTuning {
   look: number;
   lookPerSpeed: number;
   gain: number;
-  /** corner speed: m/s allowed per (1 / rad of turn over 30 m) */
-  cornerSpeed: number;
+  /** how much of the tyres' grip the bot dares to use in a bend, 0..1 */
+  margin: number;
 }
 
-export const DEFAULT_BOT: BotTuning = { look: 4, lookPerSpeed: 0.35, gain: 3.2, cornerSpeed: 20 };
+export const DEFAULT_BOT: BotTuning = { look: 9, lookPerSpeed: 0.55, gain: 2.5, margin: 0.7 };
+
+/** on grass the tyres have less than half; the bot slows for it */
+function onRoadFactor(c: Car): number {
+  return c.onRoad ? 1 : 0.7;
+}
 
 export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFAULT_BOT): CarInput {
   const t = s.track;
@@ -29,7 +35,7 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
   const look = tune.look + tune.lookPerSpeed * speed;
   const target = t.at(c.s + look);
   const turn = t.curvatureAhead(c.s, look + 20);
-  let inside = Math.max(-1, Math.min(1, turn * 1.5)) * (t.width * 0.3);
+  let inside = Math.max(-1, Math.min(1, turn * 1.5)) * (t.width * 0.2);
   let ramSteer = 0;
   for (const o of s.cars) {
     if (o === c || o.wreck > 0) continue;
@@ -47,22 +53,35 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
   let err = want - c.heading;
   while (err > Math.PI) err -= 2 * Math.PI;
   while (err < -Math.PI) err += 2 * Math.PI;
-  // in a slide, hold a touch of counter-steer so the swing settles
-  const counter = c.sliding ? -c.slipAngle * 0.6 : 0;
-  let steer = Math.max(-1, Math.min(1, err * tune.gain + counter + ramSteer));
+  // the yaw rate that closes the heading error, turned into a wheel angle through the
+  // wheelbase, so the bot asks the tyres for what they can give instead of full lock
+  const yawWant = Math.max(-2.2, Math.min(2.2, err * tune.gain));
+  const deltaWant = Math.atan((yawWant * wheelbase(c.def)) / Math.max(speed, 3));
+  let steer = Math.max(-1, Math.min(1, deltaWant / steeringLock(c.def, speed) + ramSteer));
 
-  // how sharp is the road coming: the worst turn over the braking distance
-  const brakeDist = 10 + (speed * speed) / (2 * c.def.brake);
+  // how sharp is the road coming: the worst turn over the braking distance, at what the tyres can brake
+  const stop = Math.min(c.def.brake, c.def.grip) * 0.7;
+  const brakeDist = 8 + (speed * speed) / (2 * stop);
   let sharpest = 0;
   for (let a = 5; a <= brakeDist + 30; a += 5) {
     const k = Math.abs(t.curvatureAhead(c.s + a, 30));
     if (k > sharpest) sharpest = k;
   }
-  // grippier tyres carry more speed through a bend: the Kortteli's stock grip is the baseline
-  const cornerSpeed = tune.cornerSpeed * (0.6 + 0.4 * skill) * Math.sqrt(c.def.grip / 9);
-  const allowed = Math.min(sharpest < 0.05 ? Infinity : cornerSpeed / sharpest, c.def.topSpeed * (0.7 + 0.3 * skill));
-  let brake = speed > allowed + 2 ? 1 : 0;
-  let throttle = brake ? 0 : speed > allowed ? 0.3 : 1;
+  // the speed the bend allows: v² / r at the tyres' limit, with a margin the driver's skill shrinks
+  const radius = sharpest < 0.05 ? Infinity : 30 / sharpest;
+  const margin = tune.margin * (0.75 + 0.25 * skill);
+  const allowed = Math.min(Math.sqrt(c.def.grip * margin * radius) * (onRoadFactor(c)), c.def.topSpeed * (0.7 + 0.3 * skill));
+  // brake to the limit, lift just under it, and lift when the front is washing out
+  let brake = speed > allowed ? 1 : 0;
+  let throttle = brake ? 0 : speed > allowed * 0.95 ? 0.2 : 1;
+  if (c.sliding && Math.abs(err) > 0.2) throttle = Math.min(throttle, 0.2);
+  // running wide: the car is past a third of the road and still moving outward, so brake
+  const here = t.at(c.s);
+  const outward = (c.vx * -here.ty + c.vy * here.tx) * Math.sign(c.d);
+  if (Math.abs(c.d) > t.width * 0.3 && outward > 1.5 && speed > 8) {
+    brake = 1;
+    throttle = 0;
+  }
   // stuck against something: back out for a moment, wheel the other way, then try again
   const stuck = c.stall > 0.8 && c.stall < 2.0;
   if (stuck) {

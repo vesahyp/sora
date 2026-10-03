@@ -6,9 +6,16 @@ The design is in `docs/design.md`.
 ## Next
 
 - **Playtest by hand on a phone.** The bot is the only driver so far.
-  The questions: does the tail swing on the pedal feel like a drift or a
-  crash, is the nitro burst long enough to matter, and do the guns
-  read as yours. The knobs are in `weapons.ts` and `sim.ts`.
+  The questions: does the car now feel like a car, does braking into a
+  bend bring the tail round the way it should, is the nitro burst long
+  enough to matter, and do the guns read as yours. The knobs are in
+  `cars.ts` (grip, lock), `sim.ts` (the constants at the top) and
+  `weapons.ts`.
+- The bot in the faster cars runs wide more than in the Kortteli; the
+  off-road bar in `sim-check` is 12% for that. Teach it to feed the
+  throttle on exit and bring the bar back to 8%.
+- The hairpins on Kiviaho were drawn for a two-g car. Open them a little
+  so a lap is nearer 35 s than 41.
 - Opponent aggression as a per-driver number (Burnout's arrow): the
   leader is leaned on more than the tail.
 - The bounty and the pickups against the prize table: a race should pay

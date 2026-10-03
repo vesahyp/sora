@@ -47,9 +47,9 @@ export interface CarDef {
   topSpeed: number;
   /** m/s² */
   brake: number;
-  /** rad/s at full lock and the steering speed */
+  /** the steering lock: 0.17 rad per unit at rest, less at speed */
   turnRate: number;
-  /** how hard the tyres pull sideways before they let go, m/s²; lower is more gravel */
+  /** the tyres' grip as an acceleration, m/s²: what a loaded axle can pull sideways before it slides */
   grip: number;
   /** tonnes-ish: who wins a shunt */
   mass: number;
