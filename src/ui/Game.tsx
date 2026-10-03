@@ -48,6 +48,7 @@ export function Game({ trackId, carId, laps, onEnd, onQuit }: { trackId: string;
     s.view = renderer.view();
     const input = new InputController();
     input.attach(root);
+    (window as unknown as { __input: InputController }).__input = input;
     track('race_start', { track: trackId, car: carId });
     audio.unlock();
     audio.startEngine();

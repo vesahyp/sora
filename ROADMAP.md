@@ -24,5 +24,6 @@ The design is in `docs/design.md`.
 - Two more tracks; tracks reused across classes with a different car.
 - Missiles, front and rear, and damage that costs money to repair.
 - Two players on one phone, a thumb each, the Räkkä pattern.
-- The tracking pixel and the `?stats` board (`infra/`, the Höyry copy),
-  then global lap records in DynamoDB behind one Lambda, the Räkkä way.
+- The clavesa rollup of the pixel logs and the `?stats` board (Räkkä's
+  `analytics/` and `StatsScreen`), then global lap records in DynamoDB
+  behind one Lambda, the Räkkä way.

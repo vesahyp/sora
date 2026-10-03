@@ -51,9 +51,9 @@ export function fmt(sec: number): string {
 type Track = (event: string, data?: Record<string, string | number>) => void;
 /** The clavesa tracker, when index.html loaded it. */
 export const track: Track = (event, data) => {
-  const w = window as unknown as { tracker?: { track: Track } };
+  const w = window as unknown as { __clvtracker?: { track: Track } };
   try {
-    w.tracker?.track(event, data);
+    w.__clvtracker?.track(event, data);
   } catch {
     /* never let analytics break the game */
   }

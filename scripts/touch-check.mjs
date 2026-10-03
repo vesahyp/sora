@@ -1,0 +1,72 @@
+// Drives the race with touches on an emulated phone, the way a thumb does:
+// a drag to the right must turn the car right, a drag to the left must
+// turn it left, a second finger must slow it, and the pause menu must
+// open and close by tap. Run with `make touch-check`; needs `make shots-setup`.
+import { chromium, devices } from 'playwright';
+import { spawn } from 'node:child_process';
+
+const port = 5197;
+const server = spawn('npx', ['vite', '--port', String(port), '--strictPort'], { stdio: 'ignore' });
+await new Promise((r) => setTimeout(r, 2500));
+const browser = await chromium.launch();
+const page = await (await browser.newContext({ ...devices['iPhone 15'], hasTouch: true })).newPage();
+let failed = false;
+const check = (ok, what) => {
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`);
+  if (!ok) failed = true;
+};
+const sim = (expr) => page.evaluate(expr);
+// a thumb: down at (x, y), slide to x2 over a few events, hold
+const touch = async (x, y, x2, hold) => {
+  const cdp = await page.context().newCDPSession(page);
+  const pt = (px) => [{ x: px, y, id: 1 }];
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt(x) });
+  for (let i = 1; i <= 5; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pt(x + ((x2 - x) * i) / 5) });
+  await page.waitForTimeout(hold);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+};
+try {
+  await page.goto(`http://localhost:${port}/?lang=en`);
+  await page.getByRole('button', { name: 'Drive', exact: true }).tap();
+  await page.waitForFunction(() => window.__sim && window.__sim.hold <= 0 && window.__sim.time > 4, null, { timeout: 20000 });
+  // the brake first, on the start straight, while the car is still fast
+  const cdp = await page.context().newCDPSession(page);
+  const v0 = await sim('window.__sim.car.speed');
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 120, y: 500, id: 1 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 120, y: 500, id: 1 }, { x: 280, y: 500, id: 2 }] });
+  await page.waitForTimeout(100);
+  const read = await sim('window.__input.read()');
+  await page.waitForTimeout(600);
+  const v1 = await sim('window.__sim.car.speed');
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+  check(v0 > 5 && v1 < v0 - 2, `a second finger brakes (${(v0 * 3.6).toFixed(0)} -> ${(v1 * 3.6).toFixed(0)} km/h, input ${JSON.stringify(read)})`);
+  await page.waitForTimeout(800);
+  const h0 = await sim('window.__sim.car.heading');
+  await touch(200, 600, 300, 250);
+  const h1 = await sim('window.__sim.car.heading');
+  check(h1 > h0 + 0.2, `a drag to the right turns the car right (${(h1 - h0).toFixed(2)} rad)`);
+  await touch(200, 600, 100, 250);
+  const h2 = await sim('window.__sim.car.heading');
+  check(h2 < h1 - 0.2, `a drag to the left turns the car left (${(h2 - h1).toFixed(2)} rad)`);
+  const steer = await sim('window.__sim.car.steer');
+  await page.waitForTimeout(300);
+  const steer2 = await sim('window.__sim.car.steer');
+  check(Math.abs(steer2) < 0.05, `lifting the thumb centres the wheel (${steer.toFixed(2)} -> ${steer2.toFixed(2)})`);
+  await page.locator('.iconbtn.pause').tap();
+  await page.waitForSelector('.overlay');
+  await page.getByRole('button', { name: 'Resume' }).tap();
+  await page.waitForTimeout(300);
+  check((await page.locator('.overlay').count()) === 0, 'a tap on Resume closes the pause menu');
+  await page.locator('.iconbtn.pause').tap();
+  await page.getByRole('button', { name: 'Quit' }).tap();
+  await page.waitForSelector('.title', { timeout: 5000 });
+  check(true, 'a tap on Quit returns to the title');
+} catch (e) {
+  check(false, String(e));
+} finally {
+  await browser.close();
+  server.kill();
+}
+process.exitCode = failed ? 1 : 0;

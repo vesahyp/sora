@@ -54,7 +54,9 @@ tools/
   balance.ts          npm run balance: lap times per car, side by side
 scripts/
   shots.mjs           phone screenshots with Playwright, the bot driving
+  touch-check.mjs     drives the race by touch on an emulated phone: steer, brake, pause
   icon.mjs            render public/icon.svg to the PNG icons
+infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs), see TRACKING.md
 ```
 
 ## Rules
@@ -93,6 +95,14 @@ scripts/
   Pages (`.github/workflows/deploy.yml`) at https://vesahyp.github.io/sora/.
 - Screenshots come from `make shots` (Playwright, iPhone emulation, the
   bot driving), never from a hand-held browser. `?bot=1&speed=3` makes the
-  bot drive at triple speed for scripts.
+  bot drive at triple speed for scripts. `make touch-check` drives the race
+  by touch; run it when you touched `input.ts` or the HUD buttons.
+- `make plan` and `make apply` for `infra/`: the tracking pixel host. The
+  game learns its URL only from the build environment (`VITE_PIXEL_URL`):
+  `make env` writes `.env.local` from the Terraform output for builds
+  here, and the Pages deploy reads a GitHub repository variable of the
+  same name. A clone or fork without them builds a game that beacons
+  nowhere. Never put the URL in a committed file. `TRACKING.md` has the
+  events and the setup.
 - When a change alters what the player sees or does, update `README.md` in
   player words.

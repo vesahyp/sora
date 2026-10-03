@@ -19,7 +19,7 @@ export function Title({ records, trackId, carId, onPlay }: { records: Records; t
         </div>
         <div className="small">{best ? `${tr('Paras kierros', 'Best lap')} ${fmt(best)}` : tr('Ei vielä aikaa', 'No time yet')}</div>
       </div>
-      <button className="btn primary big" onClick={onPlay}>
+      <button className="btn primary big" data-track="title-drive" onClick={onPlay}>
         {tr('Aja', 'Drive')}
       </button>
       <p className="help">{tr('Vedä peukalolla sivulle: auto kääntyy. Toinen sormi jarruttaa.', 'Drag your thumb sideways to steer. A second finger brakes.')}</p>

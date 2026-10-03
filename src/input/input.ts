@@ -95,6 +95,7 @@ export class InputController {
     if (k.has('arrowleft') || k.has('a')) steer -= 1;
     if (k.has('arrowright') || k.has('d')) steer += 1;
     if (k.has('arrowdown') || k.has('s') || k.has(' ')) brake = 1;
-    return { steer: Math.max(-1, Math.min(1, steer)), throttle: 1, brake };
+    // the foot comes off the gas while braking
+    return { steer: Math.max(-1, Math.min(1, steer)), throttle: brake ? 0 : 1, brake };
   }
 }
