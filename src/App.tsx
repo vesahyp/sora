@@ -25,13 +25,13 @@ function Screens() {
     window.scrollTo(0, 0);
   }, [screen.kind]);
 
-  const track = TRACKS[0];
+  const [trackId, setTrackId] = useState(TRACKS[0].id);
   const car = CARS[0];
-  const start = () => setScreen({ kind: 'race', trackId: track.id, carId: car.id });
+  const start = () => setScreen({ kind: 'race', trackId, carId: car.id });
 
   switch (screen.kind) {
     case 'title':
-      return <Title records={records} trackId={track.id} carId={car.id} onPlay={start} />;
+      return <Title records={records} trackId={trackId} onTrack={setTrackId} carId={car.id} onPlay={start} />;
     case 'race':
       return (
         <Game

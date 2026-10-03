@@ -97,6 +97,9 @@ class Audio {
         beep(880, 0.12, 0.12);
         beep(1100, 0.24, 0.35);
         break;
+      case 'bump':
+        beep(90, 0, 0.12, 'triangle', 0.3);
+        break;
       case 'hit': {
         const o = c.createOscillator();
         const g = c.createGain();

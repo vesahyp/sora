@@ -12,8 +12,9 @@ The design is in `docs/design.md`.
   `make balance`.
 - Skid marks and a dust trail that reads the slide, so the slide is
   visible before it is felt.
-- Opponents: three AI cars driven by the bot in `tools/autoplayer.ts`,
-  with a grid start and a finishing order.
+- The opponents are the bot with a skill knob. Watch for what they do
+  wrong (bunching, a car parked across the road) and give them what a
+  race needs: a touch of rubber banding so the field stays in view.
 
 ## Later
 
@@ -21,7 +22,7 @@ The design is in `docs/design.md`.
   weight, engine), the first used car.
 - Licence tests: short exercises with a target time that gate the next
   class.
-- Two more tracks; tracks reused across classes with a different car.
+- More tracks; tracks reused across classes with a different car.
 - Missiles, front and rear, and damage that costs money to repair.
 - Two players on one phone, a thumb each, the Räkkä pattern.
 - The clavesa rollup of the pixel logs and the `?stats` board (Räkkä's

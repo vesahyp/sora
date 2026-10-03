@@ -20,10 +20,15 @@ jarruttaa.
 
 ## Kisa
 
-Kolme kierrosta Hirvisuon soratiellä. Tien vieressä on nurmea, jolla auto
-hidastuu ja luistaa; nurmen takana on metsä, johon auto pysähtyy. Maalissa
-näet kierrosajat, ja paras kierros ja paras kisa jäävät muistiin tälle
-laitteelle.
+Kolme kierrosta, neljä autoa. Sinä ja kolme muuta lähdette ruudukosta:
+Jorma ajaa kovaa, Marko lähes yhtä kovaa, Tapsa on kuski jonka ohitat
+ensin. Autot tönivät toisiaan, mutta eivät hajoa. Tien vieressä on
+nurmea, jolla auto hidastuu ja luistaa; nurmen takana on metsä, johon auto
+pysähtyy. Maalissa näet sijoituksen, koko kentän ajat ja omat kierroksesi;
+paras kierros ja paras kisa jäävät muistiin tälle laitteelle.
+
+Kaksi rataa: **Kiviaho**, reilu puoli kilometriä ja alle puoli minuuttia
+kierros, ja **Hirvisuo**, kilometrin lenkki. Valitse rata aloitusruudusta.
 
 ## Mitä tästä tulee
 

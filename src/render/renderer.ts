@@ -108,7 +108,7 @@ export class Renderer {
 
   draw(s: SimState, dt: number): void {
     const g = this.g;
-    const c = s.car;
+    const c = s.cars[0];
     const t = s.track;
     this.ensureRoad(t);
     this.ensureGrass();
@@ -186,19 +186,22 @@ export class Renderer {
       g.fill();
     }
 
-    // the car: shadow, then the sprite
-    const spr = carSprite(c.def);
-    const sw = spr.width / SPRITE_PPM;
-    const sh = spr.height / SPRITE_PPM;
-    g.save();
-    g.translate(c.x, c.y);
-    g.rotate(c.heading);
-    g.fillStyle = 'rgba(0,0,0,0.3)';
-    g.beginPath();
-    g.ellipse(-0.1, 0.25, c.def.length * 0.5, c.def.width * 0.55, 0, 0, Math.PI * 2);
-    g.fill();
-    g.drawImage(spr, -sw / 2, -sh / 2, sw, sh);
-    g.restore();
+    // the cars, the player last so it is never hidden: shadow, then the sprite
+    for (let i = s.cars.length - 1; i >= 0; i--) {
+      const car = s.cars[i];
+      const spr = carSprite(car.def);
+      const sw = spr.width / SPRITE_PPM;
+      const sh = spr.height / SPRITE_PPM;
+      g.save();
+      g.translate(car.x, car.y);
+      g.rotate(car.heading);
+      g.fillStyle = 'rgba(0,0,0,0.3)';
+      g.beginPath();
+      g.ellipse(-0.1, 0.25, car.def.length * 0.5, car.def.width * 0.55, 0, 0, Math.PI * 2);
+      g.fill();
+      g.drawImage(spr, -sw / 2, -sh / 2, sw, sh);
+      g.restore();
+    }
 
     // trees over the car: they are taller
     for (const tr of t.trees) {
@@ -216,25 +219,26 @@ export class Renderer {
   }
 
   private stepDust(s: SimState, dt: number): void {
-    const c = s.car;
-    const spd = Math.hypot(c.vx, c.vy);
-    const want = s.hold > 0 ? 0 : (c.onRoad ? Math.abs(c.slip) * 0.8 + spd * 0.06 : spd * 0.25) * dt * 8;
-    let n = Math.floor(want);
-    if (Math.random() < want - n) n++;
-    for (let i = 0; i < n && this.dust.length < 160; i++) {
-      const back = -c.def.length * 0.45;
-      const side = (Math.random() - 0.5) * c.def.width;
-      const fx = Math.cos(c.heading);
-      const fy = Math.sin(c.heading);
-      this.dust.push({
-        x: c.x + fx * back - fy * side,
-        y: c.y + fy * back + fx * side,
-        vx: c.vx * 0.15 + (Math.random() - 0.5) * 2,
-        vy: c.vy * 0.15 + (Math.random() - 0.5) * 2,
-        age: 0,
-        life: 0.7 + Math.random() * 0.6,
-        r: 0.5 + Math.random() * 0.5,
-      });
+    for (const c of s.cars) {
+      const spd = Math.hypot(c.vx, c.vy);
+      const want = s.hold > 0 ? 0 : (c.onRoad ? Math.abs(c.slip) * 0.8 + spd * 0.06 : spd * 0.25) * dt * 8;
+      let n = Math.floor(want);
+      if (Math.random() < want - n) n++;
+      for (let i = 0; i < n && this.dust.length < 240; i++) {
+        const back = -c.def.length * 0.45;
+        const side = (Math.random() - 0.5) * c.def.width;
+        const fx = Math.cos(c.heading);
+        const fy = Math.sin(c.heading);
+        this.dust.push({
+          x: c.x + fx * back - fy * side,
+          y: c.y + fy * back + fx * side,
+          vx: c.vx * 0.15 + (Math.random() - 0.5) * 2,
+          vy: c.vy * 0.15 + (Math.random() - 0.5) * 2,
+          age: 0,
+          life: 0.7 + Math.random() * 0.6,
+          r: 0.5 + Math.random() * 0.5,
+        });
+      }
     }
     for (let i = this.dust.length - 1; i >= 0; i--) {
       const d = this.dust[i];
@@ -272,13 +276,16 @@ export class Renderer {
     g.strokeStyle = 'rgba(240,230,200,0.9)';
     g.lineWidth = 5 / k;
     g.stroke(this.roadPath!);
-    g.fillStyle = s.car.def.colour;
-    g.beginPath();
-    g.arc(s.car.x, s.car.y, 5 / k, 0, Math.PI * 2);
-    g.fill();
-    g.strokeStyle = '#fff';
-    g.lineWidth = 1.5 / k;
-    g.stroke();
+    for (let i = s.cars.length - 1; i >= 0; i--) {
+      const car = s.cars[i];
+      g.fillStyle = car.def.colour;
+      g.beginPath();
+      g.arc(car.x, car.y, (i === 0 ? 5 : 3.5) / k, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = i === 0 ? '#fff' : 'rgba(0,0,0,0.6)';
+      g.lineWidth = 1.5 / k;
+      g.stroke();
+    }
     g.restore();
   }
 }

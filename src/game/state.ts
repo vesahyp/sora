@@ -1,8 +1,17 @@
 import type { CarDef, TrackDef } from './types';
 import { Track } from './track';
+import type { Text } from '../i18n';
+
+export interface Driver {
+  name: Text;
+  /** 0..1: how hard the bot drives this car. 1 is the bot's own ceiling. */
+  skill: number;
+  colour: string;
+}
 
 export interface Car {
   def: CarDef;
+  driver: Driver;
   x: number;
   y: number;
   /** radians, 0 is +x, screen-down positive */
@@ -16,7 +25,7 @@ export interface Car {
   /** sideways speed, for dust and sound */
   slip: number;
   onRoad: boolean;
-  /** 1 while scraping the trees this step */
+  /** 1 while scraping the trees or another car this step */
   hit: number;
   /** where on the lap */
   s: number;
@@ -24,38 +33,50 @@ export interface Car {
   d: number;
   /** set after passing half distance; a lap counts only with it */
   half: boolean;
+  /** 1-based; totalLaps + 1 once finished */
+  lap: number;
+  lapStart: number;
+  laps: number[];
+  /** race time at the flag, or -1 */
+  finishedAt: number;
+  /** lap * L + s, for the running order */
+  progress: number;
 }
 
 export interface SimState {
   time: number;
   track: Track;
-  car: Car;
+  /** index 0 is the player */
+  cars: Car[];
   totalLaps: number;
-  /** 1-based; totalLaps + 1 once finished */
-  lap: number;
-  lapStart: number;
-  laps: number[];
+  /** the player has crossed the flag */
   finished: boolean;
-  /** the countdown before the lights go, seconds; the car is held while > 0 */
+  /** the countdown before the lights go, seconds; the cars are held while > 0 */
   hold: number;
   /** names of sounds for the loop to drain */
   sounds: string[];
-  /** world metres visible, set by the renderer so the sim can cull; unused by the sim itself */
+  /** world metres visible, set by the renderer; unused by the sim itself */
   view: { w: number; h: number };
 }
 
-export function createState(trackDef: TrackDef, carDef: CarDef, totalLaps: number): SimState {
+export const PLAYER: Driver = { name: { fi: 'Sinä', en: 'You' }, skill: 1, colour: '#c8352a' };
+
+export function createState(trackDef: TrackDef, carDef: CarDef, totalLaps: number, opponents: Driver[] = []): SimState {
   const track = new Track(trackDef);
-  const p = track.at(-8);
-  const heading = Math.atan2(p.ty, p.tx);
-  return {
-    time: 0,
-    track,
-    car: {
-      def: carDef,
-      x: p.x,
-      y: p.y,
-      heading,
+  const drivers = [PLAYER, ...opponents];
+  // the grid: two abreast, the player on the front row, behind the line
+  const cars = drivers.map((driver, i) => {
+    const row = Math.floor(i / 2);
+    const side = i % 2 ? 1 : -1;
+    const s = track.length - 7 - row * 7;
+    const p = track.at(s);
+    const d = side * trackDef.width * 0.22;
+    return {
+      def: { ...carDef, colour: driver.colour },
+      driver,
+      x: p.x - p.ty * d,
+      y: p.y + p.tx * d,
+      heading: Math.atan2(p.ty, p.tx),
       vx: 0,
       vy: 0,
       steer: 0,
@@ -63,17 +84,30 @@ export function createState(trackDef: TrackDef, carDef: CarDef, totalLaps: numbe
       slip: 0,
       onRoad: true,
       hit: 0,
-      s: track.length - 8,
-      d: 0,
+      s,
+      d,
       half: false,
-    },
-    totalLaps,
-    lap: 1,
-    lapStart: 0,
-    laps: [],
-    finished: false,
-    hold: 2.5,
-    sounds: [],
-    view: { w: 40, h: 70 },
-  };
+      lap: 1,
+      lapStart: 0,
+      laps: [],
+      finishedAt: -1,
+      progress: 0,
+    };
+  });
+  return { time: 0, track, cars, totalLaps, finished: false, hold: 2.5, sounds: [], view: { w: 40, h: 70 } };
+}
+
+/** The running order: finishers by flag time, then everyone by distance covered. */
+export function standings(s: SimState): Car[] {
+  return s.cars.slice().sort((a, b) => {
+    if (a.finishedAt >= 0 && b.finishedAt >= 0) return a.finishedAt - b.finishedAt;
+    if (a.finishedAt >= 0) return -1;
+    if (b.finishedAt >= 0) return 1;
+    return b.progress - a.progress;
+  });
+}
+
+/** 1-based place of a car. */
+export function placeOf(s: SimState, car: Car): number {
+  return standings(s).indexOf(car) + 1;
 }

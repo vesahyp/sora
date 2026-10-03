@@ -10,8 +10,8 @@ design: what the game is meant to become.
 **Sora** is a top-down arcade racer in the shape of Super Cars II, with a
 career in the shape of Gran Turismo, for the browser, phones first. One
 thumb steers; the throttle is always on; a second finger brakes. Finnish
-gravel roads, nineties cars. Today it is one car on one track against the
-clock. Sora is Finnish for gravel.
+gravel roads, nineties cars. Today it is one car, two tracks, and a field of
+four: the player and three cars the bot drives. Sora is Finnish for gravel.
 
 ## Stack
 
@@ -32,12 +32,13 @@ The Räkkä architecture, copied from `hoyry`:
 src/
   game/               the simulation, no DOM anywhere in here
     types.ts          CarInput, TrackDef, CarDef
-    state.ts          SimState, Car, createState
-    sim.ts            step(): the car model, grass, trees, lap counting
+    state.ts          SimState, Car, Driver, createState (the grid), standings
+    sim.ts            step(): the car model, car contact, grass, trees, lap counting
     track.ts          Track: smoothing, locate(x, y) -> (s, d), at(s), the forest
     rng.ts            seeded RNG and hashes
     content/
       cars.ts         the cars: the balance knobs
+      drivers.ts      the opponents: a name, a colour, a skill for the bot
       tracks.ts       the tracks: a centreline in metres, a width, a surface
   render/
     renderer.ts       camera, grass, road, dust, car, trees, minimap

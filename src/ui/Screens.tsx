@@ -2,11 +2,11 @@ import { tr, t, lang, setLang } from '../i18n';
 import { fmt, recordKey, type Records } from '../records';
 import { BUILD_NAME } from '../version';
 import type { RaceResult } from './Game';
-import { TRACK_BY_ID } from '../game/content/tracks';
+import { TRACKS, TRACK_BY_ID } from '../game/content/tracks';
 import { CAR_BY_ID } from '../game/content/cars';
 import { UpdateBanner } from './Update';
 
-export function Title({ records, trackId, carId, onPlay }: { records: Records; trackId: string; carId: string; onPlay: () => void }) {
+export function Title({ records, trackId, onTrack, carId, onPlay }: { records: Records; trackId: string; onTrack: (id: string) => void; carId: string; onPlay: () => void }) {
   const best = records.bestLap[recordKey(trackId, carId)];
   return (
     <div className="screen title">
@@ -14,8 +14,15 @@ export function Title({ records, trackId, carId, onPlay }: { records: Records; t
       <h1 className="logo">SORA</h1>
       <p className="tagline">{tr('Soraa, mutkia ja kello. Yksi peukalo ohjaa, kaasu on pohjassa.', 'Gravel, corners and a clock. One thumb steers, the throttle is down.')}</p>
       <div className="card">
+        <div className="tracks">
+          {TRACKS.map((tk) => (
+            <button key={tk.id} className={`trackbtn${tk.id === trackId ? ' on' : ''}`} onClick={() => onTrack(tk.id)}>
+              {t(tk.name)}
+            </button>
+          ))}
+        </div>
         <div className="where">
-          <b>{t(TRACK_BY_ID[trackId].name)}</b> · {t(CAR_BY_ID[carId].name)}
+          {t(CAR_BY_ID[carId].name)} · {tr('3 kierrosta, 4 autoa', '3 laps, 4 cars')}
         </div>
         <div className="small">{best ? `${tr('Paras kierros', 'Best lap')} ${fmt(best)}` : tr('Ei vielä aikaa', 'No time yet')}</div>
       </div>
@@ -37,12 +44,26 @@ export function Result({ r, set, records, onAgain, onMenu }: { r: RaceResult; se
   const key = recordKey(r.trackId, r.carId);
   const total = r.laps.reduce((a, b) => a + b, 0);
   const best = Math.min(...r.laps);
+  const placeWord = [tr('Voitto!', 'Winner!'), tr('Toinen', 'Second'), tr('Kolmas', 'Third'), tr('Neljäs', 'Fourth')][r.place - 1] ?? `${r.place}.`;
   return (
     <div className="screen result">
-      <h2>{tr('Maalissa', 'Finished')}</h2>
+      <h2>{placeWord}</h2>
       <div className="small">
         {t(TRACK_BY_ID[r.trackId].name)} · {t(CAR_BY_ID[r.carId].name)}
       </div>
+      <table className="order">
+        <tbody>
+          {r.order.map((d, i) => (
+            <tr key={i} className={d.player ? 'me' : ''}>
+              <td className="pos">{i + 1}.</td>
+              <td>
+                <i style={{ background: d.colour }} /> {t(d.name)}
+              </td>
+              <td className="n">{d.time >= 0 ? fmt(d.time) : tr('ajaa vielä', 'still out')}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
       <table className="laps">
         <tbody>
           {r.laps.map((l, i) => (

@@ -20,9 +20,10 @@ for (const track of TRACKS) {
   console.log(`${track.id}  ${Math.round(new Track(track).length)} m`);
   for (const car of CARS) {
     const s = createState(track, car, laps);
-    while (!s.finished && s.time < 1200) step(s, botInput(s), DT);
-    const best = s.laps.length ? Math.min(...s.laps) : NaN;
-    const total = s.laps.reduce((a, b) => a + b, 0);
-    console.log(`  ${car.id.padEnd(12)} best ${best.toFixed(2)}  total ${total.toFixed(1)}  laps ${s.laps.map((l) => l.toFixed(1)).join(' ')}`);
+    while (!s.finished && s.time < 1200) step(s, [botInput(s)], DT);
+    const me = s.cars[0];
+    const best = me.laps.length ? Math.min(...me.laps) : NaN;
+    const total = me.laps.reduce((a, b) => a + b, 0);
+    console.log(`  ${car.id.padEnd(12)} best ${best.toFixed(2)}  total ${total.toFixed(1)}  laps ${me.laps.map((l) => l.toFixed(1)).join(' ')}`);
   }
 }

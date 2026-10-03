@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { createState, type SimState } from '../game/state';
+import { createState, placeOf, standings, type SimState } from '../game/state';
+import { OPPONENTS } from '../game/content/drivers';
+import type { Text } from '../i18n';
 import { step, DT } from '../game/sim';
 import { TRACK_BY_ID } from '../game/content/tracks';
 import { CAR_BY_ID } from '../game/content/cars';
@@ -14,9 +16,15 @@ export interface RaceResult {
   trackId: string;
   carId: string;
   laps: number[];
+  /** 1-based finishing place */
+  place: number;
+  /** the field in finishing order; time is -1 for a car still out */
+  order: { name: Text; colour: string; time: number; player: boolean }[];
 }
 
 interface Hud {
+  place: number;
+  field: number;
   lap: number;
   total: number;
   time: number;
@@ -41,7 +49,7 @@ export function Game({ trackId, carId, laps, onEnd, onQuit }: { trackId: string;
   useEffect(() => {
     const canvas = canvasRef.current!;
     const root = rootRef.current!;
-    const s = createState(TRACK_BY_ID[trackId], CAR_BY_ID[carId], laps);
+    const s = createState(TRACK_BY_ID[trackId], CAR_BY_ID[carId], laps, OPPONENTS);
     simRef.current = s;
     (window as unknown as { __sim: SimState }).__sim = s;
     const renderer = new Renderer(canvas);
@@ -73,16 +81,33 @@ export function Game({ trackId, carId, laps, onEnd, onQuit }: { trackId: string;
     let lastCount = Math.ceil(s.hold);
     let finishedAt = -1;
     const publishHud = () => {
+      const me = s.cars[0];
       setHud({
-        lap: Math.min(s.lap, s.totalLaps),
+        place: placeOf(s, me),
+        field: s.cars.length,
+        lap: Math.min(me.lap, s.totalLaps),
         total: s.totalLaps,
-        time: s.finished ? s.laps[s.laps.length - 1] : s.time - s.lapStart,
-        last: s.laps.length ? s.laps[s.laps.length - 1] : null,
-        best: s.laps.length ? Math.min(...s.laps) : null,
-        speed: Math.max(0, s.car.speed),
+        time: s.finished ? me.laps[me.laps.length - 1] : s.time - me.lapStart,
+        last: me.laps.length ? me.laps[me.laps.length - 1] : null,
+        best: me.laps.length ? Math.min(...me.laps) : null,
+        speed: Math.max(0, me.speed),
         hold: s.hold,
         finished: s.finished,
       });
+    };
+    const result = (): RaceResult => {
+      const me = s.cars[0];
+      const place = placeOf(s, me);
+      // run the field home off screen, so the result has every time
+      let guard = 0;
+      while (s.cars.some((c) => c.finishedAt < 0) && guard++ < 120 * 60) step(s, s.cars.map((c) => botInput(s, c)), DT);
+      return {
+        trackId,
+        carId,
+        laps: me.laps.slice(),
+        place,
+        order: standings(s).map((c) => ({ name: c.driver.name, colour: c.def.colour, time: c.finishedAt, player: c === me })),
+      };
     };
 
     let raf = 0;
@@ -98,8 +123,8 @@ export function Game({ trackId, carId, laps, onEnd, onQuit }: { trackId: string;
       acc += dt * speed;
       let n = 0;
       while (acc >= DT && n < 4 * speed) {
-        const inp = bot ? botInput(s) : input.read();
-        step(s, inp, DT);
+        const inputs = s.cars.map((c, i) => (i === 0 && !bot ? input.read() : botInput(s, c)));
+        step(s, inputs, DT);
         acc -= DT;
         n++;
         for (const name of s.sounds) audio.play(name);
@@ -111,16 +136,17 @@ export function Game({ trackId, carId, laps, onEnd, onQuit }: { trackId: string;
         }
         if (s.finished && finishedAt < 0) {
           finishedAt = s.time;
-          track('race_end', { track: trackId, car: carId, best: Math.round(Math.min(...s.laps) * 100) / 100, total: Math.round(s.laps.reduce((a, b) => a + b, 0) * 100) / 100 });
+          const me = s.cars[0];
+          track('race_end', { track: trackId, car: carId, place: placeOf(s, me), best: Math.round(Math.min(...me.laps) * 100) / 100, total: Math.round(me.laps.reduce((a, b) => a + b, 0) * 100) / 100 });
         }
         if (s.finished && s.time - finishedAt > 2.2 && !endedRef.current) {
           endedRef.current = true;
-          onEnd({ trackId, carId, laps: s.laps.slice() });
+          onEnd(result());
         }
       }
       if (acc > DT * 4 * speed) acc = 0;
       renderer.draw(s, dt);
-      audio.engineAt(Math.min(1, Math.max(0, s.car.speed) / s.car.def.topSpeed), s.car.slip);
+      audio.engineAt(Math.min(1, Math.max(0, s.cars[0].speed) / s.cars[0].def.topSpeed), s.cars[0].slip);
       // the wheel ghost
       const w = wheelRef.current;
       if (w) {
@@ -171,6 +197,9 @@ export function Game({ trackId, carId, laps, onEnd, onQuit }: { trackId: string;
       </div>
       {hud && (
         <div className="hud">
+          <div className="place">
+            <b>{hud.place}.</b>/{hud.field}
+          </div>
           <div className="lapno">
             {tr('Kierros', 'Lap')} <b>{hud.lap}</b>/{hud.total}
           </div>
@@ -210,7 +239,8 @@ export function Game({ trackId, carId, laps, onEnd, onQuit }: { trackId: string;
       )}
       {hud?.finished && (
         <div className="banner">
-          <div className="t">{tr('MAALI', 'FINISH')}</div>
+          <div className="t">{hud.place}.</div>
+          <div className="s">{tr('MAALI', 'FINISH')}</div>
         </div>
       )}
       {paused && (
