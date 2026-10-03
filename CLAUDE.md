@@ -89,7 +89,8 @@ tools/
 scripts/
   shots.mjs           phone screenshots with Playwright, the bot driving
   touch-check.mjs     drives the race by touch on an emulated phone: steer, brake, pause
-  icon.mjs            render public/icon.svg to the PNG icons
+  icon.mjs            render public/icon.svg to the PNG icons: 512, 192, the 180 iOS icon, a 32 favicon
+  pwa-check.mjs       the install check: manifest, every icon at its size, the service worker, offline
 infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs), see TRACKING.md
 ```
 
@@ -141,6 +142,12 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
   bot driving), never from a hand-held browser. `?bot=1&speed=3` makes the
   bot drive at triple speed for scripts. `make touch-check` drives the race
   by touch; run it when you touched `input.ts` or the HUD buttons.
+- **The game installs as an app.** `public/manifest.webmanifest` and the
+  icons are hand-written; `vite.config.ts` writes `sw.js` into the build
+  with the list of that build's files, so the game opens offline and a new
+  deploy is a new cache. `make pwa-check` runs the install check against
+  the live site (`URL=` for a preview). Run it after touching the
+  manifest, the icons, `index.html`'s head or the service worker plugin.
 - `make plan` and `make apply` for `infra/`: the tracking pixel host. The
   game learns its URL only from the build environment (`VITE_PIXEL_URL`):
   `make env` writes `.env.local` from the Terraform output for builds

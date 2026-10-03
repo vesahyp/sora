@@ -4,7 +4,9 @@ Soraa, mutkia ja kello. Ylhäältä kuvattu ralli puhelimeen: yksi peukalo
 ohjaa, kaasu on pohjassa, ja kello käy.
 
 **Pelaa: https://vesahyp.github.io/sora/**. Toimii puhelimessa ja
-selaimessa. Lisää kotinäytölle, niin se aukeaa koko ruudulle.
+selaimessa. Lisää kotinäytölle (iPhone: Jaa, Lisää Koti-valikkoon;
+Chrome: osoiterivin asennuskuvake), niin se aukeaa koko ruudulle omalla
+kuvakkeellaan ja toimii ilman verkkoa.
 
 Peli on suomeksi ja englanniksi, kielen valitsee selain. *In English: the
 game follows your browser's language.*
