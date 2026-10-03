@@ -69,8 +69,8 @@ export const GRUDGE = {
 export const PACING = {
   pushRange: 20,
   easeRange: 15,
-  engine: { push: 0.15, ease: 0.2 },
-  corner: { push: 0.25, ease: 0.25 },
+  engine: { push: 0.2, ease: 0.2 },
+  corner: { push: 0.4, ease: 0.25 },
 };
 
 /**

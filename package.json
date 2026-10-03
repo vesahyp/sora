@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "sim-check": "vite build --ssr tools/sim-check.ts --outDir .sim-check --logLevel error && node .sim-check/sim-check.js",
+    "physics-check": "vite build --ssr tools/physics-check.ts --outDir .sim-check --logLevel error && node .sim-check/physics-check.js",
     "balance": "vite build --ssr tools/balance.ts --outDir .sim-check --logLevel error && node .sim-check/balance.js"
   },
   "author": "Vesa Hyppönen <vesa.hypponen@gmail.com> (https://github.com/vesahyp)",

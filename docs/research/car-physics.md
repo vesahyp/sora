@@ -121,6 +121,39 @@ speeds and steers):
   the peak, hold a third throttle rather than brake while the tail is
   out. Without that it spun every car with a loose rear.
 
+## The second model (2026-10-03, ADR 0003)
+
+Played on the phone, the first model's car stopped dead on the trees,
+cars met as circles, a spin ended in a halt, and grip switched. The
+second keeps the bicycle model and changes the rest:
+
+- The tyre curve drops past the peak to a share (`slide` per surface),
+  `2x / (1 + x²)` up to the peak, so grip lets go progressively. A flat
+  cap felt like a switch.
+- The thumb has no throttle, so a held slide on an open throttle became
+  a spin. Four aids answer that, each a known one: caster (a free wheel
+  follows the front axle's direction), traction control (drive fades as
+  the rear passes its peak), a rear spin guard (a tail far out bites
+  again) and yaw damping only while the rear is past its peak. The last
+  one matters most: once both axles are saturated their forces no
+  longer depend on how fast the car turns, and nothing else slows a
+  spin.
+- The handbrake has to take the rear's side grip away directly. Scaled
+  as a longitudinal demand in the friction circle, a dragged rear kept
+  its share sideways and the pedal barely moved the tail.
+- Rigid-body contacts by impulse at the contact point (separating axes
+  for two boxes, the deepest corner for the trees), 180 Hz substeps so
+  contacts stay shallow. A hit's yaw inertia is 1.5 times the body's,
+  standing in for the tyres resisting the turn; without it a punt off
+  the middle spun a car at 9 rad/s.
+
+Read off the sweeps (`tools/dbg/matrix.ts`): full lock at 90 km/h for a
+second slides 7 to 10 degrees and straightens in about half a second;
+a pedal stab at half lock turns 40 to 50 degrees, held through the
+slide a hairpin's 75 to 90; a held half lock drifts at about 12 degrees
+on the rear-drive cars. The Kiila, four-wheel drive, grips: it barely
+slides at half lock.
+
 ## Measuring instead of feeling
 
 A step response at constant steer and speed tells more than a lap:

@@ -29,10 +29,13 @@ The Räkkä architecture, copied from `hoyry`:
 - **Canvas 2D** for the game view. No engine. Sprites are drawn once with
   canvas paths and cached (`src/render/sprites.ts`). The road is one
   stroked path at road width. See `docs/adr/0001-canvas-2d.md`.
-- **No physics library.** The car is the bicycle model with saturating
-  tyres, weight transfer and a friction circle (`src/game/sim.ts`,
-  `docs/adr/0002-bicycle-model.md`). The track is a smoothed closed
-  polyline with a width (`src/game/track.ts`), queried by arc length.
+- **No physics library.** A car is a rigid box on two axles (the
+  bicycle model) with a tyre that lets go smoothly, weight transfer and
+  a friction circle; cars and the tree line meet through impulses at the
+  contact point (`src/game/physics.ts`, `docs/adr/0003-rigid-body-cars.md`).
+  Each axle reads the surface under it, and a car has a height for
+  jumps. The track is a smoothed closed polyline with a width
+  (`src/game/track.ts`), queried by arc length.
 
 ## Where things live
 
@@ -41,9 +44,14 @@ src/
   game/               the simulation, no DOM anywhere in here
     types.ts          CarInput, TrackDef, CarDef
     state.ts          SimState, Car (with its grudges and the race's credits), Driver, createState (the grid), standings
-    sim.ts            step(): the bicycle model, nitro, the automatic guns, bullets,
-                        missiles, mines, pickups, ramming, wrecks and respawns, lap counting
-    track.ts          Track: smoothing, locate(x, y) -> (s, d), at(s), the forest
+    sim.ts            step(): the automatic guns, bullets, missiles, mines, pickups,
+                        wrecks and respawns, lap counting; hands the cars to the car model
+    physics.ts        the car model: the tyres, the aids, height and landing, box-against-box
+                        and tree contacts by impulse, in SUB substeps a frame
+    physics-old.ts    the model before 2026-10-03, at ?physics=old for one release. Delete after
+    harm.ts           what a hit costs, for both models: damage, grudge, a blast's spin, a ram
+    track.ts          Track: smoothing, locate(x, y) -> (s, d), at(s), the forest,
+                        surfaceAt(s, d) from the patches, groundAt(s, d) from the jumps
     rng.ts            seeded RNG and hashes
     content/
       cars.ts         the cars, one per class: the balance knobs, a price
@@ -56,7 +64,8 @@ src/
       drivers.ts      the opponents: a name, a colour, a skill and an aggression for the bot; PACING, Death Rally's catch-up:
                         sim.ts scales an opponent's engine by its gap to the player, the bot its corners;
                         GRUDGE, Burnout's hostility: what a ram, shot or wreck costs and how the bot uses it
-      tracks.ts       the tracks: a centreline in metres, a width, a surface
+      tracks.ts       the tracks: a centreline in metres, a width, a surface, patches, jumps
+      surfaces.ts     what each surface does to a tyre and a car: grip, peak, slide, drag, top
   career/save.ts      the save: credits, cars owned with parts, licences; one object in localStorage
   render/
     look.ts           the one light: a low sun from the upper left; shadow direction and
@@ -82,6 +91,8 @@ tools/
   autoplayer.ts       the bot driver: yaw-rate steering through the wheelbase, braking to
                         the speed a bend allows, a running-wide reflex, leaning on neighbours,
                         blocking, punting and waiting for whoever it holds a grudge against
+  physics-check.ts    npm run physics-check: the car model's promises as set pieces with numbers:
+                        a straight line, full lock, a pedal stab, tree hits, car hits, a jump, water
   sim-check.ts        npm run sim-check: the bot laps every track in every car, asserts;
                         asserts the field is on the player's screen and in the sights, and that
                         aggression pays the player more than the road
@@ -89,6 +100,7 @@ tools/
 scripts/
   shots.mjs           phone screenshots with Playwright, the bot driving
   touch-check.mjs     drives the race by touch on an emulated phone: steer, brake, pause
+  drive-log.mjs       set pieces by touch on an emulated phone, the physics logged frame by frame
   icon.mjs            render public/icon.svg to the PNG icons: 512, 192, the 180 iOS icon, a 32 favicon
   pwa-check.mjs       the install check: manifest, every icon at its size, the service worker, offline
 infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs), see TRACKING.md
@@ -102,7 +114,8 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
    in the renderer.
 2. **Fixed step.** The sim runs at `DT = 1/60`; the render loop accumulates
    real time and calls `step` a whole number of times. Never pass a frame
-   delta into `step`.
+   delta into `step`. The car model cuts each step into `SUB` substeps of
+   its own; that is inside `physics.ts` and nothing outside sees it.
 3. **Content is data.** A new track is a list of points in `tracks.ts`. A
    new car is a `CarDef`, a new race an `EventDef`. Balance changes are
    number changes in `content/`. A part's effect is one line in `tuned()`.
@@ -123,13 +136,18 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
 ## Workflow
 
 - `make dev` (http://localhost:5173, also on the LAN for a phone).
-- **Before committing:** `make check` (typecheck, build, sim-check) must
-  pass. `sim-check` prints the bot's laps first; read them when you touched
-  the car, the track or the bot.
-- **Physics changes are read off `tools/dbg/trace.ts`** (gitignored, see
-  the ADR): a step response at constant steer, then the bot's lap with
-  the moments it leaves the road. Build it like the tools:
-  `npx vite build --ssr tools/dbg/trace.ts --outDir .sim-check && node .sim-check/trace.js`.
+- **Before committing:** `make check` (typecheck, build, physics-check,
+  sim-check) must pass. `sim-check` prints the bot's laps first; read them
+  when you touched the car, the track or the bot.
+- **Physics changes are read, then felt.** `make drive-log` drives set
+  pieces by touch on an emulated phone and prints speed, yaw, slip,
+  contacts and body overlap (`PHYSICS=old` for the old model).
+  `physics-check` holds the numbers. The local tools in `tools/dbg/`
+  (gitignored) are the sweeps: `matrix.ts` (full lock, half lock, a
+  pedal stab, per car), `fight.ts` (the race's view and fight over six
+  grid orders), `spin.ts` (the ground a blast costs). Build one like
+  the tools: `npx vite build --ssr tools/dbg/matrix.ts --outDir .sim-check && node .sim-check/matrix.js`.
+- `?physics=old` plays the old car model, for one release, to compare.
 - **Balance with `make balance`.** It prints the bot's laps per car, stock
   and fully built, per track. The bot is a floor, not a player: a human
   who looks through the corner beats it. A change that moves the bot's

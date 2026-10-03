@@ -6,6 +6,7 @@ import { CLASS_RANK } from './types';
 import { GRUDGE, hostility, leaderOf } from './content/drivers';
 import { anger, boom, clamp, hurt, spin, wrap } from './harm';
 import { advanceOld } from './physics-old';
+import { advance } from './physics';
 
 export const DT = 1 / 60;
 
@@ -13,18 +14,13 @@ export const DT = 1 / 60;
 const LOCK = 0.17;
 const LOCK_FADE = 50;
 /**
- * One fixed step. The car is the bicycle model (Marco Monster, "Car
- * Physics for Games"): velocity in the car's frame, a slip angle for
- * each axle from the lateral velocity and the yaw rate, a cornering
- * force per axle that grows with the slip angle and saturates at the
- * tyre's grip times its load, and yaw from the torque the two axles
- * make about the centre of gravity. Braking moves load to the front,
- * so the rear lets go first: braking into a corner swings the tail.
- * The pedal brakes, and at speed also locks the rear; held at a
- * standstill it reverses. A tap of nitro is a burst from a tank that
- * drifting, ramming and wrecking fill. Guns fire themselves. Cars push
- * each other, and a shunt hurts the one that was hit. At 100 damage a
- * car is a wreck for a few seconds, then it is back on the centreline.
+ * One fixed step. The car model moves the cars (physics.ts: the tyres,
+ * the contacts between cars and with the trees, height; physics-old.ts
+ * at ?physics=old). Around it the race runs: the countdown, a tap of
+ * nitro from a tank that drifting, ramming and wrecking fill, guns that
+ * fire themselves, bullets, missiles, mines and pickups, and the laps.
+ * At 100 damage a car is a wreck for a few seconds, then it is back on
+ * the centreline.
  */
 export function step(s: SimState, inputs: CarInput[], dt: number): void {
   s.time += dt;
@@ -42,7 +38,8 @@ export function step(s: SimState, inputs: CarInput[], dt: number): void {
   // grudges fade, slowly
   for (const c of s.cars) for (let k = 0; k < c.grudge.length; k++) if (c.grudge[k] > 0) c.grudge[k] = Math.max(0, c.grudge[k] - GRUDGE.decay * dt);
   const held = s.cars.map((_, i) => inputs[i] ?? { steer: 0, throttle: 0, brake: 1, boost: false });
-  advanceOld(s, held, dt);
+  if (s.physics === 'old') advanceOld(s, held, dt);
+  else advance(s, held, dt);
   for (let i = 0; i < s.cars.length; i++) {
     const c = s.cars[i];
     if (c.wreck > 0) burn(s, c, dt);
@@ -279,7 +276,8 @@ function pickups(s: SimState, dt: number): void {
 function wreck(s: SimState, c: Car): void {
   c.wreck = WRECK_TIME;
   c.wrecked++;
-  c.vx = c.vy = c.yaw = 0;
+  // the old model stops a wreck dead; the new one lets it slide to a stop on locked wheels
+  if (s.physics === 'old') c.vx = c.vy = c.yaw = 0;
   c.spin = 0;
   c.boosting = 0;
   boom(s, c.x, c.y, c === s.cars[0] ? 1 : 0.5);
@@ -306,6 +304,8 @@ function burn(s: SimState, c: Car, dt: number): void {
   c.y = p.y;
   c.heading = Math.atan2(p.ty, p.tx);
   c.vx = c.vy = c.yaw = 0;
+  c.z = c.vz = 0;
+  c.air = false;
   c.damage = RESPAWN_DAMAGE;
   c.d = 0;
   c.stall = 0;

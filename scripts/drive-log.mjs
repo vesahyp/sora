@@ -92,7 +92,6 @@ const SAMPLER = () => {
 
 // a thumb held at an offset from where it landed, through CDP like a real touch
 const cdp = await page.context().newCDPSession(page);
-// CDP lists every finger still down on each event; a finger left out of a touchMove is lifted
 let held = null;
 const thumb = async (dx) => {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 200, y: 600, id: 1 }] });
@@ -107,8 +106,12 @@ const pedal = async (on) => {
   const b = await page.locator('.pedal').boundingBox();
   const pt = { x: b.x + b.width / 2, y: b.y + b.height / 2, id: 3 };
   if (on) await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: held ? [held, pt] : [pt] });
-  else if (held) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [held] });
-  else await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  else {
+    // a finger left out of a touchMove is not lifted for the page, so lift both and put the thumb back
+    const dx = held ? held.x - 200 : 0;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    if (held) await thumb(dx);
+  }
 };
 
 // put the player on the lap at s, at speed, angled off the road's direction by `off` rad;

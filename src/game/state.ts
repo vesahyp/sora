@@ -1,4 +1,4 @@
-import type { CarDef, TrackDef } from './types';
+import type { CarDef, Surface, TrackDef } from './types';
 import { Track } from './track';
 import type { Text } from '../i18n';
 import { PICKUP_OFFSET, PICKUP_OFFSET_CASH, PICKUP_ORDER, PICKUP_SPACING, type PickupKind } from './content/pickups';
@@ -23,8 +23,15 @@ export interface Car {
   vy: number;
   /** rad/s, the yaw rate */
   yaw: number;
-  /** last step's longitudinal acceleration, for the load shift */
+  /** the longitudinal acceleration, smoothed, for the load shift */
   ax: number;
+  /** height of the car over the flat ground, metres, and its vertical speed */
+  z: number;
+  vz: number;
+  /** off the ground: no grip, no steering, until it lands */
+  air: boolean;
+  /** what the tyres are on, under the middle of the car */
+  surface: Surface;
   /** the wheel, smoothed from the input */
   steer: number;
   /** forward speed, m/s */
@@ -134,7 +141,7 @@ export interface Pickup {
 
 /** A burst for the renderer: an explosion, a puff, sparks, a pickup flash, a wreck's fire. */
 export interface Fx {
-  kind: 'boom' | 'puff' | 'spark' | 'flash' | 'cash';
+  kind: 'boom' | 'puff' | 'spark' | 'flash' | 'cash' | 'splash';
   x: number;
   y: number;
   age: number;
@@ -148,8 +155,12 @@ export interface Toast {
   age: number;
 }
 
+/** The car model: `new` is physics.ts, `old` the one before it, kept for one release (?physics=old). */
+export type Physics = 'new' | 'old';
+
 export interface SimState {
   time: number;
+  physics: Physics;
   track: Track;
   /** index 0 is the player */
   cars: Car[];
@@ -182,7 +193,7 @@ export interface Entry {
   mines?: number;
 }
 
-export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: number, opponents: Entry[] = [], ammo: { missiles: number; mines: number } = { missiles: 0, mines: 0 }): SimState {
+export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: number, opponents: Entry[] = [], ammo: { missiles: number; mines: number } = { missiles: 0, mines: 0 }, physics: Physics = 'new'): SimState {
   const track = new Track(trackDef);
   const entries: Entry[] = [{ driver: PLAYER, car: playerCar, ...ammo }, ...opponents];
   // the grid: two abreast behind the line, the player in the last slot. Death Rally starts
@@ -205,6 +216,10 @@ export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: nu
       vy: 0,
       yaw: 0,
       ax: 0,
+      z: 0,
+      vz: 0,
+      air: false,
+      surface: trackDef.surface as Surface,
       steer: 0,
       speed: 0,
       slip: 0,
@@ -258,7 +273,7 @@ export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: nu
     const d = (i % 2 ? 1 : -1) * (trackDef.width / 2) * (kind === 'cash' ? PICKUP_OFFSET_CASH : PICKUP_OFFSET);
     pickups.push({ kind, x: p.x - p.ty * d, y: p.y + p.tx * d, gone: 0 });
   }
-  return { time: 0, track, cars, totalLaps, finished: false, hold: 2.5, bullets: [], missiles: [], mines: [], pickups, fx: [], toasts: [], shake: 0, sounds: [], view: { w: 40, h: 70 } };
+  return { time: 0, physics, track, cars, totalLaps, finished: false, hold: 2.5, bullets: [], missiles: [], mines: [], pickups, fx: [], toasts: [], shake: 0, sounds: [], view: { w: 40, h: 70 } };
 }
 
 /** The running order: finishers by flag time, then everyone by distance covered. */

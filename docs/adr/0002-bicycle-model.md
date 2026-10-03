@@ -2,7 +2,7 @@
 adr: 2
 title: The car is a bicycle model with saturating tyres
 date: 2026-10-03
-status: Accepted
+status: Superseded by 0003
 deciders: Vesa
 ---
 

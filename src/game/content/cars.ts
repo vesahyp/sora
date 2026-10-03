@@ -59,6 +59,7 @@ export const CARS: CarDef[] = [
     brake: 22,
     turnRate: 3.1,
     grip: 26,
+    frontDrive: 0.3,
     mass: 1.25,
     armour: 0,
     gun: 0,

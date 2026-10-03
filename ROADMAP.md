@@ -5,6 +5,17 @@ The design is in `docs/design.md`.
 
 ## Next
 
+- **Playtest the new car model on a phone against the old one**
+  (https://vesahyp.github.io/sora/?physics=old). The questions: does a
+  slide feel like weight and grip letting go, does the pedal stab turn
+  a hairpin, does a glancing tree hit slide along, do hits push and turn
+  cars. The knobs are the constants at the top of `src/game/physics.ts`
+  and `content/surfaces.ts`; `make drive-log` and `tools/dbg/matrix.ts`
+  read a change before it is felt.
+- **Delete the old car model in the release after**: `physics-old.ts`,
+  `SimState.physics`, the `?physics=old` branch in `Game.tsx` and
+  `sim.ts`, the old kick in `harm.spin`, and `PHYSICS=` in `drive-log`.
+
 - **Playtest by hand on a phone, again.** The race was rebuilt (start
   last, a paced field with grudges, a 6 m road, a close camera) and so
   was the look. The questions now: does it feel like Death Rally, is

@@ -12,7 +12,32 @@ export interface CarInput {
 
 export const NO_INPUT: CarInput = { steer: 0, throttle: 0, brake: 0, boost: false };
 
-export type Surface = 'gravel' | 'tarmac';
+/** What a tyre is on. A road is gravel or tarmac; patches and the verge bring the rest (content/surfaces.ts). */
+export type Surface = 'gravel' | 'tarmac' | 'grass' | 'mud' | 'water' | 'ice';
+
+/**
+ * A stretch of a track that is not its road surface: a ford, a mud hole,
+ * an icy bend. From `s` to `to` metres along the lap, and across the road
+ * from `d[0]` to `d[1]` metres off the centreline (positive is right of
+ * travel); without `d` it spans the road and the verge.
+ */
+export interface SurfacePatch {
+  surface: Surface;
+  s: number;
+  to: number;
+  d?: [number, number];
+}
+
+/**
+ * A kicker: the road rises over `len` metres to `h` metres at `s`, then
+ * drops straight back to the ground. A car that reaches the lip faster
+ * than gravity can pull it down leaves the ground.
+ */
+export interface JumpDef {
+  s: number;
+  len: number;
+  h: number;
+}
 
 /** The classes, slowest first. A car has one; an event is run in one. */
 export type CarClass = 'C' | 'B' | 'A';
@@ -24,7 +49,11 @@ export interface TrackDef {
   name: Text;
   /** road width in metres */
   width: number;
-  surface: Surface;
+  /** the road's surface; off the road is grass */
+  surface: 'gravel' | 'tarmac';
+  /** stretches of another surface, in arc length: fords, mud, ice */
+  patches?: SurfacePatch[];
+  jumps?: JumpDef[];
   /** the centreline, metres, closed: the last point joins the first. Driven in index order. */
   points: [number, number][];
 }
@@ -51,6 +80,8 @@ export interface CarDef {
   turnRate: number;
   /** the tyres' grip as an acceleration, m/s²: what a loaded axle can pull sideways before it slides */
   grip: number;
+  /** share of the drive on the front axle: 0 is rear drive, 0.5 four-wheel drive. Rear when absent */
+  frontDrive?: number;
   /** tonnes-ish: who wins a shunt */
   mass: number;
   /** armour level 0..3: less damage taken, more dealt */

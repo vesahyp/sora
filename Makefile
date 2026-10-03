@@ -5,7 +5,7 @@
 #   make dev           # vite dev server, reachable on the LAN for a phone
 #   make build         # production build -> dist/
 #   make preview       # build, then serve it locally
-#   make check         # typecheck + build + sim-check, what a commit needs green
+#   make check         # typecheck + build + physics-check + sim-check, what a commit needs green
 #   make balance       # bot lap times per car (LAPS ?= 3 TRACK ?=)
 #   make shots-setup   # once: install Playwright
 #   make shots         # phone screenshots into shots/
@@ -40,6 +40,7 @@ preview: build
 check:
 	npm run typecheck
 	npm run build
+	npm run physics-check
 	npm run sim-check
 
 LAPS ?= 3

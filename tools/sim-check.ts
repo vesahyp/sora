@@ -17,12 +17,11 @@ import { standings } from '../src/game/state';
  * A phone's view of the world in metres, portrait: the renderer shows ten
  * cars across the short side (CARS_ACROSS in renderer.ts), so 17 m by
  * 37 m. The shares of the race that another car must be on it and that
- * a target must be in the sights, averaged over three races. The
- * on-screen floor is where the race landed once the opponents' engines
- * were paced to the player (PACING in drivers.ts): 39 to 51% across the
- * tracks and cars. Grudges and blocking (GRUDGE) did not move it on
- * average: Kiviaho rose to 38 to 57%, Hirvisuo fell to 31 to 33%, so the
- * floors stay. The target is still a half.
+ * a target must be in the sights, averaged over six races (every grid
+ * order). On the rigid-body car model (ADR 0003) with the catch-up in
+ * PACING the race sat at 42 to 65% on screen and 35 to 41% in the
+ * sights across the tracks and cars; the old model gave 27 to 50% and
+ * 15 to 37%. The floors stay where they were set; the target is a half.
  */
 const VIEW = { w: 17, h: 37 };
 const ON_SCREEN_MIN = 0.3;
@@ -65,8 +64,8 @@ for (const track of TRACKS) {
       assert(hits < 30, `${track.id}/${car.id}: the bot rarely meets a tree (${hits} steps)`);
     }
     // then the race: four bots, armed, so the race is tested with the guns in. One race is
-    // chaos (a wreck early moves everything after it), so it is run three times with the
-    // field in a different grid order, everyone must finish each, and the view is the average.
+    // chaos (a wreck early moves everything after it), so it is run in every grid order of the
+    // three opponents, everyone must finish each, and the view is the average.
     let racing = 0;
     let onScreen = 0;
     let inSights = 0;
@@ -74,8 +73,9 @@ for (const track of TRACKS) {
     let playerRams = 0;
     let fightCredits = 0;
     let roadCredits = 0;
-    for (let rot = 0; rot < 3; rot++) {
-      const field = OPPONENTS.map((_, k) => OPPONENTS[(k + rot) % OPPONENTS.length]);
+    const orders = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+    for (const grid of orders) {
+      const field = grid.map((k) => OPPONENTS[k]);
       const race = createState(track, car, 3, field.map((driver) => ({ driver, car, missiles: 2, mines: 2 })), { missiles: 2, mines: 2 });
       let drifting = 0;
       let boosts = 0;
@@ -110,15 +110,15 @@ for (const track of TRACKS) {
     }
     const seen = onScreen / Math.max(1, racing);
     const aimed = inSights / Math.max(1, racing);
-    console.log(`  view:  another car on screen ${(seen * 100).toFixed(0)}% of the race, a target in the sights ${(aimed * 100).toFixed(0)}%, the player wrecked ${playerWrecks} in three races`);
+    console.log(`  view:  another car on screen ${(seen * 100).toFixed(0)}% of the race, a target in the sights ${(aimed * 100).toFixed(0)}%, the player wrecked ${playerWrecks} in ${orders.length} races`);
     // aggression against the road, the player's own, per race: wrecking and ramming must pay more
     // than driving over cash, or the race teaches the player to drive round the fight. The bot
     // drives the line and rarely takes cash, so it is also held against a race that takes every
     // cash pickup on every lap (they grow back faster than a lap)
-    const fight = fightCredits / 3;
-    const road = roadCredits / 3;
+    const fight = fightCredits / orders.length;
+    const road = roadCredits / orders.length;
     const allCash = createState(track, car, 3).pickups.filter((p) => p.kind === 'cash').length * PICKUPS.cash.amount * 3;
-    console.log(`  fight: per race the player rams or is rammed ${(playerRams / 3).toFixed(1)} times, wrecks ${(playerWrecks / 3).toFixed(1)}, earns ${Math.round(fight)} cr from aggression and ${Math.round(road)} cr off the road (every cash: ${allCash})`);
+    console.log(`  fight: per race the player rams or is rammed ${(playerRams / orders.length).toFixed(1)} times, wrecks ${(playerWrecks / orders.length).toFixed(1)}, earns ${Math.round(fight)} cr from aggression and ${Math.round(road)} cr off the road (every cash: ${allCash})`);
     assert(fight > road, `${track.id}/${car.id}: aggression pays more than the road (${Math.round(fight)} > ${Math.round(road)} cr)`);
     assert(fight > allCash, `${track.id}/${car.id}: aggression pays more than taking every cash (${Math.round(fight)} > ${allCash} cr)`);
     assert(seen > ON_SCREEN_MIN, `${track.id}/${car.id}: the race happens on screen (${(seen * 100).toFixed(0)}% > ${ON_SCREEN_MIN * 100}%)`);

@@ -1,4 +1,4 @@
-import type { TrackDef } from './types';
+import type { Surface, SurfacePatch, TrackDef } from './types';
 import { hash32 } from './rng';
 
 /**
@@ -44,6 +44,8 @@ export class Track {
   readonly bounds: { minX: number; minY: number; maxX: number; maxY: number };
   private cell = 20;
   private grid = new Map<number, number[]>();
+  /** the patches that touch each TILE metres of the lap, for surfaceAt */
+  private tiles: SurfacePatch[][] = [];
 
   constructor(readonly def: TrackDef) {
     this.width = def.width;
@@ -91,6 +93,35 @@ export class Track {
       if (list) list.push(i); else this.grid.set(key, [i]);
     }
     this.plantTrees();
+    const nt = Math.ceil(this.length / TILE);
+    for (let k = 0; k < nt; k++) this.tiles.push([]);
+    for (const p of def.patches ?? []) {
+      for (let a = p.s; a < p.to; a += TILE) this.tiles[Math.floor((((a % this.length) + this.length) % this.length) / TILE)].push(p);
+      this.tiles[Math.floor((((p.to - 0.01) % this.length) + this.length) % this.length / TILE)].push(p);
+    }
+  }
+
+  /** The surface at (s, d): a patch if one covers the spot, else the road's surface on it and grass off it. */
+  surfaceAt(s: number, d: number): Surface {
+    s = ((s % this.length) + this.length) % this.length;
+    for (const p of this.tiles[Math.floor(s / TILE)] ?? []) {
+      if (!inSpan(s, p.s, p.to, this.length)) continue;
+      if (p.d && (d < p.d[0] || d > p.d[1])) continue;
+      return p.surface;
+    }
+    return Math.abs(d) <= this.width / 2 ? this.def.surface : 'grass';
+  }
+
+  /** The ground's height at (s, d), metres: zero but on a jump's ramp, which spans the road and a metre either side. */
+  groundAt(s: number, d: number): number {
+    const jumps = this.def.jumps;
+    if (!jumps || Math.abs(d) > this.width / 2 + 1) return 0;
+    for (const j of jumps) {
+      let x = s - (j.s - j.len);
+      x = ((x % this.length) + this.length) % this.length;
+      if (x < j.len) return (j.h * x) / j.len;
+    }
+    return 0;
   }
 
   private key(cx: number, cy: number): number {
@@ -193,6 +224,14 @@ export class Track {
       }
     }
   }
+}
+
+/** metres of lap per tile of the surface lookup */
+const TILE = 4;
+
+function inSpan(s: number, from: number, to: number, length: number): boolean {
+  const a = ((s - from) % length + length) % length;
+  return a < to - from;
 }
 
 function catmull(p0: number, p1: number, p2: number, p3: number, t: number): number {

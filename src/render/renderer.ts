@@ -203,7 +203,8 @@ export class Renderer {
       if (!visible(car.x, car.y)) continue;
       const sh = carShadow(car.def, car.heading);
       g.save();
-      g.translate(car.x, car.y);
+      // a car off the ground leaves its shadow behind on it, thrown away from the sun
+      g.translate(car.x + SHADOW_X * SHADOW_PER_M * car.z, car.y + SHADOW_Y * SHADOW_PER_M * car.z);
       g.rotate(car.heading);
       g.drawImage(sh.img, sh.x, sh.y, sh.w, sh.h);
       g.restore();
@@ -426,6 +427,26 @@ export class Renderer {
           g.stroke();
         }
         g.globalCompositeOperation = 'source-over';
+      } else if (f.kind === 'splash') {
+        // water thrown up behind the wheels: a white crown that spreads and falls back
+        if (k > 0.5) continue;
+        const q = k / 0.5;
+        const seed = Math.round(f.x * 97) ^ Math.round(f.y * 53);
+        g.fillStyle = `rgba(235,242,240,${0.75 * (1 - q)})`;
+        for (let i = 0; i < 7; i++) {
+          const h = hash32(seed + i * 613);
+          const a = ((h & 0xffff) / 0xffff) * Math.PI * 2;
+          const dist = (0.3 + ((h >>> 16) & 0xff) / 255 * 1.4) * Math.sqrt(q);
+          const r = 0.1 + 0.18 * (1 - q);
+          g.beginPath();
+          g.arc(f.x + Math.cos(a) * dist, f.y + Math.sin(a) * dist, r, 0, Math.PI * 2);
+          g.fill();
+        }
+        g.strokeStyle = `rgba(220,232,230,${0.5 * (1 - q)})`;
+        g.lineWidth = 0.08;
+        g.beginPath();
+        g.arc(f.x, f.y, 0.4 + q * 1.6, 0, Math.PI * 2);
+        g.stroke();
       } else if (f.kind === 'flash') {
         g.strokeStyle = f.colour ?? PAL.hud;
         g.globalAlpha = (1 - k) * 0.8;
@@ -551,6 +572,8 @@ export class Renderer {
     g.save();
     g.translate(car.x, car.y);
     g.rotate(car.heading);
+    // in the air the car comes up toward the camera
+    if (car.z > 0.02) g.scale(1 + car.z * 0.1, 1 + car.z * 0.1);
     // the front wheels, turned with the steering, under the body
     const wh = wheelLayout(car.def);
     const k = 1 / SPRITE_PPM;
@@ -751,7 +774,8 @@ export class Renderer {
 
   private stepDust(s: SimState, dt: number): void {
     for (const c of s.cars) {
-      if (c.wreck > 0) continue;
+      // no dust off a car in the air or in water; the water throws its own spray
+      if (c.wreck > 0 || c.air || c.surface === 'water') continue;
       const spd = Math.hypot(c.vx, c.vy);
       const want = s.hold > 0 ? 0 : (c.onRoad ? Math.abs(c.slip) * 0.8 + spd * 0.04 + (c.sliding ? 4 : 0) : spd * 0.18 + 2.5) * dt * 5;
       let n = Math.floor(want);

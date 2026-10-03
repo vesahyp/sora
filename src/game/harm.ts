@@ -28,7 +28,10 @@ export function spin(s: SimState, c: Car, k: number): void {
   c.spin = SPIN_TIME;
   c.vx *= k;
   c.vy *= k;
-  c.yaw += (Math.sin(s.time * 13 + c.x) >= 0 ? 1 : -1) * 5;
+  // the new model carries a spin on saturated tyres where the old one stopped it dead, so it is kicked
+  // less: a blast costs about the same ground in both (tools/dbg/spin.ts measures it)
+  const kick = s.physics === 'old' ? 5 : 3;
+  c.yaw += (Math.sin(s.time * 13 + c.x) >= 0 ? 1 : -1) * kick;
   if (c === s.cars[0]) s.sounds.push('spin');
 }
 
@@ -45,7 +48,8 @@ export function boom(s: SimState, x: number, y: number, shake: number): void {
  * the heavier and better armoured doing more, a grudge, nitro for the
  * rammer, and past RAM.spinClosing the victim is thrown and the rammer
  * paid. `throwVictim` is how the car model throws a car: the old one
- * kicks the yaw, the new one has already done it with the impulse.
+ * kicks the yaw; in the new one the impulse has turned it already, and
+ * the throw only loosens its tyres for a moment.
  */
 export function ram(s: SimState, i: number, j: number, closing: number, nx: number, ny: number, x: number, y: number, throwVictim: (victim: Car) => void): void {
   const a = s.cars[i];

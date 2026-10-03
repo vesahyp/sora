@@ -172,6 +172,29 @@ class Audio {
       case 'bump':
         beep(90, 0, 0.12, 'triangle', 0.3);
         break;
+      case 'land':
+        // the springs bottoming out: a low thud and a knock
+        beep(70, 0, 0.18, 'triangle', 0.35);
+        beep(140, 0.02, 0.06, 'square', 0.08);
+        break;
+      case 'splash': {
+        // a hiss of water: noise through a band that falls
+        const len = 0.35;
+        const buf = c.createBuffer(1, c.sampleRate * len, c.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+        const src = c.createBufferSource();
+        src.buffer = buf;
+        const f = c.createBiquadFilter();
+        f.type = 'bandpass';
+        f.frequency.setValueAtTime(2400, t);
+        f.frequency.exponentialRampToValueAtTime(700, t + len);
+        const g = c.createGain();
+        g.gain.value = 0.25;
+        src.connect(f).connect(g).connect(c.destination);
+        src.start(t);
+        break;
+      }
       case 'hit': {
         const o = c.createOscillator();
         const g = c.createGain();

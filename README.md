@@ -50,6 +50,14 @@ mennä vasta, kun sen jaksaa pitää.
 Tie on kapea, kolmen auton levyinen. Ohi pääsee, mutta ei ilman
 kylkiä.
 
+**Auto painaa.** Perä lähtee luisuun pehmeästi ja pitää, ja kun peukalo
+nousee, auto oikaisee itsensä. Poljin mutkassa heittää perän ympäri
+hiusneulaa varten. Puurivi ei pysäytä: viistossa osumassa auto liukuu
+puiden vartta ja jatkaa. Autot tönivät toisiaan oikeasti: osuma toisen
+takakulmaan pyöräyttää sen, ja painavampi auto siirtää kevyempää.
+Vanhan ajomallin voi vielä yhden version ajan kokeilla osoitteessa
+https://vesahyp.github.io/sora/?physics=old.
+
 - **Sivuluisu** täyttää nitrotankkia. Niin täyttää myös töytäisy ja
   erityisesti toisen auton romuttaminen, joka täyttää tankin kerralla.
 - **Törmäys** sattuu siihen, johon osutaan. Painavampi ja panssaroitu

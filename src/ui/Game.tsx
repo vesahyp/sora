@@ -79,7 +79,9 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
   useEffect(() => {
     const canvas = canvasRef.current!;
     const root = rootRef.current!;
-    const s = createState(TRACK_BY_ID[trackId], car, laps, field, ammo);
+    // ?physics=old drives the car model from before 2026-10-03, kept for one release to compare
+    const physics = new URLSearchParams(location.search).get('physics') === 'old' ? 'old' : 'new';
+    const s = createState(TRACK_BY_ID[trackId], car, laps, field, ammo, physics);
     simRef.current = s;
     (window as unknown as { __sim: SimState }).__sim = s;
     const renderer = new Renderer(canvas);
