@@ -97,6 +97,25 @@ From the forum threads and the arcade implementations found:
   for the bend ahead, and brake when running wide. A bot that steers
   by heading error gain alone slams the lock and plows.
 
+## What Sora settled on (2026-10-03)
+
+Measured with the handling table (`tools/dbg/handling.ts`: yaw rate
+against the kinematic bicycle, lateral g, rear slip, body angle, at set
+speeds and steers):
+
+- Rear grip 0.9 of the front, CG in the middle, yaw inertia 0.75 of a
+  box. At 15 m/s and a third of lock the Kortteli turns at the kinematic
+  rate, 1.2 g, with the rear just past its peak: neutral, with the tail
+  working. The first cut had the rear at 1.08, and that car pushed.
+- The throttle's cost in the friction circle lands on the rear only, the
+  brakes' mostly on the front: power loosens the rear, braking loads the
+  nose and brings the tail.
+- Grip 12.5 to 15.5 m/s² by class, above real gravel, because the
+  corners were drawn for a two-g car.
+- The bot needs counter-steer to drive it: steer into a rear slip past
+  the peak, hold a third throttle rather than brake while the tail is
+  out. Without that it spun every car with a loose rear.
+
 ## Measuring instead of feeling
 
 A step response at constant steer and speed tells more than a lap:

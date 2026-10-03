@@ -16,8 +16,8 @@ const CAR_R = 1.5;
 const G = 9.81;
 /** radians of slip at which a tyre gives all it has; past it the force is flat */
 const ALPHA_PEAK = 0.12;
-/** the rear tyres against the front: above 1 the car understeers at the limit, as a road car does */
-const REAR_GRIP = 1.08;
+/** the rear tyres against the front: below 1 the rear lets go first, so the car rotates at the limit instead of plowing */
+const REAR_GRIP = 0.9;
 /** centre of gravity height over the wheelbase: how much braking unloads the rear */
 const CG_OVER_L = 0.18;
 /** steering lock at rest, radians per unit of turnRate, and the speed that halves it */
@@ -116,7 +116,7 @@ function moveCar(s: SimState, c: Car, input: CarInput, dt: number): void {
   const L = wheelbase(def);
   const b = L * 0.5; // CG to the front axle
   const cc = L - b; // CG to the rear axle
-  const k2 = (def.length * def.length + def.width * def.width) / 12; // yaw inertia over mass, m²
+  const k2 = ((def.length * def.length + def.width * def.width) / 12) * 0.75; // yaw inertia over mass, m²: a little under a box, for turn-in
   const delta = c.steer * steeringLock(def, vx);
 
   // the tyres' grip on this surface, as an acceleration
@@ -141,9 +141,12 @@ function moveCar(s: SimState, c: Car, input: CarInput, dt: number): void {
   } else if (vx < 0) ax += Math.min(def.brake * 0.5, -vx / dt);
   ax -= braking;
 
-  // the friction circle: what the tyres spend lengthwise they do not have sideways
-  const used = clamp((drive * 0.35 + braking) / mu, 0, 0.95);
-  const circle = Math.sqrt(1 - used * used);
+  // the friction circle: what the tyres spend lengthwise they do not have sideways.
+  // The rear drives, so throttle loosens the rear; the brakes are mostly on the front.
+  const usedR = clamp((drive * 0.5 + braking * 0.4) / mu, 0, 0.95);
+  const usedF = clamp((braking * 0.6) / mu, 0, 0.95);
+  const circleR = Math.sqrt(1 - usedR * usedR);
+  const circleF = Math.sqrt(1 - usedF * usedF);
 
   // load per axle, shifted by the last step's longitudinal acceleration
   const shift = clamp((CG_OVER_L * c.ax) / G, -0.25, 0.25);
@@ -152,8 +155,8 @@ function moveCar(s: SimState, c: Car, input: CarInput, dt: number): void {
   let muR = mu * REAR_GRIP;
   // braking hard: the rear tyres, lightened and part locked, have less left sideways
   if (c.handbrake) muR *= 0.8;
-  const capF = mu * loadF * circle;
-  const capR = muR * loadR * circle;
+  const capF = mu * loadF * circleF;
+  const capR = muR * loadR * circleR;
   // slip angles; the denominator floors at walking pace so rest is not a singularity
   const vxs = Math.max(Math.abs(vx), 3);
   const alphaF = Math.atan2(vy + w * b, vxs) - delta;

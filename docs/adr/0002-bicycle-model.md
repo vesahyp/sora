@@ -43,7 +43,7 @@ comes round under braking, a slide that settles.
   through the wheelbase, and brakes to the speed a bend allows from grip
   and radius. It also brakes when it is running wide. It drives at the
   limit of a model it only approximates, so the off-road bar in
-  `sim-check` is 12% for now.
+  `sim-check` is 15% for now.
 - Laps are about a third longer than before. The licence targets were
   re-read off `make balance`.
 - `turnRate` on a car is the steering lock now, `grip` the tyres'

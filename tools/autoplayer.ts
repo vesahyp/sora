@@ -56,7 +56,11 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
   // the yaw rate that closes the heading error, turned into a wheel angle through the
   // wheelbase, so the bot asks the tyres for what they can give instead of full lock
   const yawWant = Math.max(-2.2, Math.min(2.2, err * tune.gain));
-  const deltaWant = Math.atan((yawWant * wheelbase(c.def)) / Math.max(speed, 3));
+  let deltaWant = Math.atan((yawWant * wheelbase(c.def)) / Math.max(speed, 3));
+  // the tail is out past the tyres' peak: steer into the slide, the way a hand does
+  const alphaR = Math.atan2(c.slip - c.yaw * wheelbase(c.def) * 0.5, Math.max(Math.abs(c.speed), 3));
+  const tailOut = Math.abs(alphaR) > 0.1 && speed > 6;
+  if (tailOut) deltaWant += alphaR * 1.1;
   let steer = Math.max(-1, Math.min(1, deltaWant / steeringLock(c.def, speed) + ramSteer));
 
   // how sharp is the road coming: the worst turn over the braking distance, at what the tyres can brake
@@ -71,6 +75,7 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
   const radius = sharpest < 0.05 ? Infinity : 30 / sharpest;
   const margin = tune.margin * (0.75 + 0.25 * skill);
   const allowed = Math.min(Math.sqrt(c.def.grip * margin * radius) * (onRoadFactor(c)), c.def.topSpeed * (0.7 + 0.3 * skill));
+  const stuck = c.stall > 0.8 && c.stall < 2.0;
   // brake to the limit, lift just under it, and lift when the front is washing out
   let brake = speed > allowed ? 1 : 0;
   let throttle = brake ? 0 : speed > allowed * 0.95 ? 0.2 : 1;
@@ -82,8 +87,12 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
     brake = 1;
     throttle = 0;
   }
+  // with the tail out, braking would unload the rear further: hold a little throttle instead
+  if (tailOut && !stuck) {
+    brake = 0;
+    throttle = Math.min(throttle, 0.35);
+  }
   // stuck against something: back out for a moment, wheel the other way, then try again
-  const stuck = c.stall > 0.8 && c.stall < 2.0;
   if (stuck) {
     brake = 1;
     throttle = 0;

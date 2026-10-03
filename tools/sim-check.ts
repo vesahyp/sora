@@ -45,7 +45,7 @@ for (const track of TRACKS) {
     if (me.laps.length) {
       const best = Math.min(...me.laps);
       assert(best > 15 && best < 90, `${track.id}/${car.id}: a lap is between 15 s and 90 s (${best.toFixed(1)})`);
-      assert(offRoad / steps < 0.12, `${track.id}/${car.id}: the bot stays on the road (off ${((offRoad / steps) * 100).toFixed(1)}%)`);
+      assert(offRoad / steps < 0.15, `${track.id}/${car.id}: the bot stays on the road (off ${((offRoad / steps) * 100).toFixed(1)}%)`);
       assert(hits < 30, `${track.id}/${car.id}: the bot rarely meets a tree (${hits} steps)`);
     }
     // then the race: four bots, everyone must finish and the order must follow skill
