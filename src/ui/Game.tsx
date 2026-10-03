@@ -10,6 +10,7 @@ import { audio } from '../audio';
 import { botInput } from '../../tools/autoplayer';
 import { fmt, track } from '../records';
 import { t, tr } from '../i18n';
+import { Lamps, MineIcon, MissileIcon, PauseIcon, SoundIcon, WheelIcon } from './Dash';
 
 export interface RaceResult {
   trackId: string;
@@ -268,16 +269,19 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
         <small>{tr('pidä: peruuta', 'hold: reverse')}</small>
       </div>
       <div className="steerwheel" ref={steerRef}>
-        <i />
+        <WheelIcon />
       </div>
       <div className="nitrohint">{tr('napautus: nitro', 'tap: nitro')}</div>
       {hud && (
         <div className="hud">
-          <div className="place">
-            <b>{hud.place}.</b>/{hud.field}
-          </div>
-          <div className="lapno">
-            {tr('Kierros', 'Lap')} <b>{hud.lap}</b>/{hud.total}
+          <div className="plate">
+            <div className="place">
+              <b>{hud.place}</b>/{hud.field}
+            </div>
+            <div className="lapno">
+              <span>{tr('Kierros', 'Lap')}</span>
+              <b>{hud.lap}</b>/{hud.total}
+            </div>
           </div>
           <div className="clock">{fmt(hud.time)}</div>
           <div className="times">
@@ -293,32 +297,37 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
             )}
           </div>
           <div className="speedo">
-            <b>{Math.round(hud.speed * 3.6)}</b> km/h
+            <b>{Math.round(hud.speed * 3.6)}</b>
+            <span>km/h</span>
           </div>
-          <div className={`damage${hud.damage > 60 ? ' bad' : ''}`}>
-            <span>{tr('Vauriot', 'Damage')}</span>
-            <div className="bar">
-              <div style={{ width: `${hud.damage}%` }} />
+          <div className="gauges">
+            <div className={`gauge${hud.damage > 60 ? ' bad' : ''}`}>
+              <span>{tr('Vauriot', 'Damage')}</span>
+              <Lamps n={8} v={hud.damage / 100} tone={hud.damage > 60 ? 'red' : 'amber'} />
             </div>
-          </div>
-          <div className={`nitro${hud.boosting ? ' on' : ''}`}>
-            <span>{tr('Nitro', 'Nitro')}</span>
-            <div className="bar">
-              <div style={{ width: `${hud.boost * 100}%` }} />
+            <div className={`gauge${hud.boosting ? ' lit' : ''}`}>
+              <span>{tr('Nitro', 'Nitro')}</span>
+              <Lamps n={8} v={hud.boost} tone="bone" />
             </div>
-          </div>
-          <div className={`heat${hud.overheated ? ' hot' : ''}`}>
-            <span>{tr('Kk', 'MG')}</span>
-            <div className="bar">
-              <div style={{ width: `${hud.heat * 100}%` }} />
+            <div className={`gauge${hud.overheated ? ' bad' : ''}`}>
+              <span>{tr('Kk', 'MG')}</span>
+              <Lamps n={8} v={hud.heat} tone={hud.overheated || hud.heat > 0.8 ? 'red' : 'amber'} />
             </div>
-            <b>
-              🚀{hud.missiles} 💣{hud.mines}
-            </b>
+            <div className="ammo">
+              <span className={hud.missiles ? '' : 'out'}>
+                <MissileIcon />
+                <b>{hud.missiles}</b>
+              </span>
+              <span className={hud.mines ? '' : 'out'}>
+                <MineIcon />
+                <b>{hud.mines}</b>
+              </span>
+            </div>
           </div>
           <div className="toasts">
             {hud.toasts.map((x, i) => (
-              <div key={i} style={{ color: x.colour, opacity: Math.min(1, (2.6 - x.age) * 2) }}>
+              <div key={i} className="tape" style={{ opacity: Math.min(1, (2.6 - x.age) * 2) }}>
+                <i style={{ background: x.colour }} />
                 {x.text}
               </div>
             ))}
@@ -326,13 +335,13 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
         </div>
       )}
       <button className="iconbtn pause" data-ui onClick={() => pause(true)} aria-label={tr('Tauko', 'Pause')}>
-        II
+        <PauseIcon />
       </button>
-      <button className="iconbtn mute" data-ui onClick={toggleMute} aria-label={tr('Ääni', 'Sound')}>
-        {muted ? '🔇' : '🔊'}
+      <button className={`iconbtn mute${muted ? ' off' : ''}`} data-ui onClick={toggleMute} aria-label={tr('Ääni', 'Sound')}>
+        <SoundIcon off={muted} />
       </button>
       {count > 0 && (
-        <div className="banner">
+        <div className="banner count" key={count}>
           <div className="t">{count}</div>
         </div>
       )}
@@ -342,7 +351,7 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
         </div>
       )}
       {hud?.wreck && !hud.finished && (
-        <div className="banner">
+        <div className="banner wreck">
           <div className="t">{tr('ROMUNA', 'WRECKED')}</div>
         </div>
       )}

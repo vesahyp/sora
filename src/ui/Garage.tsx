@@ -10,6 +10,7 @@ import { TRACK_BY_ID } from '../game/content/tracks';
 import { carSprite } from '../render/sprites';
 import type { CarDef } from '../game/types';
 import { fmt, recordKey, type Records } from '../records';
+import { Lamps, MineIcon, MissileIcon } from './Dash';
 
 /** The car, drawn big, as the sprite the race uses. */
 function CarPic({ car, size = 160 }: { car: CarDef; size?: number }) {
@@ -26,10 +27,22 @@ function CarPic({ car, size = 160 }: { car: CarDef; size?: number }) {
     g.save();
     g.translate(size / 2, size * 0.25);
     g.rotate(-0.25);
-    g.fillStyle = 'rgba(0,0,0,0.3)';
-    g.beginPath();
-    g.ellipse(0, 4, (spr.width * k) / 2, (spr.height * k) / 2 + 2, 0, 0, Math.PI * 2);
-    g.fill();
+    // a hard shadow toward the lower right, the same low sun as the race:
+    // the sprite's own outline filled with shadow ink
+    const sh = document.createElement('canvas');
+    sh.width = spr.width;
+    sh.height = spr.height;
+    const sg = sh.getContext('2d')!;
+    sg.drawImage(spr, 0, 0);
+    sg.globalCompositeOperation = 'source-in';
+    sg.fillStyle = 'rgba(18,14,22,0.55)';
+    sg.fillRect(0, 0, sh.width, sh.height);
+    g.save();
+    g.rotate(0.25);
+    g.translate(size * 0.03, size * 0.04);
+    g.rotate(-0.25);
+    g.drawImage(sh, (-spr.width * k) / 2, (-spr.height * k) / 2, spr.width * k, spr.height * k);
+    g.restore();
     g.drawImage(spr, (-spr.width * k) / 2, (-spr.height * k) / 2, spr.width * k, spr.height * k);
     g.restore();
   }, [car, size]);
@@ -40,10 +53,17 @@ function Stat({ label, v, max, up }: { label: string; v: number; max: number; up
   return (
     <div className="stat">
       <span>{label}</span>
-      <div className="bar">
-        <div style={{ width: `${Math.min(100, (v / max) * 100)}%` }} />
-        {up !== undefined && up > v && <div className="up" style={{ left: `${Math.min(100, (v / max) * 100)}%`, width: `${Math.min(100, ((up - v) / max) * 100)}%` }} />}
-      </div>
+      <Lamps v={v / max} up={up !== undefined && up > v ? up / max : undefined} n={12} />
+    </div>
+  );
+}
+
+/** The car's name on a door plate, the class stencilled beside it. */
+function RallyPlate({ car }: { car: CarDef }) {
+  return (
+    <div className="rallyplate">
+      <span className="cls">{car.cls}</span>
+      <b>{t(car.name)}</b>
     </div>
   );
 }
@@ -65,8 +85,11 @@ function Top({ save, title, onBack }: { save: Save; title: string; onBack?: () =
   return (
     <div className="top">
       {onBack ? (
-        <button className="btn ghost back" data-ui onClick={onBack}>
-          ‹ {tr('Talli', 'Garage')}
+        <button className="btn back" data-ui onClick={onBack}>
+          <svg className="glyph" viewBox="0 0 24 24" aria-hidden>
+            <path d="M15 5l-7 7 7 7" stroke="currentColor" strokeWidth="3" fill="none" />
+          </svg>
+          {tr('Talli', 'Garage')}
         </button>
       ) : (
         <span />
@@ -84,14 +107,12 @@ export function Garage({ save, onEvents, onShop, onDealer, onLicences, onArmoury
     <div className="screen garage">
       <Top save={save} title={tr('Talli', 'Garage')} />
       <CarPic car={car} />
-      <div className="carname">
-        {t(car.name)} <span className="cls">{car.cls}</span>
-      </div>
+      <RallyPlate car={car} />
       <CarStats car={car} />
       {save.cars.length > 1 && (
         <div className="row owned">
           {save.cars.map((o, i) => (
-            <button key={i} className={`trackbtn${i === save.current ? ' on' : ''}`} onClick={() => onPick(i)}>
+            <button key={i} className={`chip${i === save.current ? ' on' : ''}`} aria-pressed={i === save.current} onClick={() => onPick(i)}>
               {t(CAR_BY_ID[o.carId].name)}
             </button>
           ))}
@@ -101,29 +122,30 @@ export function Garage({ save, onEvents, onShop, onDealer, onLicences, onArmoury
         <button className="btn primary big" data-track="garage-race" onClick={onEvents}>
           {tr('Kisat', 'Races')}
         </button>
-        <button className="btn" onClick={onShop}>
+        <button className="item" onClick={onShop}>
           {tr('Osakauppa', 'Parts shop')}
           <small>{Object.values(owned.parts).reduce((a, b) => a + b, 0)}/12</small>
         </button>
-        <button className="btn" onClick={onArmoury}>
+        <button className="item" onClick={onArmoury}>
           {tr('Asevarasto', 'Armoury')}
           <small>
-            🚀 {save.missiles} · 💣 {save.mines}
+            <MissileIcon /> {save.missiles} <MineIcon /> {save.mines}
           </small>
         </button>
-        <button className="btn" onClick={onDealer}>
+        <button className="item" onClick={onDealer}>
           {tr('Autokauppa', 'Dealer')}
+          <small>{save.cars.length}/{CARS.length}</small>
         </button>
-        <button className="btn" onClick={onLicences}>
+        <button className="item" onClick={onLicences}>
           {tr('Ajokortit', 'Licences')}
           <small>{['C', ...save.licences].join(' ')}</small>
         </button>
-        <button className="btn ghost" onClick={onTitle}>
+        <button className="item quiet" onClick={onTitle}>
           {tr('Alkuun', 'Title')}
         </button>
       </div>
       <div className="small">
-        {tr('Kisoja', 'Races')} {save.races} · {tr('voittoja', 'wins')} {save.wins} · {tr('romutettuja', 'wrecked')} {save.wrecks ?? 0}
+        {tr('Kisoja', 'Races')} {save.races}, {tr('voittoja', 'wins')} {save.wins}, {tr('romutettuja', 'wrecked')} {save.wrecks ?? 0}
       </div>
     </div>
   );
@@ -147,10 +169,10 @@ export function Events({ save, records, onPick, onBack }: { save: Save; records:
               <div className="body">
                 <div className="name">
                   {t(e.name)}
-                  {best && <span className="lvl">{best === 1 ? '🏆' : `${best}.`}</span>}
+                  {best && <span className="stamp">{best === 1 ? tr('Voitto', 'Won') : `${best}.`}</span>}
                 </div>
                 <div className="desc">
-                  {t(TRACK_BY_ID[e.trackId].name)} · {e.laps} {tr('kierrosta', 'laps')} · {tr('1. sija', '1st')} {cr(e.prizes[0])}
+                  {t(TRACK_BY_ID[e.trackId].name)}, {e.laps} {tr('kierrosta', 'laps')}, {tr('voittajalle', 'to the winner')} <b className="num">{cr(e.prizes[0])}</b>
                 </div>
                 <div className="desc sub">
                   {!licence ? tr(`Vaatii ${e.cls}-ajokortin`, `Needs the ${e.cls} licence`) : !fits ? tr(`Autosi luokka on ${car.cls}: liian hyvä tähän`, `Your car is class ${car.cls}: too much for this`) : lap ? `${tr('Paras kierroksesi', 'Your best lap')} ${fmt(lap)}` : tr('Ei vielä ajettu', 'Not driven yet')}
@@ -187,7 +209,7 @@ export function Shop({ save, onBuy, onBack }: { save: Save; onBuy: (kind: PartKi
               <div className="body">
                 <div className="name">
                   {t(p.name)}
-                  <span className="lvl">{price === null ? tr('Täysi', 'Maxed') : cr(price)}</span>
+                  {price === null ? <span className="stamp">{tr('Täysi', 'Maxed')}</span> : <span className="lvl">{cr(price)}</span>}
                 </div>
                 <div className="desc">{price === null ? t(p.levels[2]) : t(p.levels[lvl])}</div>
                 <div className="desc sub">{t(p.effect)}</div>
@@ -218,8 +240,10 @@ export function Dealer({ save, onBuy, onBack }: { save: Save; onBuy: (car: CarDe
               </div>
               <div className="body">
                 <div className="name">
-                  {t(c.name)} <span className="cls">{c.cls}</span>
-                  <span className="lvl">{owned ? tr('Omistat', 'Owned') : cr(c.price)}</span>
+                  <span>
+                    <span className="cls">{c.cls}</span> {t(c.name)}
+                  </span>
+                  {owned ? <span className="stamp">{tr('Omistat', 'Owned')}</span> : <span className="lvl">{cr(c.price)}</span>}
                 </div>
                 <div className="desc">{t(c.blurb)}</div>
                 {above && !owned && <div className="desc sub">{tr(`Luokan ${c.cls} kisat vaativat ${c.cls}-ajokortin`, `Class ${c.cls} races need the ${c.cls} licence`)}</div>}
@@ -246,7 +270,7 @@ export function Licences({ save, onTake, onBack }: { save: Save; onTake: (l: Lic
               <div className="body">
                 <div className="name">
                   {t(l.name)}
-                  <span className="lvl">{have ? tr('Suoritettu', 'Passed') : fmt(l.target)}</span>
+                  {have ? <span className="stamp">{tr('Suoritettu', 'Passed')}</span> : <span className="lvl">{fmt(l.target)}</span>}
                 </div>
                 <div className="desc">{t(l.desc)}</div>
               </div>
@@ -276,9 +300,10 @@ export function Armoury({ save, onBuy, onBack }: { save: Save; onBuy: (w: Weapon
               </div>
               <div className="body">
                 <div className="name">
-                  {w.id === 'missile' ? '🚀 ' : '💣 '}
-                  {t(w.name)}
-                  <span className="lvl">{full ? tr('Täynnä', 'Full') : `${cr(w.price)} / ${tr('kpl', 'each')}`}</span>
+                  <span>
+                    {w.id === 'missile' ? <MissileIcon /> : <MineIcon />} {t(w.name)}
+                  </span>
+                  {full ? <span className="stamp">{tr('Täynnä', 'Full')}</span> : <span className="lvl">{`${cr(w.price)} / ${tr('kpl', 'each')}`}</span>}
                 </div>
                 <div className="desc">{t(w.desc)}</div>
               </div>

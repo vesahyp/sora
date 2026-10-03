@@ -70,7 +70,10 @@ src/
     sprites.ts        procedural sprite cache: car bodies lit per heading, liveries, damage
                         stages, shadows, trees and roadside objects
   input/input.ts      one thumb (drag to steer, tap for nitro), the pedal, keyboard
-  ui/                 React: Game (loop + HUD), Screens (title, result), Garage (garage, races, shop, dealer, licences)
+  ui/                 React: Game (loop + HUD), Screens (title, result), Garage (garage, races, shop, dealer, licences),
+                        Dash (the shared chrome: segmented lamps, inline SVG glyphs, the stencil-or-plain face() rule)
+  styles.css          the chrome's look: palette tokens named after the frame (soot, gravel, straw, amber), grain,
+                        the two bundled Big Shoulders faces in public/fonts (OFL)
   records.ts          localStorage best lap and best race; the tracker shim
   audio.ts            Web Audio synth: the engine note and the event beeps
   version.ts          build id and the newer-build check behind the update banner
