@@ -42,3 +42,6 @@ The design is in `docs/design.md`.
 - The clavesa rollup of the pixel logs and the `?stats` board (Räkkä's
   `analytics/` and `StatsScreen`), then global lap records in DynamoDB
   behind one Lambda, the Räkkä way.
+- itch.io and Newgrounds: the portal kit from Räkkä (`docs/portals.md`
+  there): a relative-path build, the iframe check, English store images,
+  records read through the CloudFront cache, two beacons a race.
