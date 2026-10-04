@@ -54,7 +54,7 @@ function Screens() {
     // every rival in their own vehicle, on the class car's numbers; the field carries what its
     // class allows, more as the cars get built
     const ammo = fieldAmmo(e);
-    const field: Entry[] = rivalField(e.cls, e.fieldParts).map((r) => ({ ...r, ...ammo }));
+    const field: Entry[] = rivalField(e.cls, e.fieldParts, e.fieldSkill ?? 1).map((r) => ({ ...r, ...ammo }));
     setScreen({ kind: 'race', purpose: { kind: 'event', id: e.id }, trackId: e.trackId, car: playerCar(save), field, laps: e.laps });
   };
   const take = (l: LicenceDef) => {

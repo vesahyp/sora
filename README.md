@@ -153,7 +153,9 @@ kolmeen paikkaan:
   pääsee ostamalla auton.
 
 Kisat on jaettu luokkiin. Kentän autot ovat luokan autoja, ja saman luokan
-myöhemmät kisat ajetaan rakennetummilla autoilla. Luokan C kisoihin ei
+myöhemmät kisat ajetaan rakennetummilla autoilla. Jokkisluokassa
+kilpailijoiden autot ovat vakioita loppuun asti: siellä kasvaa vain
+kuljettajien taito, ei auto. Luokan C kisoihin ei
 pääse B-autolla: se olisi liian helppoa. Luokan viisi ensimmäistä kisaa,
 rahat ja kaupan järjestys ovat [`docs/progression.md`](docs/progression.md).
 

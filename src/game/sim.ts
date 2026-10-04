@@ -446,7 +446,7 @@ function settle(s: SimState, c: Car, player: boolean): void {
     let along = c.s - c.stuckS;
     if (along < -L / 2) along += L;
     if (along > L / 2) along -= L;
-    if (along >= TOW_ALONG && !slow) {
+    if (along >= TOW_ALONG) {
       c.stuck = 0;
       c.stuckS = c.s;
     } else c.stuck += DT;

@@ -110,22 +110,30 @@ it.
 ## The first five races
 
 All in JM, in the Tauno, against Jorma, Marko and Tapsa in their own tiny cars. The
-field's cars get built one part at a time so the fifth race is the
-hardest.
+field's cars stay stock: the rivals never drive a better car than the
+player's in the folk class. What grows is the driver: each event sets
+the share of their skill the rivals drive at (`fieldSkill`), from 0.7
+in the first race to 1.1 at the final, so the fifth race is the
+hardest without a single part the player could not have bought. The
+parts and the pace gap arrive with the classes: C fields are stock
+for two races, then lightly built; B and A fields are built. This was
+changed on 2026-10-04 after the field gained a part a race and a new
+player in a stock Tauno met cars 2 s a lap faster than his by the
+fourth race, and asked why the rivals had better cars. The proof is
+in `sim-check`: a half-margin bot, a stand-in for a thumb that has not
+learnt the car, must win the first two folk races from every grid.
 
-1. **Kiviahon jokkis**, Kiviaho, 3 laps. The field is stock with oil.
-   The race must be fun in its first ten seconds: the crest on the
-   start straight lifts the whole field on lap one, the first bend is
-   a long sweeper, and right after it the road jumps a river from its
-   bank.
+1. **Kiviahon jokkis**, Kiviaho, 3 laps. The field is stock with oil,
+   driving at 0.7 of its skill. The race must be fun in its first ten
+   seconds: the crest on the start straight lifts the whole field on
+   lap one, the first bend is a long sweeper, and right after it the
+   road jumps a river from its bank.
 2. **Hirvisuon jokkis**, Hirvisuo, 3 laps. The kilometre lap, a crest
-   on its straight, a river on the long bottom straight. The field has
-   ram bars.
-3. **Kiviahon kahlaus**, Kiviaho, 4 laps. The field has ram bars,
-   armour and engines, and more oil.
-4. **Hirvisuon pitkä**, Hirvisuo, 4 laps. The field has tyres too.
-5. **Jokkisfinaali**, Kiviaho, 6 laps. The field is as built as a
-   Tauno gets.
+   on its straight, a river on the long bottom straight. Skill 0.8.
+3. **Kiviahon kahlaus**, Kiviaho, 4 laps. Skill 0.9, more oil.
+4. **Hirvisuon pitkä**, Hirvisuo, 4 laps. Skill 1.
+5. **Jokkisfinaali**, Kiviaho, 6 laps. Skill 1.1, and the field has a
+   ram bar and an engine, the two parts a winning Tauno has by then.
 
 Winning the five pays for the Kortteli with a ram bar and tyres on the
 Tauno along the way.

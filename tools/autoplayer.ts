@@ -222,7 +222,7 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
   // paced to the player: the bot dares more or less in a bend, and its top speed is the one
   // the sim gives its paced engine
   const pace = paceToPlayer(s, c);
-  const margin = tune.margin * (0.45 + 0.55 * skill) * (1 + pace * catchUp(c) * (pace > 0 ? PACING.corner.push : PACING.corner.ease));
+  const margin = tune.margin * (0.25 + 0.75 * skill) * (1 + pace * catchUp(c) * (pace > 0 ? PACING.corner.push : PACING.corner.ease));
   // now and then a poor driver misjudges the bend coming and arrives too fast: it runs wide
   // and the running-wide reflex below has to catch it
   const bend = Math.floor(c.s / LATE.bend) + c.laps.length * 1000 + who * 7919;
@@ -237,7 +237,7 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
   // mistake to slow for, but it holds less, so the mouth is taken at the grass's pace
   const gripHere = lane ? SURFACES[lane.lane.surface].grip : 1;
   // a poor driver is never flat out: it short-shifts and lifts, its foot the same share as its top speed
-  const foot = 0.6 + 0.4 * skill;
+  const foot = 0.45 + 0.55 * skill;
   const allowed = (rubbing ? 0.9 : 1) * Math.min(Math.sqrt(c.def.grip * gripHere * margin * radius) * (lane?.inside ? 1 : onRoadFactor(c)) * late, c.def.topSpeed * foot * enginePace(s, c)) * wait;
   // nose in the trees: slow at the forest's edge and pointing away from the road. The tree
   // wall bounces the car, so the stall clock never runs long enough; back out on this instead

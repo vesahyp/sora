@@ -69,24 +69,30 @@ export interface Vehicle {
   skill: number;
 }
 
+/*
+ * Skill per class, read with the bot's formula (autoplayer.ts: corner margin 0.25 + 0.75 x skill,
+ * throttle 0.45 + 0.55 x skill, 2026-10-04): JM drivers are crap on purpose, 0.3 to 0.4, so a
+ * new player in a stock car wins; C, B and A sit where they sat under the old, flatter formula.
+ */
 export const RIVAL_CARS: Record<string, Record<CarClass, Vehicle>> = {
   jorma: {
     JM: { shape: 'beetle', name: L('Kupla'), colour: '#2f6fd6', accent: '#e6dfcc', livery: 'stripe', number: 3, length: 2.9, width: 1.4, massScale: 0.9, skill: 0.4 },
-    C: { shape: 'saloon', name: L('Mosse'), colour: '#2a5bb0', accent: '#e6dfcc', livery: 'checker', number: 33, length: 4.1, width: 1.65, massScale: 1, skill: 0.45 },
-    B: { shape: 'rally', name: L('Kiituri'), colour: '#2f6fd6', accent: '#e6dfcc', livery: 'split', number: 8, length: 4.4, width: 1.85, massScale: 1.05, skill: 0.8 },
-    A: { shape: 'hearse', name: L('Saattaja'), colour: '#22345e', accent: '#c9b07a', livery: 'band', number: 2, length: 5.2, width: 1.8, massScale: 1.1, pace: { top: 1.02 }, skill: 0.96 },
+    C: { shape: 'saloon', name: L('Mosse'), colour: '#2a5bb0', accent: '#e6dfcc', livery: 'checker', number: 33, length: 4.1, width: 1.65, massScale: 1, skill: 0.6 },
+    B: { shape: 'rally', name: L('Kiituri'), colour: '#2f6fd6', accent: '#e6dfcc', livery: 'split', number: 8, length: 4.4, width: 1.85, massScale: 1.05, skill: 0.85 },
+    A: { shape: 'hearse', name: L('Saattaja'), colour: '#22345e', accent: '#c9b07a', livery: 'band', number: 2, length: 5.2, width: 1.8, massScale: 1.1, pace: { top: 1.02 }, skill: 0.97 },
   },
   marko: {
-    JM: { shape: 'van', name: L('Pikkupaku'), colour: '#d8a428', accent: '#77756c', livery: 'primer', number: 66, length: 3.2, width: 1.5, massScale: 1.15, skill: 0.35 },
-    C: { shape: 'tractor', name: L('Valmet'), colour: '#d0a02c', accent: '#2c2a26', livery: 'roof', number: 99, length: 3.6, width: 1.9, massScale: 1.8, pace: { top: 0.6, accel: 1.15, turn: 1.4 }, offroad: 0.85, skill: 0.4 },
-    B: { shape: 'monster', name: L('Monsteri'), colour: '#e0b030', accent: '#2c2a26', livery: 'split', number: 44, length: 4.6, width: 2.6, massScale: 2.1, pace: { top: 0.96, grip: 0.92 }, offroad: 0.6, spinOnShunt: true, skill: 0.74 },
-    A: { shape: 'plough', name: L('Aura-Sisu'), colour: '#d4a52c', accent: '#2c2a26', livery: 'band', number: 69, length: 6.0, width: 2.4, massScale: 3.2, pace: { top: 0.88, accel: 0.85, turn: 1.3 }, ram: 3, skill: 0.9 },
+    // no heavier than the Tauno: in the first races the shunts go both ways
+    JM: { shape: 'van', name: L('Pikkupaku'), colour: '#d8a428', accent: '#77756c', livery: 'primer', number: 66, length: 3.2, width: 1.5, massScale: 1.0, skill: 0.35 },
+    C: { shape: 'tractor', name: L('Valmet'), colour: '#d0a02c', accent: '#2c2a26', livery: 'roof', number: 99, length: 3.6, width: 1.9, massScale: 1.8, pace: { top: 0.6, accel: 1.15, turn: 1.4 }, offroad: 0.85, skill: 0.55 },
+    B: { shape: 'monster', name: L('Monsteri'), colour: '#e0b030', accent: '#2c2a26', livery: 'split', number: 44, length: 4.6, width: 2.6, massScale: 2.1, pace: { top: 0.96, grip: 0.92 }, offroad: 0.6, spinOnShunt: true, skill: 0.8 },
+    A: { shape: 'plough', name: L('Aura-Sisu'), colour: '#d4a52c', accent: '#2c2a26', livery: 'band', number: 69, length: 6.0, width: 2.4, massScale: 3.2, pace: { top: 0.88, accel: 0.85, turn: 1.3 }, ram: 3, skill: 0.92 },
   },
   tapsa: {
     JM: { shape: 'microcar', name: L('Mopoauto'), colour: '#ecebe0', accent: '#3c7a5a', livery: 'stripe', number: 12, length: 2.4, width: 1.3, massScale: 0.6, pace: { top: 0.88, accel: 0.85, turn: 1.4 }, skill: 0.3 },
-    C: { shape: 'niva', name: L('Niva'), colour: '#f2f2ea', accent: '#2a2a26', livery: 'stripe', number: 21, length: 3.7, width: 1.7, massScale: 1.15, pace: { top: 0.94, turn: 1.05 }, offroad: 0.3, skill: 0.35 },
-    B: { shape: 'bus', name: L('Linja-auto'), colour: '#e6e4d8', accent: '#2f6f8a', livery: 'band', number: 18, length: 7.5, width: 2.3, massScale: 3.0, pace: { top: 0.86, accel: 0.8, turn: 1.3 }, skill: 0.68 },
-    A: { shape: 'coupe', name: L('Liitäjä'), colour: '#f2f2ea', accent: '#d06a2a', livery: 'split', number: 5, length: 4.7, width: 1.8, massScale: 1.05, skill: 0.82 },
+    C: { shape: 'niva', name: L('Niva'), colour: '#f2f2ea', accent: '#2a2a26', livery: 'stripe', number: 21, length: 3.7, width: 1.7, massScale: 1.15, pace: { top: 0.94, turn: 1.05 }, offroad: 0.3, skill: 0.5 },
+    B: { shape: 'bus', name: L('Linja-auto'), colour: '#e6e4d8', accent: '#2f6f8a', livery: 'band', number: 18, length: 7.5, width: 2.3, massScale: 3.0, pace: { top: 0.86, accel: 0.8, turn: 1.3 }, skill: 0.75 },
+    A: { shape: 'coupe', name: L('Liitäjä'), colour: '#f2f2ea', accent: '#d06a2a', livery: 'split', number: 5, length: 4.7, width: 1.8, massScale: 1.05, skill: 0.86 },
   },
 };
 
@@ -119,12 +125,13 @@ export function vehicleDef(v: Vehicle, cls: CarClass, parts: Parts): CarDef {
 }
 
 /** A rival on the grid of a race of this class: the driver at that vehicle's skill, in it, built to `parts`. */
-export function rivalEntry(rival: Rival, cls: CarClass, parts: Parts): { driver: Driver; car: CarDef } {
+export function rivalEntry(rival: Rival, cls: CarClass, parts: Parts, skillScale = 1): { driver: Driver; car: CarDef } {
   const v = RIVAL_CARS[rival.id][cls];
-  return { driver: { ...rival, skill: v.skill }, car: vehicleDef(v, cls, parts) };
+  return { driver: { ...rival, skill: Math.min(1, v.skill * skillScale) }, car: vehicleDef(v, cls, parts) };
 }
 
 /** The field for a race: every rival in their own vehicle. */
-export function rivalField(cls: CarClass, parts: Parts): { driver: Driver; car: CarDef }[] {
-  return OPPONENTS.map((rival) => rivalEntry(rival, cls, parts));
+/** The field of a race: every rival in that class's vehicle, built to `parts`, driving at `skillScale` of its skill (EventDef.fieldSkill). */
+export function rivalField(cls: CarClass, parts: Parts, skillScale = 1): { driver: Driver; car: CarDef }[] {
+  return OPPONENTS.map((rival) => rivalEntry(rival, cls, parts, skillScale));
 }

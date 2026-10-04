@@ -6,7 +6,7 @@
  */
 import { createState } from '../src/game/state';
 import { step, DT, TOW_AFTER } from '../src/game/sim';
-import { TRACKS } from '../src/game/content/tracks';
+import { TRACKS, TRACK_BY_ID } from '../src/game/content/tracks';
 import { CARS, classCar } from '../src/game/content/cars';
 import { botInput, DEFAULT_BOT } from './autoplayer';
 import { OPPONENTS } from '../src/game/content/drivers';
@@ -15,6 +15,7 @@ import { PICKUPS } from '../src/game/content/pickups';
 import { standings } from '../src/game/state';
 import { STOCK, tuned } from '../src/game/content/parts';
 import { RIVAL_CARS, rivalEntry, rivalField, vehicleDef } from '../src/game/content/rivals';
+import { EVENTS } from '../src/game/content/events';
 import { CLASSES } from '../src/game/types';
 import { canCarry, carried } from '../src/game/content/weapons';
 
@@ -47,6 +48,12 @@ const assert = (ok: boolean, what: string) => {
 
 /** The player's result in each armed race, the default bot at the wheel: place, and the gap to the best rival (negative is ahead). */
 const results: { track: string; cls: CarClass; grid: string; place: number; gap: number }[] = [];
+/**
+ * A thumb that has not learnt the car: the bot at 0.65 of its corner margin, 37.2 s round Kiviaho
+ * in the Tauno against the learnt bot's 32.0 (tools/dbg/calib.ts, 2026-10-04). The folk class is
+ * raced by this driver, in the view checks and the first-races check: the learnt bot walks JM.
+ */
+const NEW_PLAYER = { ...DEFAULT_BOT, margin: DEFAULT_BOT.margin * 0.65 };
 
 // the full workout on the class cars, the career's spine; the dealer's wild buys are lapped alone below
 for (const track of TRACKS) {
@@ -152,7 +159,7 @@ for (const track of TRACKS) {
       // stalled off the road: off it and not 3 m along the lap since the clock started, per car
       const stalledFrom = race.cars.map(() => ({ t: -1, s: 0 }));
       while (race.cars.some((c) => c.finishedAt < 0) && race.time < 900) {
-        step(race, race.cars.map((c) => botInput(race, c)), DT);
+        step(race, race.cars.map((c, i) => botInput(race, c, i === 0 && car.cls === 'JM' ? NEW_PLAYER : DEFAULT_BOT)), DT);
         race.cars.forEach((c, k) => {
           const st = stalledFrom[k];
           // forward from the mark only, as the sim counts it: rocking back over the mark is not progress
@@ -299,9 +306,42 @@ for (const track of TRACKS) {
     if (!rs.length) continue;
     const cells = rs.map((r) => `${r.grid} P${r.place} ${r.gap <= 0 ? '+' : '-'}${Math.abs(r.gap).toFixed(1)}s`);
     console.log(`  ${track.id.padEnd(9)} ${cls.padEnd(3)} ${cells.join('   ')}`);
-    if (cls === 'JM') assert(rs.every((r) => r.place === 1 && r.gap <= -3), `${track.id}/JM: the player wins every race by 3 s or more`);
+    // JM is raced by the new-player bot against the drivers at full skill, the final's level; the
+    // event-by-event check below proves the first races are won outright
+    if (cls === 'JM') assert(rs.every((r) => r.place <= 2), `${track.id}/JM: a new player is never worse than second against the final's field`);
 
     if (cls === 'A') assert(rs.some((r) => r.place > 1), `${track.id}/A: the player does not win every race`);
+  }
+}
+
+// the first races as a new player meets them: the event's own field (its parts, its drivers at
+// the event's share of their skill) against the stock starting car driven by a bot that corners
+// at 0.65 of the default margin, a stand-in for a thumb that has not learnt the car: it laps
+// Kiviaho in 37.2 s against the learnt bot's 32.0 (tools/dbg/calib.ts, 2026-10-04). The rivals'
+// cars are no better than his there (2026-10-04, after "why do the rivals have better cars"),
+// so the new player must win the first two folk races and never finish last in the folk class
+console.log('\nthe first races as a new player: a half-margin bot in the stock car against each event\'s own field');
+{
+  const early = EVENTS.filter((e) => e.cls === 'JM' || e.cls === 'C');
+  for (const e of early) {
+    const track = TRACK_BY_ID[e.trackId];
+    const mine = CARS.find((c) => c.cls === e.cls)!;
+    const places: number[] = [];
+    const gaps: number[] = [];
+    for (const grid of [[0, 1, 2], [1, 2, 0], [2, 0, 1]]) {
+      const field = rivalField(e.cls, e.fieldParts, e.fieldSkill ?? 1);
+      const boot = carried(e.cls, { oil: 2, mines: 1, missiles: 1 });
+      const race = createState(track, mine, e.laps, grid.map((k) => ({ ...field[k], ...boot })), boot);
+      while (race.cars.some((c) => c.finishedAt < 0) && race.time < 900) step(race, race.cars.map((c, i) => botInput(race, c, i === 0 ? NEW_PLAYER : DEFAULT_BOT)), DT);
+      const me = race.cars[0];
+      const order = standings(race);
+      places.push(order.indexOf(me) + 1);
+      gaps.push(me.finishedAt - Math.min(...race.cars.slice(1).map((c) => c.finishedAt)));
+    }
+    console.log(`  ${e.id.padEnd(14)} ${places.map((p, i) => `P${p} ${gaps[i] <= 0 ? '+' : '-'}${Math.abs(gaps[i]).toFixed(1)}s`).join('   ')}`);
+    const idx = early.indexOf(e);
+    if (e.cls === 'JM' && idx < 2) assert(places.every((p) => p === 1), `${e.id}: a new player wins the folk race from every grid (P${places.join(' P')})`);
+    if (e.cls === 'JM') assert(places.every((p) => p < 4), `${e.id}: a new player is never last in the folk class`);
   }
 }
 

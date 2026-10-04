@@ -21,14 +21,20 @@ export interface EventDef {
   /** credits for 1st to 4th */
   prizes: [number, number, number, number];
   fieldParts: Parts;
+  /**
+   * How much of their own skill the rivals drive at, 1 when absent. The
+   * early folk races are won by a new player in a stock car: the rivals'
+   * cars are no better than his and their drivers start poor and improve
+   * race by race; the parts and the real pace arrive with the classes.
+   */
+  fieldSkill?: number;
 }
 
 const stock: Parts = { ...STOCK };
-/** the JM field, one part at a time */
-const jmRam: Parts = { ...STOCK, ram: 1 };
-const jmSome: Parts = { ...STOCK, ram: 1, armour: 1, engine: 1 };
-const jmMore: Parts = { ...STOCK, ram: 2, armour: 1, engine: 1, tyres: 1 };
-const jmFull: Parts = { ...STOCK, ram: 2, armour: 2, engine: 2, tyres: 2 };
+/** the JM field: stock cars until the final, where a ram bar and an engine show up (2026-10-04:
+ *  the field used to gain a part a race, and a new player in a stock Tauno met cars 2 s a lap
+ *  faster than his by the fourth race and asked why the rivals had better cars) */
+const jmFinal: Parts = { ...STOCK, ram: 1, engine: 1 };
 const some: Parts = { ...STOCK, tyres: 1, weight: 1, ram: 1, gun: 1 };
 const built: Parts = { ...STOCK, tyres: 2, weight: 2, engine: 2, brakes: 1, armour: 1, ram: 2, gun: 2 };
 
@@ -36,14 +42,14 @@ const built: Parts = { ...STOCK, tyres: 2, weight: 2, engine: 2, brakes: 1, armo
 const purse = (win: number): [number, number, number, number] => [win, Math.round((win * 0.55) / 10) * 10, Math.round((win * 0.28) / 10) * 10, Math.round((win * 0.13) / 10) * 10];
 
 export const EVENTS: EventDef[] = [
-  { id: 'jm-kiviaho', name: L('Kiviahon jokkis', 'Kiviaho Folk Race'), cls: 'JM', trackId: 'kiviaho', laps: 3, prizes: purse(300), fieldParts: stock },
-  { id: 'jm-hirvisuo', name: L('Hirvisuon jokkis', 'Hirvisuo Folk Race'), cls: 'JM', trackId: 'hirvisuo', laps: 3, prizes: purse(450), fieldParts: jmRam },
-  { id: 'jm-kiviaho-4', name: L('Kiviahon kahlaus', 'Kiviaho Wade'), cls: 'JM', trackId: 'kiviaho', laps: 4, prizes: purse(600), fieldParts: jmSome },
-  { id: 'jm-hirvisuo-4', name: L('Hirvisuon pitkä jokkis', 'Hirvisuo Long Folk Race'), cls: 'JM', trackId: 'hirvisuo', laps: 4, prizes: purse(800), fieldParts: jmMore },
-  { id: 'jm-final', name: L('Jokkisfinaali', 'Folk Race Final'), cls: 'JM', trackId: 'kiviaho', laps: 6, prizes: purse(1200), fieldParts: jmFull },
-  { id: 'c-kiviaho', name: L('Kiviahon sprintti', 'Kiviaho Sprint'), cls: 'C', trackId: 'kiviaho', laps: 3, prizes: purse(1200), fieldParts: stock },
-  { id: 'c-hirvisuo', name: L('Hirvisuon ajot', 'Hirvisuo Trophy'), cls: 'C', trackId: 'hirvisuo', laps: 3, prizes: purse(2200), fieldParts: some },
-  { id: 'c-kiviaho-5', name: L('Kiviahon kuntoajo', 'Kiviaho Endurance'), cls: 'C', trackId: 'kiviaho', laps: 5, prizes: purse(3400), fieldParts: built },
+  { id: 'jm-kiviaho', name: L('Kiviahon jokkis', 'Kiviaho Folk Race'), cls: 'JM', trackId: 'kiviaho', laps: 3, prizes: purse(300), fieldParts: stock, fieldSkill: 0.7 },
+  { id: 'jm-hirvisuo', name: L('Hirvisuon jokkis', 'Hirvisuo Folk Race'), cls: 'JM', trackId: 'hirvisuo', laps: 3, prizes: purse(450), fieldParts: stock, fieldSkill: 0.8 },
+  { id: 'jm-kiviaho-4', name: L('Kiviahon kahlaus', 'Kiviaho Wade'), cls: 'JM', trackId: 'kiviaho', laps: 4, prizes: purse(600), fieldParts: stock, fieldSkill: 0.9 },
+  { id: 'jm-hirvisuo-4', name: L('Hirvisuon pitkä jokkis', 'Hirvisuo Long Folk Race'), cls: 'JM', trackId: 'hirvisuo', laps: 4, prizes: purse(800), fieldParts: stock, fieldSkill: 1 },
+  { id: 'jm-final', name: L('Jokkisfinaali', 'Folk Race Final'), cls: 'JM', trackId: 'kiviaho', laps: 6, prizes: purse(1200), fieldParts: jmFinal, fieldSkill: 1.1 },
+  { id: 'c-kiviaho', name: L('Kiviahon sprintti', 'Kiviaho Sprint'), cls: 'C', trackId: 'kiviaho', laps: 3, prizes: purse(1200), fieldParts: stock, fieldSkill: 0.9 },
+  { id: 'c-hirvisuo', name: L('Hirvisuon ajot', 'Hirvisuo Trophy'), cls: 'C', trackId: 'hirvisuo', laps: 3, prizes: purse(2200), fieldParts: stock },
+  { id: 'c-kiviaho-5', name: L('Kiviahon kuntoajo', 'Kiviaho Endurance'), cls: 'C', trackId: 'kiviaho', laps: 5, prizes: purse(3400), fieldParts: some },
   { id: 'b-kiviaho', name: L('Kiviahon B-sprintti', 'Kiviaho B Sprint'), cls: 'B', trackId: 'kiviaho', laps: 3, prizes: purse(4000), fieldParts: stock },
   { id: 'b-hirvisuo', name: L('Hirvisuon B-ajot', 'Hirvisuo B Trophy'), cls: 'B', trackId: 'hirvisuo', laps: 4, prizes: purse(7000), fieldParts: some },
   { id: 'b-hirvisuo-6', name: L('Hirvisuon pitkä', 'Hirvisuo Long'), cls: 'B', trackId: 'hirvisuo', laps: 6, prizes: purse(11000), fieldParts: built },
