@@ -5,45 +5,87 @@ The design is in `docs/design.md`.
 
 ## Next
 
-- **Playtest the new car model on a phone against the old one**
-  (https://vesahyp.github.io/sora/?physics=old). The questions: does a
-  slide feel like weight and grip letting go, does the pedal stab turn
-  a hairpin, does a glancing tree hit slide along, do hits push and turn
-  cars. The knobs are the constants at the top of `src/game/physics.ts`
-  and `content/surfaces.ts`; `make drive-log` and `tools/dbg/matrix.ts`
-  read a change before it is felt.
-- **Delete the old car model in the release after**: `physics-old.ts`,
-  `SimState.physics`, the `?physics=old` branch in `Game.tsx` and
-  `sim.ts`, the old kick in `harm.spin`, and `PHYSICS=` in `drive-log`.
-
-- **Playtest by hand on a phone, again.** The race was rebuilt (start
-  last, a paced field with grudges, a 6 m road, a close camera) and so
-  was the look. The questions now: does it feel like Death Rally, is
-  the field close enough or too close, and the frame rate on a device:
-  the frame draws in about 11 ms portrait in headless Chromium, a chunk
-  bake takes 5 to 11 ms, and the first frame about 700 ms during the
-  countdown. Knobs: `PACING` and `GRUDGE` in `drivers.ts`, `CARS_ACROSS`
-  in `renderer.ts`.
+- **Delete the old car model in the next release.** Vesa played the
+  new one (2026-10-03) and it is better, so `?physics=old` has done its
+  job. Remove `src/game/physics-old.ts`, `SimState.physics` and the
+  `physics` argument of `createState`, the `?physics=old` read in
+  `Game.tsx`, the branches on `s.physics` in `sim.ts` (`advanceOld`,
+  the wreck that stops dead) and `harm.ts` (the 5 rad/s kick in
+  `spin`, the yaw kick passed to `ram`), case 9 in
+  `tools/physics-check.ts`, `PHYSICS=` in the Makefile and
+  `scripts/drive-log.mjs`, and the `?physics=old` lines in `README.md`
+  and `CLAUDE.md`. ADR 0003 already says so.
+- **Playtest the race by hand on a phone.** The questions: does it feel
+  like Death Rally, is the field close enough or too close, and the
+  frame rate on a device: the frame draws in about 11 ms portrait in
+  headless Chromium, a chunk bake takes 5 to 11 ms, and the first frame
+  about 700 ms during the countdown. Knobs: `PACING` and `GRUDGE` in
+  `drivers.ts`, `CARS_ACROSS` in `renderer.ts`.
 - The look, what is still short: the birch crowns are too yellow-green
   and their limbs too stark, the spruce reads as a dark bush more than
   a conifer, the hurt-engine smoke leaves a row of spots, the haze
   overlay does not move with the shake, the ditch edge scallops.
-- **Playtest by hand on a phone.** The bot is the only driver so far.
-  The questions: does the car now feel like a car, does braking into a
-  bend bring the tail round the way it should, is the nitro burst long
-  enough to matter, and do the guns read as yours. The knobs are in
-  `cars.ts` (grip, lock), `sim.ts` (the constants at the top) and
-  `weapons.ts`. If it still pushes, say in which phase: on turn-in
-  (lock and yaw inertia), through the bend (grip and the rear's share),
-  or on the throttle out (the rear's cost in the friction circle). Each
-  is a different number, and `tools/dbg/handling.ts` measures it.
 - Show the grudge on the HUD: Burnout's arrow over a car that has it in
   for you. The number is in state (`Car.grudge`).
 
+## Heights and surfaces: what is built
+
+The car model (`src/game/physics.ts`, ADR 0003) already carries what
+the track features below need. All of it is data in `tracks.ts`:
+
+- **Surfaces** (`content/surfaces.ts`): gravel, tarmac, grass, mud,
+  water, ice, each a grip, a tyre peak, a slide share, a drag, a top
+  speed share, and `splash`. A track's road is gravel or tarmac
+  (`TrackDef.surface`); off the road is grass. `TrackDef.patches` lays
+  another surface from `s` to `to` metres along the lap, optionally
+  only across `d: [from, to]` metres off the centreline. Each axle
+  reads the surface under it (`Track.surfaceAt`, looked up in 4 m tiles).
+- **Height** (`TrackDef.jumps`): a kicker rises over `len` metres to
+  `h` at `s` and drops straight back (`Track.groundAt`). A car carries
+  `z`, `vz` and `air`; in the air it has no grip and no steering, and
+  it lands with a bounce that scrubs the sideways speed. Cars more than
+  0.9 m apart in height pass over each other. The renderer lifts a car
+  in the air and leaves its shadow on the ground.
+- **Drawn** (`src/render/ground.ts`, `bakeFeatures`): a water patch
+  across the whole road as a river that runs on under the trees,
+  shallow over the road, and each kicker as planks, a lit lip and the
+  drop's shadow. `splash` fx and the `splash` and `land` sounds exist.
+- **On a track:** Kiviaho has a 0.6 m kicker with its lip at 45 m on
+  the start straight and a 9 m ford at 340 m on the sweeper.
+- **Checked:** `tools/physics-check.ts` flies a 1.2 m kicker, holds
+  that full lock does nothing in the air, that a crooked landing costs
+  more than a straight one, that water drags and splashes, and that ice
+  slides where gravel grips.
+
+## Heights and surfaces: what is left
+
+- **Drawing for the other surfaces.** Mud, ice and a tarmac patch work
+  in the sim but `bakeFeatures` draws only water across the road and
+  kickers. A patch with `d` (part of the road) is not drawn at all.
+- **Ground that is not a kicker.** `groundAt` knows only ramps with a
+  sheer drop. Crests, dips, a landing ramp and a bridge deck over water
+  need a height profile along `s`, and a bridge needs the car's height
+  to decide whether it is on the deck or in the river.
+- **Walls that are not the tree line.** The only wall is the forest at
+  `width / 2 + verge`. Gates, bridge rails, log piles and the inside of
+  a shortcut need obstacles in the sim: boxes or circles that
+  `treeContacts` (an impulse at the corner that went in) can push
+  against, and a renderer for them.
+- **The river is a wall at the tree line.** Cars cannot drive down the
+  river past the forest edge, though it is drawn running on under the
+  trees. Fine for a ford; a river to drive along would need its own
+  corridor.
+- **The bot does not know features.** It slows for bends only, so it
+  crosses the ford flat out and takes the kicker at whatever speed it
+  has. It still laps Kiviaho clean (0.2 s slower than without the
+  ford), but a shortcut or a bridge will need the bot to see it.
+- **The minimap** shows neither the kicker nor the ford.
+
 ## Track features
 
-What to put on the roads next, each one data in `tracks.ts` on the
-surfaces and the height the car model already has (ADR 0003):
+What to put on the roads next, each one built on the heights and
+surfaces above. Jumps and fords are data today; the rest needs what is
+listed as left:
 
 - **Jumps** on every track (Kiviaho's start straight has the first).
   A kicker across the road (`TrackDef.jumps`): take it
