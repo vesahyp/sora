@@ -1,16 +1,24 @@
 /**
  * Procedural sprites, drawn once with canvas paths and cached. The car
- * faces +x; the renderer rotates it. Three bodies that read apart at a
- * glance: the hatch is short and square with a big tailgate window, the
- * coupe is long and low with a long bonnet and a fastback, the rally car
- * is wide with flared arches, a roof scoop, a light pod and a wing.
+ * faces +x; the renderer rotates it.
+ *
+ * Cars are drawn in Hill Climb Racing's proportions inside the game's
+ * worn palette: big wheels proud of the arches, a thick dark outline, a
+ * bold two-tone livery and a big roof number. Every body has its own
+ * silhouette and one feature that reads at 17 m across a phone: the
+ * saloon's big bumpers and three boxes, the hatch's tailgate, the
+ * coupe's long nose and lip, the rally car's arches and wing, the
+ * estate's long roof and rails, the beetle's dome and fenders, the van's
+ * ladder, the pickup's loaded bed, the microcar's being tiny. What the
+ * shop fitted is on the car too: the ram bar, armour plate, the guns,
+ * the tyres, the scoop and the pipes.
  *
  * The sun never moves but the car turns under it, so a car is cached
  * once per sixteenth of a turn with its light baked for that heading:
  * the bright edge stays toward the sun whichever way the car points.
  * Damage is a separate overlay per stage, drawn over the lit body.
  */
-import type { CarDef } from '../game/types';
+import type { CarDef, CarShape } from '../game/types';
 import { hash32 } from '../game/rng';
 import { PAL, SHADOW_INK, SHADOW_PER_M, SHADOW_X, SHADOW_Y, faded, shade } from './look';
 
@@ -25,20 +33,20 @@ export const SPRITE_PPM = 24;
 const SPRITE_RES = 3;
 /** canvas pixels per metre of a cached car sprite: what the renderer divides by */
 export const SPRITE_PX = SPRITE_PPM * SPRITE_RES;
-/** drawing units of margin around the body */
-const PAD = 10;
+/** drawing units of margin around the body: room for a plough, a wing and the wheels */
+const PAD = 12;
 /** light bins per turn */
 const LIGHT_BINS = 16;
+/** the outline: dark and thick, so a body reads as a shape before it reads as a colour */
+const INK = '#0d0a07';
+const STEEL = '#6f6a60';
+const STEEL_DARK = '#2a2622';
 
 export interface CarLook {
-  /** the race number on the roof */
-  number?: number;
   /** an opponent: paint sun-bleached */
   faded?: boolean;
   /** the heading the light is baked for, radians */
   heading?: number;
-  /** which livery: twin stripes, side bands, a two-tone split */
-  livery?: number;
 }
 
 function lightBin(heading: number): number {
@@ -54,6 +62,83 @@ function localSun(bin: number): { x: number; y: number } {
   return { x: -(SHADOW_X * c - SHADOW_Y * s), y: -(SHADOW_X * s + SHADOW_Y * c) };
 }
 
+/**
+ * Per body: where the glass and the roof sit along the length (bonnet
+ * seam, screen top, roof back, rear glass end, as fractions from the
+ * tail), how far the glass narrows at the screen and the rear, how far
+ * the sides sit in from the arches, the nose and tail chamfers, where
+ * the wheels are and how big, and how tall the roof stands for the
+ * shadow, metres.
+ */
+interface BodySpec {
+  bonnet: number;
+  screen: number;
+  roofB: number;
+  rear: number;
+  wF: number;
+  wR: number;
+  inset: number;
+  nose: [number, number];
+  tail: [number, number];
+  frontX: number;
+  rearX: number;
+  /** wheel diameter and tread width scale, on the common chunky wheel */
+  wheel: number;
+  tread: number;
+  height: number;
+}
+
+const SPEC: Record<CarShape, BodySpec> = {
+  saloon: { bonnet: 0.69, screen: 0.6, roofB: 0.34, rear: 0.26, wF: 0.11, wR: 0.13, inset: 0.035, nose: [0.012, 0.05], tail: [0.012, 0.05], frontX: 0.72, rearX: 0.13, wheel: 1, tread: 1, height: 1.4 },
+  hatch: { bonnet: 0.72, screen: 0.6, roofB: 0.16, rear: 0.035, wF: 0.12, wR: 0.1, inset: 0.04, nose: [0.035, 0.12], tail: [0.012, 0.06], frontX: 0.72, rearX: 0.09, wheel: 1, tread: 1, height: 1.5 },
+  coupe: { bonnet: 0.56, screen: 0.45, roofB: 0.3, rear: 0.08, wF: 0.15, wR: 0.28, inset: 0.05, nose: [0.07, 0.25], tail: [0.04, 0.15], frontX: 0.7, rearX: 0.12, wheel: 1, tread: 1.05, height: 1.25 },
+  rally: { bonnet: 0.66, screen: 0.55, roofB: 0.29, rear: 0.17, wF: 0.15, wR: 0.19, inset: 0.11, nose: [0.035, 0.14], tail: [0.025, 0.1], frontX: 0.7, rearX: 0.11, wheel: 1.08, tread: 1.25, height: 1.35 },
+  estate: { bonnet: 0.74, screen: 0.64, roofB: 0.07, rear: 0.02, wF: 0.12, wR: 0.12, inset: 0.03, nose: [0.012, 0.05], tail: [0.008, 0.04], frontX: 0.74, rearX: 0.15, wheel: 1, tread: 1, height: 1.45 },
+  beetle: { bonnet: 0.66, screen: 0.58, roofB: 0.3, rear: 0.22, wF: 0.22, wR: 0.24, inset: 0.16, nose: [0, 0], tail: [0, 0], frontX: 0.7, rearX: 0.12, wheel: 1, tread: 0.9, height: 1.5 },
+  van: { bonnet: 0.87, screen: 0.8, roofB: 0.02, rear: 0, wF: 0.1, wR: 0.1, inset: 0.015, nose: [0.02, 0.09], tail: [0.006, 0.03], frontX: 0.76, rearX: 0.12, wheel: 1, tread: 1.1, height: 2.1 },
+  pickup: { bonnet: 0.71, screen: 0.61, roofB: 0.43, rear: 0.41, wF: 0.12, wR: 0.14, inset: 0.03, nose: [0.015, 0.07], tail: [0.008, 0.04], frontX: 0.74, rearX: 0.11, wheel: 1.08, tread: 1.15, height: 1.75 },
+  microcar: { bonnet: 0.82, screen: 0.72, roofB: 0.14, rear: 0.05, wF: 0.12, wR: 0.12, inset: 0.035, nose: [0.06, 0.18], tail: [0.025, 0.12], frontX: 0.7, rearX: 0.08, wheel: 0.82, tread: 0.75, height: 1.55 },
+};
+
+/** Wheel size and where the pairs sit, in sprite units; the renderer scales by SPRITE_PPM. */
+export function wheelLayout(def: CarDef): { wl: number; ww: number; out: number; frontX: number; rearX: number } {
+  const L = def.length * SPRITE_PPM;
+  const sp = SPEC[def.shape];
+  const t = def.tyres ?? 0;
+  // Hill Climb wheels: bigger than life and standing out of the arches, fatter with every set of tyres
+  const wl = (0.52 + 0.07 * def.length) * sp.wheel * (1 + 0.04 * t) * SPRITE_PPM;
+  const ww = 0.34 * sp.tread * (1 + 0.12 * t) * SPRITE_PPM;
+  const out = ww * (def.shape === 'rally' ? 0.85 : 0.75);
+  return { wl, ww, out, frontX: L * sp.frontX, rearX: L * sp.rearX };
+}
+
+type Pt = [number, number];
+/** a path segment: a line to a point, or a cubic with two controls */
+type Seg = { to: Pt; c1?: Pt; c2?: Pt };
+
+/**
+ * The outline of one flank, tail to nose, as segments from a start
+ * point; the other flank is the mirror, traced back. One closed path,
+ * so the rims and the clip see a single shape.
+ */
+function mirrored(start: Pt, segs: Seg[], W: number): Path2D {
+  const p = new Path2D();
+  p.moveTo(...start);
+  for (const s of segs) {
+    if (s.c1 && s.c2) p.bezierCurveTo(...s.c1, ...s.c2, ...s.to);
+    else p.lineTo(...s.to);
+  }
+  const m = (q: Pt): Pt => [q[0], W - q[1]];
+  for (let i = segs.length - 1; i >= 0; i--) {
+    const s = segs[i];
+    const from = i ? segs[i - 1].to : start;
+    if (s.c1 && s.c2) p.bezierCurveTo(...m(s.c2), ...m(s.c1), ...m(from));
+    else p.lineTo(...m(from));
+  }
+  p.closePath();
+  return p;
+}
+
 interface Geo {
   L: number;
   W: number;
@@ -61,101 +146,121 @@ interface Geo {
   /** the greenhouse: screen, roof and rear window, the part that stands tall */
   cabin: Path2D;
   roof: [number, number, number, number];
-  screen: [number, number][];
-  rear: [number, number][];
-  sideL: [number, number][];
-  sideR: [number, number][];
+  /** the roof as drawn: a box, or the beetle's dome */
+  roofPath: Path2D;
+  screen: Pt[];
+  rear: Pt[];
+  sideL: Pt[];
+  sideR: Pt[];
   /** x of the bonnet seam and the boot seam */
   bonnetX: number;
   bootX: number;
 }
 
-/** The body: chamfered, never rounded, with the arches flared where the wheels sit. */
+const geoCache = new Map<string, Geo>();
+
+/** The body: chamfered, the arches flared where the wheels sit, the beetle round. */
 function geometry(def: CarDef): Geo {
+  const gk = `${def.shape}:${def.length}:${def.width}:${def.tyres ?? 0}`;
+  const hit = geoCache.get(gk);
+  if (hit) return hit;
   const L = def.length * SPRITE_PPM;
   const W = def.width * SPRITE_PPM;
-  const shape = def.shape;
+  const sp = SPEC[def.shape];
   const wh = wheelLayout(def);
-  const inset = W * (shape === 'rally' ? 0.075 : shape === 'coupe' ? 0.03 : shape === 'saloon' ? 0.02 : 0.04);
-  const fl = 2.5;
-  const nose = shape === 'coupe' ? [L * 0.05, W * 0.2] : shape === 'rally' ? [L * 0.03, W * 0.1] : shape === 'saloon' ? [L * 0.015, W * 0.06] : [L * 0.025, W * 0.09];
-  const tail = shape === 'coupe' ? [L * 0.04, W * 0.14] : shape === 'saloon' ? [L * 0.015, W * 0.06] : [L * 0.025, W * 0.08];
-  const ra0 = wh.rearX - 2;
-  const ra1 = wh.rearX + wh.wl + 2;
-  const fa0 = wh.frontX - 2;
-  const fa1 = wh.frontX + wh.wl + 2;
-  const top: [number, number][] = [
-    [0, tail[1]],
-    [tail[0], inset],
-    [ra0, inset],
-    [ra0 + fl, 0],
-    [ra1 - fl, 0],
-    [ra1, inset],
-    [fa0, inset],
-    [fa0 + fl, 0],
-    [fa1 - fl, 0],
-    [fa1, inset],
-    [L - nose[0], inset],
-    [L, nose[1]],
-  ];
-  const body = new Path2D();
-  top.forEach(([x, y], i) => (i ? body.lineTo(x, y) : body.moveTo(x, y)));
-  for (let i = top.length - 1; i >= 0; i--) body.lineTo(top[i][0], W - top[i][1]);
-  body.closePath();
+  const inset = W * sp.inset;
+  let body: Path2D;
+  if (def.shape === 'beetle') {
+    // a round tub, four fenders that stand out over the wheels, running boards between them
+    const tub = inset;
+    const board = W * 0.07;
+    const r0 = wh.rearX - 4;
+    const r1 = wh.rearX + wh.wl + 4;
+    const f0 = wh.frontX - 4;
+    const f1 = wh.frontX + wh.wl + 4;
+    body = mirrored([0, W / 2], [
+      { to: [L * 0.1, tub], c1: [0, W * 0.2], c2: [L * 0.04, tub] },
+      { to: [r0, tub] },
+      { to: [r1, board], c1: [r0 + 2, -1.5], c2: [r1 - 2, -1.5] },
+      { to: [f0, board] },
+      { to: [f1, tub], c1: [f0 + 2, -1.5], c2: [f1 - 2, -1.5] },
+      { to: [L * 0.88, tub] },
+      { to: [L, W / 2], c1: [L * 0.97, tub], c2: [L, W * 0.24] },
+    ], W);
+  } else {
+    const fl = 3;
+    const ra0 = wh.rearX - 3;
+    const ra1 = wh.rearX + wh.wl + 3;
+    const fa0 = wh.frontX - 3;
+    const fa1 = wh.frontX + wh.wl + 3;
+    const [nx, ny] = [L * sp.nose[0], W * sp.nose[1]];
+    const [tx, ty] = [L * sp.tail[0], W * sp.tail[1]];
+    body = mirrored([0, ty], [
+      { to: [tx, inset] },
+      { to: [ra0, inset] },
+      { to: [ra0 + fl, 0] },
+      { to: [ra1 - fl, 0] },
+      { to: [ra1, inset] },
+      { to: [fa0, inset] },
+      { to: [fa0 + fl, 0] },
+      { to: [fa1 - fl, 0] },
+      { to: [fa1, inset] },
+      { to: [L - nx, inset] },
+      { to: [L, ny] },
+    ], W);
+  }
 
-  // the greenhouse in fractions of the length: bonnet seam, screen, roof, rear window. The
-  // saloon is three boxes: a long bonnet, an upright cabin in the middle, a boot behind it
-  const f =
-    shape === 'coupe'
-      ? { bonnet: 0.62, screen: 0.48, roofB: 0.36, rear: 0.12, wF: 0.15, wR: 0.22 }
-      : shape === 'rally'
-        ? { bonnet: 0.68, screen: 0.55, roofB: 0.27, rear: 0.17, wF: 0.12, wR: 0.17 }
-        : shape === 'saloon'
-          ? { bonnet: 0.7, screen: 0.6, roofB: 0.34, rear: 0.24, wF: 0.11, wR: 0.13 }
-          : { bonnet: 0.76, screen: 0.63, roofB: 0.15, rear: 0.06, wF: 0.12, wR: 0.13 };
   const g0 = inset + W * 0.06;
-  const roof: [number, number, number, number] = [L * f.roofB, inset + W * 0.13, L * (f.screen - f.roofB), W - 2 * (inset + W * 0.13)];
-  const screen: [number, number][] = [
-    [L * f.screen, roof[1]],
-    [L * f.bonnet, W * f.wF],
-    [L * f.bonnet, W * (1 - f.wF)],
-    [L * f.screen, roof[1] + roof[3]],
+  const rIn = def.shape === 'beetle' ? inset + W * 0.06 : inset + W * 0.12;
+  const roof: [number, number, number, number] = [L * sp.roofB, rIn, L * (sp.screen - sp.roofB), W - 2 * rIn];
+  const roofPath = new Path2D();
+  if (def.shape === 'beetle') roofPath.ellipse(roof[0] + roof[2] / 2, W / 2, roof[2] / 2 + 3, roof[3] / 2, 0, 0, Math.PI * 2);
+  else roofPath.rect(...roof);
+  const screen: Pt[] = [
+    [L * sp.screen, roof[1]],
+    [L * sp.bonnet, W * sp.wF],
+    [L * sp.bonnet, W * (1 - sp.wF)],
+    [L * sp.screen, roof[1] + roof[3]],
   ];
-  const rear: [number, number][] = [
-    [L * f.roofB, roof[1]],
-    [L * f.rear, W * f.wR],
-    [L * f.rear, W * (1 - f.wR)],
-    [L * f.roofB, roof[1] + roof[3]],
+  // the van's back is barn doors, no glass to speak of from above
+  const rear: Pt[] = def.shape === 'van' ? [] : [
+    [L * sp.roofB, roof[1]],
+    [L * sp.rear, W * sp.wR],
+    [L * sp.rear, W * (1 - sp.wR)],
+    [L * sp.roofB, roof[1] + roof[3]],
   ];
-  const sx0 = L * f.roofB + 3;
-  const sx1 = L * f.screen - 2;
-  const sideL: [number, number][] = [
+  const sx0 = L * sp.roofB + 3;
+  const sx1 = L * sp.screen - 2;
+  const sideL: Pt[] = [
     [sx0, g0],
     [sx1, g0],
     [sx1 - 2, roof[1] - 1],
     [sx0 + 1, roof[1] - 1],
   ];
-  const sideR = sideL.map(([x, y]) => [x, W - y] as [number, number]);
+  const sideR = sideL.map(([x, y]) => [x, W - y] as Pt);
   const cabin = polyPath([
-    [L * f.rear, W * f.wR],
-    [L * f.roofB, g0],
-    [L * f.screen, g0],
-    [L * f.bonnet, W * f.wF],
-    [L * f.bonnet, W * (1 - f.wF)],
-    [L * f.screen, W - g0],
-    [L * f.roofB, W - g0],
-    [L * f.rear, W * (1 - f.wR)],
+    [L * sp.rear, W * sp.wR],
+    [L * sp.roofB, g0],
+    [L * sp.screen, g0],
+    [L * sp.bonnet, W * sp.wF],
+    [L * sp.bonnet, W * (1 - sp.wF)],
+    [L * sp.screen, W - g0],
+    [L * sp.roofB, W - g0],
+    [L * sp.rear, W * (1 - sp.wR)],
   ]);
-  return { L, W, body, cabin, roof, screen, rear, sideL, sideR, bonnetX: L * f.bonnet, bootX: L * f.rear };
+  const geo = { L, W, body, cabin, roof, roofPath, screen, rear, sideL, sideR, bonnetX: L * sp.bonnet, bootX: L * sp.rear };
+  geoCache.set(gk, geo);
+  return geo;
 }
 
-function poly(g: CanvasRenderingContext2D | Path2D, pts: [number, number][]): void {
+function poly(g: CanvasRenderingContext2D | Path2D, pts: Pt[]): void {
+  if (!pts.length) return;
   if (!(g instanceof Path2D)) g.beginPath();
   pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
   g.closePath();
 }
 
-function polyPath(pts: [number, number][]): Path2D {
+function polyPath(pts: Pt[]): Path2D {
   const p = new Path2D();
   poly(p, pts);
   return p;
@@ -188,17 +293,144 @@ function sunWash(g: CanvasRenderingContext2D, shape: Path2D, cx: number, cy: num
   g.fill(shape);
 }
 
-/** Livery per car: a second tone, dark on light paint and light on dark, and how it is laid. */
-function livery(colour: string, k: number): { kind: 'twin' | 'band' | 'split'; tone: string } {
-  const n = parseInt(colour.slice(1), 16);
-  const kind = (['twin', 'band', 'split'] as const)[k % 3];
-  const light = ((n >> 16) & 255) + ((n >> 8) & 255) + (n & 255) > 500;
-  return { kind, tone: light ? '#2c2a26' : '#d9d0ba' };
+/** A steel part: filled, outlined in ink, a lit top edge. */
+function steel(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, fill = STEEL_DARK): void {
+  g.fillStyle = fill;
+  g.fillRect(x, y, w, h);
+  g.strokeStyle = INK;
+  g.lineWidth = 0.7;
+  g.strokeRect(x, y, w, h);
+  g.fillStyle = 'rgba(255,236,204,0.3)';
+  g.fillRect(x, y, w, Math.min(0.7, h));
+}
+
+function rivets(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, step = 3.5): void {
+  g.fillStyle = 'rgba(230,220,200,0.55)';
+  for (let i = x + 1.2; i < x + w - 0.5; i += step) {
+    g.fillRect(i, y + 0.6, 0.7, 0.7);
+    g.fillRect(i, y + h - 1.3, 0.7, 0.7);
+  }
+}
+
+/** One wheel seen from above: a fat black tread, a pale sidewall, knobs once the tyres are bought. */
+export function tyre(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, level = 0): void {
+  const r = Math.min(w, h) * 0.3;
+  g.fillStyle = '#121110';
+  g.beginPath();
+  g.roundRect(x, y, w, h, r);
+  g.fill();
+  if (level > 0) {
+    // knobbly: blocks standing proud of the tread along both shoulders
+    const n = 5 + level;
+    const k = 0.5 + level * 0.35;
+    for (let i = 0; i < n; i++) {
+      const bx = x + 1 + ((w - 2) * (i + 0.5)) / n - 0.9;
+      g.fillRect(bx, y - k, 1.8, k + 1);
+      g.fillRect(bx + (i % 2 ? 0.6 : -0.6), y + h - 1, 1.8, k + 1);
+    }
+  }
+  // the sidewalls: grey rubber caught by the light, so a wheel reads on dark ground too
+  g.fillStyle = '#4a453e';
+  g.fillRect(x + r * 0.6, y + 0.4, w - r * 1.2, Math.max(0.9, h * 0.14));
+  g.fillRect(x + r * 0.6, y + h - 0.4 - Math.max(0.9, h * 0.14), w - r * 1.2, Math.max(0.9, h * 0.14));
+  g.fillStyle = level > 0 ? 'rgba(150,140,120,0.55)' : 'rgba(120,110,95,0.4)';
+  const bars = 5 + level * 2;
+  for (let i = 1; i < bars; i++) g.fillRect(x + (w * i) / bars, y + h * 0.2, 0.7, h * 0.6);
+  g.strokeStyle = INK;
+  g.lineWidth = 0.8;
+  g.beginPath();
+  g.roundRect(x, y, w, h, r);
+  g.stroke();
+}
+
+/** The livery's second colour on the body, clipped to it: how it is laid is the car's own. */
+function paintLivery(g: CanvasRenderingContext2D, def: CarDef, geo: Geo, tone: string): void {
+  const { L, W } = geo;
+  g.fillStyle = tone;
+  switch (def.livery) {
+    case 'roof':
+      // a white roof and a pinstripe down each flank
+      g.fillRect(-2, W * 0.13, L + 4, 1.2);
+      g.fillRect(-2, W * 0.87 - 1.2, L + 4, 1.2);
+      break;
+    case 'band':
+      g.fillRect(-2, 0, L + 4, W * 0.2);
+      g.fillRect(-2, W * 0.8, L + 4, W * 0.2);
+      break;
+    case 'twin':
+      g.fillRect(-2, W * 0.33, L + 4, W * 0.11);
+      g.fillRect(-2, W * 0.56, L + 4, W * 0.11);
+      break;
+    case 'stripe':
+      g.fillRect(-2, W * 0.39, L + 4, W * 0.22);
+      break;
+    case 'split':
+      // the front in the second tone, cut on a slant
+      poly(g, [[L * 0.64, -2], [L + 4, -2], [L + 4, W + 2], [L * 0.5, W + 2]]);
+      g.fill();
+      break;
+    case 'works':
+      // a sweep from the nose back along the flanks, a dark pinstripe on its edge, a sponsor on the bonnet
+      for (const s of [1, -1]) {
+        const y = (v: number) => (s > 0 ? v : W - v);
+        poly(g, [[L + 4, y(W * 0.3)], [L + 4, y(W * 0.5)], [L * 0.78, y(W * 0.42)], [L * 0.3, y(W * 0.2)], [-2, y(W * 0.17)], [-2, y(W * 0.06)], [L * 0.3, y(W * 0.08)], [L * 0.78, y(W * 0.26)]]);
+        g.fill();
+      }
+      g.strokeStyle = 'rgba(20,16,12,0.8)';
+      g.lineWidth = 1;
+      g.beginPath();
+      for (const s of [1, -1]) {
+        const y = (v: number) => (s > 0 ? v : W - v);
+        g.moveTo(L + 4, y(W * 0.5));
+        g.lineTo(L * 0.78, y(W * 0.42));
+        g.lineTo(L * 0.3, y(W * 0.2));
+        g.lineTo(-2, y(W * 0.17));
+      }
+      g.stroke();
+      break;
+    case 'primer':
+      // scrapyard panels: a grey bonnet and a grey door, rust at the edges
+      g.fillRect(geo.bonnetX + 1, W * 0.1, L - geo.bonnetX - 3, W * 0.8);
+      g.fillRect(geo.roof[0] - 2, -2, geo.roof[2] * 0.6, W * 0.24);
+      g.fillStyle = 'rgba(120,62,30,0.55)';
+      for (let i = 0; i < 14; i++) {
+        const h = hash32(i * 331 + 17);
+        g.fillRect(((h & 0xff) / 255) * L, (h >>> 8) & 1 ? W - 2.5 : 0.5, 1.5 + ((h >>> 9) & 3), 1.4);
+      }
+      break;
+    case 'checker':
+      break;
+  }
+}
+
+/** The roof's share of the livery: a white roof, the stripes carried over, a chequer. */
+function roofLivery(g: CanvasRenderingContext2D, def: CarDef, geo: Geo, tone: string): void {
+  const { W } = geo;
+  const [rx, ry, rw, rh] = geo.roof;
+  g.save();
+  g.clip(geo.roofPath);
+  g.fillStyle = shade(tone, 1.04);
+  if (def.livery === 'roof') g.fill(geo.roofPath);
+  else if (def.livery === 'twin') {
+    g.fillRect(rx - 4, W * 0.33, rw + 8, W * 0.11);
+    g.fillRect(rx - 4, W * 0.56, rw + 8, W * 0.11);
+  } else if (def.livery === 'stripe') g.fillRect(rx - 4, W * 0.39, rw + 8, W * 0.22);
+  else if (def.livery === 'checker') {
+    const n = 4;
+    const s = rh / n;
+    for (let i = 0; i * s < rw + 4; i++) for (let j = 0; j < n; j++) if ((i + j) % 2) g.fillRect(rx + i * s, ry + j * s, s, s);
+  }
+  g.restore();
+}
+
+/** Everything a car's picture depends on: the body, the paint, every fitted part, the light. */
+function carKey(def: CarDef, look: CarLook): string {
+  return `${def.shape}:${def.length}:${def.width}:${def.colour}:${def.accent}:${def.livery}:${def.number}:${def.ram}:${def.armour}:${def.gun}:${def.tyres ?? 0}:${def.engine ?? 0}:${look.faded ? 1 : 0}:${lightBin(look.heading ?? -0.3)}`;
 }
 
 export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
   const bin = lightBin(look.heading ?? -0.3);
-  const key = `car:${def.shape}:${def.length}:${def.width}:${def.colour}:${def.ram}:${look.number ?? 0}:${look.faded ? 1 : 0}:${look.livery ?? 0}:${bin}`;
+  const key = `car:${carKey(def, look)}`;
   const hit = cache.get(key);
   if (hit) return hit;
   const geo = geometry(def);
@@ -210,15 +442,29 @@ export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
   const g = c.getContext('2d')!;
   g.scale(SPRITE_RES, SPRITE_RES);
   g.translate(PAD, PAD);
+  g.lineJoin = 'round';
   const shape = def.shape;
-  const paint = look.faded ? faded(def.colour) : def.colour;
-  const liv = livery(def.colour, look.livery ?? 0);
-  const tone = look.faded ? faded(liv.tone, 0.25) : liv.tone;
+  const paint = look.faded ? faded(def.colour, 0.25) : def.colour;
+  const tone = look.faded ? faded(def.accent, 0.2) : def.accent;
   const wh = wheelLayout(def);
+  const tl = def.tyres ?? 0;
+  const eng = def.engine ?? 0;
 
-  // rear tyres: black and tired; the front pair turn, so the renderer draws them
-  tyre(g, wh.rearX, -wh.out, wh.wl, wh.ww);
-  tyre(g, wh.rearX, W - wh.ww + wh.out, wh.wl, wh.ww);
+  // the side pipes run out under the body, so they go down first
+  if (eng >= 2) {
+    for (const side of eng >= 3 ? [0, 1] : [0]) {
+      const y = side ? W - 0.5 : -1.9;
+      const x0 = wh.rearX + wh.wl + 4;
+      steel(g, x0, y, wh.frontX - x0 - 4, 2.4, '#8d877a');
+      g.fillStyle = '#16130f';
+      g.beginPath();
+      g.arc(x0 + 1, y + 1.2, 0.9, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  // rear tyres: the front pair turn, so the renderer draws them
+  tyre(g, wh.rearX, -wh.out, wh.wl, wh.ww, tl);
+  tyre(g, wh.rearX, W - wh.ww + wh.out, wh.wl, wh.ww, tl);
   if (shape === 'rally') {
     // mud flaps behind every wheel
     g.fillStyle = '#1c1915';
@@ -228,22 +474,22 @@ export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
     }
   }
 
+  // the outline first, thick, so the body's fill covers its inner half
+  g.strokeStyle = INK;
+  g.lineWidth = 3.2;
+  g.stroke(body);
+
   // paint
   g.fillStyle = paint;
   g.fill(body);
   g.save();
   g.clip(body);
-  g.fillStyle = tone;
-  if (liv.kind === 'twin') {
-    g.fillRect(-2, W * 0.36, L + 4, W * 0.08);
-    g.fillRect(-2, W * 0.56, L + 4, W * 0.08);
-  } else if (liv.kind === 'band') {
-    g.fillRect(-2, 0, L + 4, W * 0.17);
-    g.fillRect(-2, W * 0.83, L + 4, W * 0.17);
-  } else {
-    // the front in the second tone, cut on a slant
-    poly(g, [[L * 0.62, -2], [L + 4, -2], [L + 4, W + 2], [L * 0.5, W + 2]]);
-    g.fill();
+  paintLivery(g, def, geo, tone);
+  if (shape === 'beetle') {
+    // the running boards: black rubber between the fenders
+    g.fillStyle = '#1e1b17';
+    g.fillRect(wh.rearX + wh.wl + 2, 0, wh.frontX - wh.rearX - wh.wl - 4, W * 0.16);
+    g.fillRect(wh.rearX + wh.wl + 2, W * 0.84, wh.frontX - wh.rearX - wh.wl - 4, W * 0.16);
   }
   // years of gravel: the paint is chipped, the sills and arches are mud
   for (let i = 0; i < 70; i++) {
@@ -255,11 +501,11 @@ export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
   }
   const mud = (x: number, w: number) => {
     for (const side of [0, 1]) {
-      const gr = g.createLinearGradient(0, side ? W : 0, 0, side ? W - W * 0.22 : W * 0.22);
-      gr.addColorStop(0, 'rgba(78,62,40,0.85)');
+      const gr = g.createLinearGradient(0, side ? W : 0, 0, side ? W - W * 0.2 : W * 0.2);
+      gr.addColorStop(0, 'rgba(78,62,40,0.8)');
       gr.addColorStop(1, 'rgba(78,62,40,0)');
       g.fillStyle = gr;
-      g.fillRect(x, side ? W - W * 0.22 : 0, w, W * 0.22);
+      g.fillRect(x, side ? W - W * 0.2 : 0, w, W * 0.2);
     }
   };
   mud(0, L);
@@ -276,38 +522,32 @@ export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
   g.restore();
 
   // panel seams
-  g.strokeStyle = 'rgba(12,8,6,0.4)';
-  g.lineWidth = 0.6;
+  g.strokeStyle = 'rgba(12,8,6,0.45)';
+  g.lineWidth = 0.7;
   g.beginPath();
-  g.moveTo(geo.bonnetX + 1, W * 0.12);
-  g.lineTo(L - 2, W * 0.12);
-  g.moveTo(geo.bonnetX + 1, W * 0.88);
-  g.lineTo(L - 2, W * 0.88);
-  g.moveTo(geo.bootX - 1, W * 0.14);
-  g.lineTo(geo.bootX - 1, W * 0.86);
-  for (const x of [geo.roof[0] + geo.roof[2] * 0.55, geo.roof[0] - 1]) {
-    g.moveTo(x, 0.5);
-    g.lineTo(x, 3);
-    g.moveTo(x, W - 0.5);
-    g.lineTo(x, W - 3);
+  if (shape !== 'van' && shape !== 'microcar') {
+    g.moveTo(geo.bonnetX + 1, W * 0.14);
+    g.lineTo(L - 3, W * 0.14);
+    g.moveTo(geo.bonnetX + 1, W * 0.86);
+    g.lineTo(L - 3, W * 0.86);
+  }
+  if (geo.bootX > 4) {
+    g.moveTo(geo.bootX - 1, W * 0.16);
+    g.lineTo(geo.bootX - 1, W * 0.84);
   }
   g.stroke();
 
-  if (shape === 'coupe') {
-    // bonnet louvres and the pop-up lamp lids
-    g.fillStyle = 'rgba(10,8,6,0.55)';
-    for (let i = 0; i < 4; i++) g.fillRect(L * 0.74 + i * 2.2, W * 0.4, 1, W * 0.2);
-    g.strokeStyle = 'rgba(10,8,6,0.5)';
-    g.strokeRect(L * 0.9, W * 0.14, L * 0.07, W * 0.18);
-    g.strokeRect(L * 0.9, W * 0.68, L * 0.07, W * 0.18);
-  } else if (shape === 'rally') {
-    // a bonnet vent and the four-lamp pod on the nose
-    g.fillStyle = '#16130f';
-    g.fillRect(L * 0.76, W * 0.38, L * 0.08, W * 0.24);
-    g.fillStyle = '#22201b';
-    g.fillRect(L * 0.955, W * 0.18, L * 0.04, W * 0.64);
-    g.fillStyle = '#e8dcb0';
-    for (let i = 0; i < 4; i++) g.fillRect(L * 0.962, W * (0.22 + i * 0.15), L * 0.026, W * 0.09);
+  // what makes each body itself, below the glass
+  bodyFeatures(g, def, geo);
+
+  // armour: riveted plates on the doors first
+  if (def.armour >= 1) {
+    const x0 = wh.rearX + wh.wl + 3;
+    const w = wh.frontX - x0 - 3;
+    for (const y of [0.2, W - W * 0.2 - 0.2]) {
+      steel(g, x0, y, w, W * 0.2, STEEL);
+      rivets(g, x0, y, w, W * 0.2);
+    }
   }
 
   // glass: dark, with the sky caught on the side toward the sun
@@ -318,135 +558,496 @@ export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
   poly(glass, geo.sideR);
   g.fillStyle = '#262d31';
   g.fill(glass);
-  sunWash(g, glass, L * 0.45, W / 2, L * 0.3, sun, 0.4, 0.3);
-  g.fillStyle = 'rgba(70,64,52,0.35)';
+  sunWash(g, glass, L * 0.45, W / 2, L * 0.3, sun, 0.45, 0.3);
+  g.fillStyle = 'rgba(70,64,52,0.3)';
   g.fill(glass);
-  // the roof: the highest panel, it catches the most light
-  const roof = new Path2D();
-  roof.rect(...geo.roof);
-  g.fillStyle = shade(paint, 1.06);
-  g.fill(roof);
-  if (liv.kind === 'twin') {
-    g.fillStyle = shade(tone, 1.04);
-    g.fillRect(geo.roof[0], W * 0.36, geo.roof[2], W * 0.08);
-    g.fillRect(geo.roof[0], W * 0.56, geo.roof[2], W * 0.08);
-  }
-  if (shape === 'hatch') {
-    // roof rack bars
-    g.fillStyle = '#1c1915';
-    g.fillRect(geo.roof[0] + geo.roof[2] * 0.15, geo.roof[1] - 1, 1.6, geo.roof[3] + 2);
-    g.fillRect(geo.roof[0] + geo.roof[2] * 0.8, geo.roof[1] - 1, 1.6, geo.roof[3] + 2);
-  } else if (shape === 'saloon') {
-    // a jokkis saloon: the boot lid's seam, a vinyl roof gone matt, a dent in the rear quarter
-    g.fillStyle = 'rgba(12,8,6,0.22)';
-    g.fillRect(geo.roof[0], geo.roof[1], geo.roof[2], geo.roof[3]);
-    g.strokeStyle = 'rgba(12,8,6,0.4)';
-    g.lineWidth = 0.6;
-    g.beginPath();
-    g.moveTo(geo.bootX * 0.35, W * 0.16);
-    g.lineTo(geo.bootX * 0.35, W * 0.84);
-    g.stroke();
-    g.fillStyle = 'rgba(30,24,18,0.3)';
-    g.beginPath();
-    g.ellipse(geo.bootX + 2, W * 0.86, 3, 1.4, 0.3, 0, Math.PI * 2);
-    g.fill();
-  } else if (shape === 'rally') {
-    // the roof scoop
-    g.fillStyle = '#1a1712';
-    const r0 = geo.roof[0] + geo.roof[2] * 0.62;
-    const r1 = geo.roof[0] + geo.roof[2] * 0.9;
-    poly(g, [[r0, W * 0.42], [r1, W * 0.38], [r1, W * 0.62], [r0, W * 0.58]]);
-    g.fill();
-  }
-  // the race number: a scuffed white plate on the roof
-  if (look.number) {
-    const pw = Math.min(geo.roof[2] * 0.42, 11);
-    const ph = Math.min(geo.roof[3] * 0.5, 12);
-    const px = geo.roof[0] + geo.roof[2] * (shape === 'rally' ? 0.12 : 0.3);
-    const py = W / 2 - ph / 2;
-    g.fillStyle = look.faded ? '#c8c0ac' : '#e6dfcc';
-    g.fillRect(px, py, pw, ph);
+  g.strokeStyle = INK;
+  g.lineWidth = 0.9;
+  g.stroke(glass);
+  if (def.armour >= 3) {
+    // mesh over the glass
     g.save();
-    g.translate(px + pw / 2, W / 2);
-    g.rotate(Math.PI / 2);
-    g.fillStyle = '#16130f';
-    g.font = `bold ${Math.round(ph * 0.75)}px "Arial Narrow", Arial, sans-serif`;
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText(String(look.number), 0, 0.5);
+    g.clip(glass);
+    g.strokeStyle = 'rgba(150,145,130,0.75)';
+    g.lineWidth = 0.45;
+    g.beginPath();
+    for (let x = -W; x < L + W; x += 2.4) {
+      g.moveTo(x, 0);
+      g.lineTo(x + W, W);
+      g.moveTo(x + W, 0);
+      g.lineTo(x, W);
+    }
+    g.stroke();
     g.restore();
   }
 
-  // light: a wash across the whole body, a bright edge toward the sun, a dark one away
-  sunWash(g, body, L / 2, W / 2, Math.max(L, W) * 0.5, sun, 0.2, 0.38);
-  rim(g, body, -sun.x * 1.6, -sun.y * 1.6, 'rgba(255,236,204,0.5)');
-  rim(g, body, sun.x * 2.2, sun.y * 2.2, 'rgba(8,5,3,0.5)');
-  rim(g, roof, -sun.x * 1.1, -sun.y * 1.1, 'rgba(255,240,214,0.45)');
-  rim(g, roof, sun.x * 1.2, sun.y * 1.2, 'rgba(8,5,3,0.4)');
-  g.strokeStyle = 'rgba(8,6,4,0.75)';
-  g.lineWidth = 0.8;
-  g.stroke(body);
-
-  if (shape === 'rally') {
-    // the wing on its struts, off the tail
-    g.fillStyle = '#1a1712';
-    g.fillRect(-3, -1, 5, W + 2);
-    g.fillStyle = 'rgba(255,236,204,0.25)';
-    g.fillRect(-3, -1, 5, 1);
-  } else if (shape === 'coupe') {
-    g.fillStyle = '#1a1712';
-    g.fillRect(-0.5, W * 0.14, 2.4, W * 0.72);
-  }
-  // lamps: dull yellow headlights, dark red tails
-  g.fillStyle = '#e4d6a4';
-  g.fillRect(L - 2.2, W * 0.1, 2, W * 0.16);
-  g.fillRect(L - 2.2, W * 0.74, 2, W * 0.16);
-  g.fillStyle = '#8a1e14';
-  g.fillRect(0, W * 0.1, 1.8, W * 0.16);
-  g.fillRect(0, W * 0.74, 1.8, W * 0.16);
-  // the ram bar on the nose: a pipe, then a bar with spikes, then a plough
-  if (def.ram > 0) {
-    g.fillStyle = '#2a2622';
-    const bw = def.ram >= 3 ? 3.2 : 1.8;
-    g.fillRect(L - 0.6, W * 0.06, bw, W * 0.88);
-    g.fillStyle = 'rgba(255,236,204,0.3)';
-    g.fillRect(L - 0.6, W * 0.06, bw, 0.6);
-    if (def.ram === 2) {
-      g.fillStyle = '#6a655c';
-      for (let i = 0; i < 4; i++) {
-        const y = W * (0.16 + i * 0.22);
-        poly(g, [[L + 1.2, y - 0.6], [L + 2.6, y], [L + 1.2, y + 0.6]]);
-        g.fill();
-      }
-    } else if (def.ram >= 3) {
-      g.fillStyle = '#3a352f';
-      poly(g, [[L + 2.6, W * 0.04], [L + 4.2, W * 0.5], [L + 2.6, W * 0.96]]);
-      g.fill();
+  // the roof: the highest panel, it catches the most light
+  const roof = geo.roofPath;
+  g.fillStyle = shade(paint, 1.07);
+  g.fill(roof);
+  roofLivery(g, def, geo, tone);
+  if (def.armour >= 2) {
+    // riveted plates along the roof's edges, the paint and the number left between them
+    const [rx, ry, rw, rh] = geo.roof;
+    for (const y of [ry, ry + rh * 0.76]) {
+      steel(g, rx + 1, y, rw - 2, rh * 0.24, STEEL);
+      rivets(g, rx + 1, y, rw - 2, rh * 0.24, 3);
     }
   }
+  g.strokeStyle = INK;
+  g.lineWidth = 1;
+  g.stroke(roof);
+  roofFeatures(g, def, geo);
+
+  // the race number: a big scuffed white disc on the roof, the number across the car
+  roofNumber(g, def, geo, look.faded === true);
+
+  // light: a wash across the whole body, a bright edge toward the sun, a dark one away
+  sunWash(g, body, L / 2, W / 2, Math.max(L, W) * 0.5, sun, 0.2, 0.36);
+  rim(g, body, -sun.x * 1.8, -sun.y * 1.8, 'rgba(255,236,204,0.5)');
+  rim(g, body, sun.x * 2.4, sun.y * 2.4, 'rgba(8,5,3,0.5)');
+  rim(g, roof, -sun.x * 1.2, -sun.y * 1.2, 'rgba(255,240,214,0.45)');
+  rim(g, roof, sun.x * 1.3, sun.y * 1.3, 'rgba(8,5,3,0.4)');
+  g.strokeStyle = INK;
+  g.lineWidth = 1.2;
+  g.stroke(body);
+
+  tailFeatures(g, def, geo);
+  lamps(g, def, geo);
+  if (def.gun > 0) guns(g, def, geo);
+  if (eng >= 1) scoop(g, def, geo, eng);
+  if (def.ram > 0) ramBar(g, def, geo);
   cache.set(key, c);
   return c;
 }
 
-function tyre(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
-  g.fillStyle = '#121110';
-  g.fillRect(x, y, w, h);
-  g.fillStyle = 'rgba(120,110,95,0.35)';
-  for (let i = 1; i < 5; i++) g.fillRect(x + (w * i) / 5, y, 0.5, h);
+/** The signature panels of each body, painted over the paint and under the glass. */
+function bodyFeatures(g: CanvasRenderingContext2D, def: CarDef, geo: Geo): void {
+  const { L, W } = geo;
+  switch (def.shape) {
+    case 'coupe':
+      // bonnet louvres and the pop-up lamp lids down the long nose
+      g.fillStyle = 'rgba(10,8,6,0.6)';
+      for (let i = 0; i < 5; i++) g.fillRect(L * 0.68 + i * 2.4, W * 0.4, 1.1, W * 0.2);
+      g.strokeStyle = 'rgba(10,8,6,0.6)';
+      g.lineWidth = 0.7;
+      g.strokeRect(L * 0.88, W * 0.2, L * 0.07, W * 0.16);
+      g.strokeRect(L * 0.88, W * 0.64, L * 0.07, W * 0.16);
+      break;
+    case 'rally':
+      // a bonnet vent
+      g.fillStyle = '#16130f';
+      g.fillRect(L * 0.74, W * 0.38, L * 0.08, W * 0.24);
+      break;
+    case 'hatch': {
+      // the tailgate: a panel that is the whole back of the car, its hinge line across the roof
+      g.strokeStyle = INK;
+      g.lineWidth = 0.9;
+      g.strokeRect(1.5, W * 0.12, geo.roof[0] - 1.5, W * 0.76);
+      break;
+    }
+    case 'beetle':
+      // the engine lid's louvres at the back, the bonnet's ridge at the front
+      g.fillStyle = 'rgba(10,8,6,0.55)';
+      for (let i = 0; i < 4; i++) g.fillRect(L * 0.06 + i * 1.8, W * 0.36, 0.9, W * 0.28);
+      g.strokeStyle = 'rgba(10,8,6,0.45)';
+      g.lineWidth = 0.7;
+      g.beginPath();
+      g.moveTo(geo.bonnetX + 2, W / 2);
+      g.lineTo(L - 4, W / 2);
+      g.stroke();
+      break;
+    case 'pickup': {
+      // the open bed: dark floor between the sides, and a load in it
+      const x0 = L * 0.025;
+      const x1 = geo.bootX - 1.5;
+      const y0 = W * 0.13;
+      const y1 = W * 0.87;
+      g.fillStyle = '#1f1b16';
+      g.fillRect(x0, y0, x1 - x0, y1 - y0);
+      g.fillStyle = 'rgba(255,236,204,0.08)';
+      for (let x = x0 + 2; x < x1; x += 3) g.fillRect(x, y0, 0.6, y1 - y0);
+      g.strokeStyle = INK;
+      g.lineWidth = 0.9;
+      g.strokeRect(x0, y0, x1 - x0, y1 - y0);
+      // two old tyres stacked, a rusty barrel
+      const r = (y1 - y0) * 0.24;
+      for (const [cx, cy] of [[x0 + r + 2, y0 + r + 1], [x0 + r + 3.5, y0 + r + 3]] as Pt[]) {
+        g.fillStyle = '#151311';
+        g.beginPath();
+        g.arc(cx, cy, r, 0, Math.PI * 2);
+        g.fill();
+        g.strokeStyle = 'rgba(140,130,110,0.5)';
+        g.lineWidth = 0.6;
+        g.stroke();
+        g.fillStyle = '#3a352e';
+        g.beginPath();
+        g.arc(cx, cy, r * 0.45, 0, Math.PI * 2);
+        g.fill();
+      }
+      const br = (y1 - y0) * 0.22;
+      const bx = x1 - br - 2;
+      const by = y1 - br - 1.5;
+      g.fillStyle = '#2f5a6a';
+      g.beginPath();
+      g.arc(bx, by, br, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = INK;
+      g.lineWidth = 0.8;
+      g.stroke();
+      g.strokeStyle = 'rgba(200,190,160,0.45)';
+      g.lineWidth = 0.5;
+      g.beginPath();
+      g.arc(bx, by, br * 0.62, 0, Math.PI * 2);
+      g.stroke();
+      g.fillStyle = 'rgba(120,62,30,0.6)';
+      g.fillRect(bx - br * 0.4, by - br * 0.6, br * 0.5, br * 0.4);
+      break;
+    }
+    case 'van':
+      // a sliding door's runner along one flank
+      g.fillStyle = 'rgba(10,8,6,0.5)';
+      g.fillRect(L * 0.3, W * 0.12, L * 0.38, 0.8);
+      break;
+    case 'microcar':
+      // a single big wiper on the screen's base, a plastic body with a seam round it
+      g.strokeStyle = 'rgba(10,8,6,0.5)';
+      g.lineWidth = 0.7;
+      g.strokeRect(2, W * 0.1, L - 4, W * 0.8);
+      break;
+    default:
+      break;
+  }
+}
+
+/** What sits on the roof: the rally scoop, the estate's rails, the van's ladder, the hatch's spoiler. */
+function roofFeatures(g: CanvasRenderingContext2D, def: CarDef, geo: Geo): void {
+  const { W } = geo;
+  const [rx, ry, rw, rh] = geo.roof;
+  switch (def.shape) {
+    case 'rally': {
+      g.fillStyle = '#1a1712';
+      const r0 = rx + rw * 0.62;
+      const r1 = rx + rw * 0.92;
+      poly(g, [[r0, W * 0.4], [r1, W * 0.35], [r1, W * 0.65], [r0, W * 0.6]]);
+      g.fill();
+      g.strokeStyle = 'rgba(255,236,204,0.3)';
+      g.lineWidth = 0.6;
+      g.stroke();
+      break;
+    }
+    case 'estate':
+      // roof rails the length of the long flat roof, on feet
+      for (const y of [ry + 0.6, ry + rh - 2.4]) {
+        steel(g, rx + 2, y, rw - 4, 1.8, '#3a362f');
+        g.fillStyle = INK;
+        g.fillRect(rx + 2, y - 0.4, 2, 2.6);
+        g.fillRect(rx + rw - 4, y - 0.4, 2, 2.6);
+      }
+      // two cross bars
+      g.fillStyle = '#2a2622';
+      g.fillRect(rx + rw * 0.25, ry + 1, 1.4, rh - 2);
+      g.fillRect(rx + rw * 0.55, ry + 1, 1.4, rh - 2);
+      break;
+    case 'van': {
+      // a ladder along one side of the roof, a vent behind the cab
+      const x0 = rx + 3;
+      const x1 = rx + rw * 0.58;
+      const y0 = ry + 1;
+      const y1 = ry + rh * 0.36;
+      g.strokeStyle = INK;
+      g.lineWidth = 2.2;
+      g.beginPath();
+      g.moveTo(x0, y0);
+      g.lineTo(x1, y0);
+      g.moveTo(x0, y1);
+      g.lineTo(x1, y1);
+      for (let x = x0 + 1; x <= x1; x += 4.5) {
+        g.moveTo(x, y0);
+        g.lineTo(x, y1);
+      }
+      g.stroke();
+      g.strokeStyle = '#a49e8e';
+      g.lineWidth = 1.1;
+      g.stroke();
+      steel(g, rx + rw * 0.66, W * 0.62, 6, 6, '#3a362f');
+      break;
+    }
+    case 'microcar':
+      // a stubby aerial with a pennant: the one bit of pride it has
+      g.fillStyle = INK;
+      g.fillRect(rx + rw * 0.1, ry + rh - 2, 0.8, 0.8);
+      g.fillStyle = '#d06a2a';
+      poly(g, [[rx + rw * 0.1, ry + rh - 1.6], [rx + rw * 0.1 - 5, ry + rh + 0.5], [rx + rw * 0.1 - 5, ry + rh - 3.6]]);
+      g.fill();
+      break;
+    default:
+      break;
+  }
+}
+
+/** The number: a scuffed white disc on the roof, as big as the roof allows. */
+function roofNumber(g: CanvasRenderingContext2D, def: CarDef, geo: Geo, old: boolean): void {
+  if (!def.number) return;
+  const { W } = geo;
+  const [rx, , rw, rh] = geo.roof;
+  const at = def.shape === 'rally' ? 0.3 : def.shape === 'van' ? 0.8 : def.shape === 'estate' ? 0.4 : 0.5;
+  const r = Math.min(rh * 0.42, rw * 0.42, 11);
+  const cx = rx + rw * at;
+  const cy = W / 2;
+  g.fillStyle = old ? '#cfc7b2' : '#eae3d0';
+  g.beginPath();
+  g.arc(cx, cy, r, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = INK;
+  g.lineWidth = 1;
+  g.stroke();
+  g.save();
+  g.translate(cx, cy);
+  g.rotate(Math.PI / 2);
+  g.fillStyle = '#16130f';
+  const digits = String(def.number).length;
+  g.font = `900 ${Math.round(r * (digits > 1 ? 1.15 : 1.5))}px "Arial Black", "Arial Narrow", Arial, sans-serif`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(String(def.number), 0, r * 0.06);
+  g.restore();
+}
+
+/** Off the tail: the wing, the lip, the barn doors, the slow-vehicle triangle, the big bumpers. */
+function tailFeatures(g: CanvasRenderingContext2D, def: CarDef, geo: Geo): void {
+  const { L, W } = geo;
+  switch (def.shape) {
+    case 'rally':
+      // a big wing on endplates, wider than the car
+      g.fillStyle = INK;
+      g.fillRect(2, W * 0.3, 3, 1.4);
+      g.fillRect(2, W * 0.7 - 1.4, 3, 1.4);
+      steel(g, -6, -3, 7, W + 6, '#1d1a15');
+      g.fillStyle = '#16130f';
+      g.fillRect(-6.5, -3.5, 8, 1.6);
+      g.fillRect(-6.5, W + 1.9, 8, 1.6);
+      break;
+    case 'coupe':
+      steel(g, -1, W * 0.12, 3, W * 0.76, '#1a1712');
+      break;
+    case 'hatch':
+      // a roof spoiler over the tailgate
+      steel(g, geo.roof[0] - 3, W * 0.16, 3.5, W * 0.68, '#1a1712');
+      break;
+    case 'saloon':
+    case 'estate':
+      // big old bumpers, nose and tail, standing off the body
+      steel(g, -1.6, W * 0.04, 2.6, W * 0.92, '#3c3933');
+      steel(g, L - 1, W * 0.04, 2.6, W * 0.92, '#3c3933');
+      break;
+    case 'van':
+      // barn doors: the split down the middle, the hinges, a step
+      g.strokeStyle = INK;
+      g.lineWidth = 1;
+      g.beginPath();
+      g.moveTo(0, W / 2);
+      g.lineTo(4, W / 2);
+      g.stroke();
+      g.fillStyle = '#8d877a';
+      for (const y of [W * 0.08, W * 0.3, W * 0.66, W * 0.88]) g.fillRect(-0.8, y, 1.6, 2);
+      steel(g, -2.4, W * 0.3, 2.4, W * 0.4, '#2a2622');
+      break;
+    case 'pickup':
+      steel(g, -1.6, W * 0.06, 2.6, W * 0.88, '#3c3933');
+      break;
+    case 'microcar': {
+      // the slow-vehicle triangle on its tail, red and orange
+      const cy = W / 2;
+      g.fillStyle = '#b8321e';
+      poly(g, [[-1, cy - 6], [-1, cy + 6], [6, cy]]);
+      g.fill();
+      g.fillStyle = '#e07a2a';
+      poly(g, [[0.3, cy - 3.4], [0.3, cy + 3.4], [4.2, cy]]);
+      g.fill();
+      g.strokeStyle = INK;
+      g.lineWidth = 0.7;
+      poly(g, [[-1, cy - 6], [-1, cy + 6], [6, cy]]);
+      g.stroke();
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+/** Lamps: square on the old cars, round on the beetle, the rally car's pod. */
+function lamps(g: CanvasRenderingContext2D, def: CarDef, geo: Geo): void {
+  const { L, W } = geo;
+  g.strokeStyle = INK;
+  g.lineWidth = 0.6;
+  if (def.shape === 'beetle') {
+    const wh = wheelLayout(def);
+    for (const y of [W * 0.12, W * 0.88]) {
+      g.fillStyle = '#e8dcb0';
+      g.beginPath();
+      g.arc(wh.frontX + wh.wl + 1, y, 2.6, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+    }
+    g.fillStyle = '#8a1e14';
+    for (const y of [W * 0.14, W * 0.86]) {
+      g.beginPath();
+      g.arc(wh.rearX - 1.5, y, 1.8, 0, Math.PI * 2);
+      g.fill();
+    }
+    return;
+  }
+  g.fillStyle = '#e4d6a4';
+  g.fillRect(L - 2.4, W * 0.1, 2.2, W * 0.17);
+  g.fillRect(L - 2.4, W * 0.73, 2.2, W * 0.17);
+  g.fillStyle = '#8a1e14';
+  g.fillRect(0.2, W * 0.1, 1.8, W * 0.15);
+  g.fillRect(0.2, W * 0.75, 1.8, W * 0.15);
+  if (def.shape === 'rally') {
+    // the four-lamp pod on the nose
+    steel(g, L - 3.6, W * 0.18, 3, W * 0.64, '#22201b');
+    g.fillStyle = '#efe4b8';
+    for (let i = 0; i < 4; i++) {
+      g.beginPath();
+      g.arc(L - 2.1, W * (0.26 + i * 0.16), 1.5, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+}
+
+/** The machine gun on the bonnet: one barrel, a second, then the heavy pair on an ammo box. */
+function guns(g: CanvasRenderingContext2D, def: CarDef, geo: Geo): void {
+  const { L, W } = geo;
+  const x0 = geo.bonnetX - 2;
+  const heavy = def.gun >= 3;
+  const ys = def.gun >= 2 ? [W * 0.3, W * 0.7] : [W * 0.3];
+  steel(g, x0, W * (def.gun >= 2 ? 0.22 : 0.22), 7, W * (def.gun >= 2 ? 0.56 : 0.16), '#34302a');
+  if (heavy) steel(g, x0 - 1, W * 0.4, 6, W * 0.2, '#4a4a30');
+  const bw = heavy ? 2.2 : 1.5;
+  for (const y of ys) {
+    g.fillStyle = INK;
+    g.fillRect(x0 + 3, y - bw / 2 - 0.5, L - x0 + 1, bw + 1);
+    g.fillStyle = '#3a362f';
+    g.fillRect(x0 + 3, y - bw / 2, L - x0 + 1, bw);
+    g.fillStyle = 'rgba(255,236,204,0.35)';
+    g.fillRect(x0 + 3, y - bw / 2, L - x0 + 1, 0.5);
+    g.fillStyle = '#121010';
+    g.fillRect(L + 2.6, y - bw / 2 - 0.4, 1.8, bw + 0.8);
+  }
+}
+
+/** The engine on the outside: a bonnet scoop, then a bigger one, then a blower through the bonnet. */
+function scoop(g: CanvasRenderingContext2D, def: CarDef, geo: Geo, lvl: number): void {
+  const { L, W } = geo;
+  const cx = def.shape === 'van' || def.shape === 'microcar' ? geo.bonnetX - 3 : (geo.bonnetX + L) / 2;
+  if (lvl >= 3) {
+    // a blower: chrome body, two butterflies on top
+    steel(g, cx - 5, W * 0.36, 10, W * 0.28, '#9a9486');
+    g.fillStyle = '#16130f';
+    g.fillRect(cx - 3.5, W * 0.4, 3, W * 0.2);
+    g.fillRect(cx + 0.5, W * 0.4, 3, W * 0.2);
+    return;
+  }
+  const w = lvl >= 2 ? 9 : 7;
+  g.fillStyle = shade(def.colour, 0.75);
+  poly(g, [[cx - w / 2, W * 0.4], [cx + w / 2, W * 0.36], [cx + w / 2, W * 0.64], [cx - w / 2, W * 0.6]]);
+  g.fill();
+  g.strokeStyle = INK;
+  g.lineWidth = 0.8;
+  g.stroke();
+  g.fillStyle = '#121010';
+  g.fillRect(cx + w / 2 - 1.6, W * 0.39, 1.6, W * 0.22);
+}
+
+/** The ram on the nose: a steel bar, then a bull bar, then a welded plough. */
+function ramBar(g: CanvasRenderingContext2D, def: CarDef, geo: Geo): void {
+  const { L, W } = geo;
+  if (def.ram === 1) {
+    steel(g, L, W * 0.05, 2.4, W * 0.9, STEEL_DARK);
+    return;
+  }
+  if (def.ram === 2) {
+    // a bull bar: a tube frame standing off the nose with uprights
+    g.strokeStyle = INK;
+    g.lineWidth = 2.6;
+    const path = new Path2D();
+    path.moveTo(L - 1, W * 0.08);
+    path.lineTo(L + 3.5, W * 0.12);
+    path.lineTo(L + 4.5, W * 0.5);
+    path.lineTo(L + 3.5, W * 0.88);
+    path.lineTo(L - 1, W * 0.92);
+    for (const y of [0.3, 0.7]) {
+      path.moveTo(L - 1, W * y);
+      path.lineTo(L + 4.2, W * y);
+    }
+    g.stroke(path);
+    g.strokeStyle = '#7a756a';
+    g.lineWidth = 1.3;
+    g.stroke(path);
+    return;
+  }
+  // a plough: a welded wedge wider than the car, its seams and its lit edge
+  const p = polyPath([[L - 1, -2], [L + 3, -2.5], [L + 8, W * 0.5], [L + 3, W + 2.5], [L - 1, W + 2]]);
+  g.fillStyle = '#4a453d';
+  g.fill(p);
+  g.strokeStyle = INK;
+  g.lineWidth = 1.2;
+  g.stroke(p);
+  g.strokeStyle = 'rgba(255,236,204,0.4)';
+  g.lineWidth = 0.7;
+  g.beginPath();
+  g.moveTo(L + 3, -2.5);
+  g.lineTo(L + 8, W * 0.5);
+  g.lineTo(L + 3, W + 2.5);
+  g.stroke();
+  g.strokeStyle = 'rgba(20,16,12,0.6)';
+  g.lineWidth = 0.5;
+  g.beginPath();
+  for (const y of [0.25, 0.5, 0.75]) {
+    g.moveTo(L - 1, W * y);
+    g.lineTo(L + 3 + 5 * (1 - Math.abs(y - 0.5) * 2), W * y);
+  }
+  g.stroke();
+}
+
+/**
+ * The car as a picture, front wheels and all, for the garage and the
+ * lineup: the race draws the front pair itself so they can steer.
+ */
+export function carPicture(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
+  const key = `pic:${carKey(def, look)}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const spr = carSprite(def, look);
+  const c = document.createElement('canvas');
+  c.width = spr.width;
+  c.height = spr.height;
+  const g = c.getContext('2d')!;
+  g.scale(SPRITE_RES, SPRITE_RES);
+  g.translate(PAD, PAD);
+  const wh = wheelLayout(def);
+  const W = def.width * SPRITE_PPM;
+  tyre(g, wh.frontX, -wh.out, wh.wl, wh.ww, def.tyres ?? 0);
+  tyre(g, wh.frontX, W - wh.ww + wh.out, wh.wl, wh.ww, def.tyres ?? 0);
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.drawImage(spr, 0, 0);
+  cache.set(key, c);
+  return c;
 }
 
 /**
  * The car's shadow for this heading: the body extruded along the sun at
  * its sill height and the cabin at its roof height, filled solid so the
  * renderer lays it at one alpha. Returned with where its corner sits in
- * the car's frame, metres.
+ * the car's frame, metres. A van's stands long, a coupe's short.
  */
 export function carShadow(def: CarDef, heading: number): { img: HTMLCanvasElement; x: number; y: number; w: number; h: number } {
   const bin = lightBin(heading);
-  const key = `shadow:${def.shape}:${def.length}:${def.width}:${bin}`;
+  const key = `shadow:${def.shape}:${def.length}:${def.width}:${def.tyres ?? 0}:${bin}`;
   const geo = geometry(def);
   const sun = localSun(bin);
-  const reach = 1.45 * SHADOW_PER_M * SPRITE_PPM;
+  const reach = SPEC[def.shape].height * SHADOW_PER_M * SPRITE_PPM;
   const x0 = -PAD + Math.min(0, -sun.x * reach);
   const y0 = -PAD + Math.min(0, -sun.y * reach);
   const x1 = geo.L + PAD + Math.max(0, -sun.x * reach);
@@ -460,6 +1061,8 @@ export function carShadow(def: CarDef, heading: number): { img: HTMLCanvasElemen
     const g = img.getContext('2d')!;
     g.fillStyle = SHADOW_INK;
     const sill = 0.75 * SHADOW_PER_M * SPRITE_PPM;
+    // the van is a box to the roof: its whole body stands tall
+    const tall = def.shape === 'van' || def.shape === 'microcar' ? geo.body : geo.cabin;
     // stamped finely enough that the swept edge never shows steps
     const steps = 32;
     for (let i = 0; i <= steps; i++) {
@@ -467,7 +1070,7 @@ export function carShadow(def: CarDef, heading: number): { img: HTMLCanvasElemen
       g.setTransform(res, 0, 0, res, (-x0 - sun.x * sill * k) * res, (-y0 - sun.y * sill * k) * res);
       g.fill(geo.body);
       g.setTransform(res, 0, 0, res, (-x0 - sun.x * reach * k) * res, (-y0 - sun.y * reach * k) * res);
-      g.fill(geo.cabin);
+      g.fill(tall);
     }
     cache.set(key, img);
   }
@@ -486,7 +1089,7 @@ export function damageStage(damage: number): number {
  */
 export function damageSprite(def: CarDef, stage: number): HTMLCanvasElement | null {
   if (stage <= 0) return null;
-  const key = `dmg:${def.shape}:${def.length}:${def.width}:${stage}`;
+  const key = `dmg:${def.shape}:${def.length}:${def.width}:${def.tyres ?? 0}:${stage}`;
   const hit = cache.get(key);
   if (hit) return hit;
   const geo = geometry(def);
@@ -563,18 +1166,6 @@ export function damageSprite(def: CarDef, stage: number): HTMLCanvasElement | nu
   g.restore();
   cache.set(key, c);
   return c;
-}
-
-/** Wheel size and where the pairs sit, in sprite units; the renderer scales by SPRITE_PPM. */
-export function wheelLayout(def: CarDef): { wl: number; ww: number; out: number; frontX: number; rearX: number } {
-  const L = def.length * SPRITE_PPM;
-  const W = def.width * SPRITE_PPM;
-  const wl = L * (def.shape === 'coupe' ? 0.16 : 0.17);
-  const ww = W * (def.shape === 'rally' ? 0.2 : 0.16);
-  const out = def.shape === 'rally' ? ww * 0.3 : ww * 0.15;
-  const frontX = L * (def.shape === 'coupe' ? 0.72 : def.shape === 'hatch' ? 0.74 : def.shape === 'saloon' ? 0.73 : 0.7);
-  const rearX = L * (def.shape === 'hatch' ? 0.1 : def.shape === 'saloon' ? 0.15 : 0.12);
-  return { wl, ww, out, frontX, rearX };
 }
 
 // ---------------------------------------------------------------- trees

@@ -39,6 +39,14 @@ kylmästi, Marko on tappelija, Tapsa on arka kuski jonka ohitat ensin.
 Kaikki nojaavat viereiseen autoon. Kenttä pysyy lähelläsi: edellä ajava
 hiljentää ja takana tuleva painaa.
 
+**Jokainen auto on omansa.** Jokaisella kuskilla on joka luokassa oma
+autonsa, omat värinsä ja oma numeronsa: Jorma ajaa coupéta, ralliautoa
+tai kuumaa pikkuautoa, Marko farmaria, pakua, lava-autoa tai laivaa,
+Tapsa kuplaa, mopoautoa tai pientä viistoperää. Paku on painava ja
+mopoauto kevyt, kun autot törmäävät. Omasi on aina punainen, ja siitä
+näkee, mitä olet siihen ostanut: puskurin, panssarilevyt, konekiväärin
+konepellillä, nappularenkaat ja ilmanottimen.
+
 **Kenttä kantaa kaunaa.** Kun töytäiset, ammut tai romutat jonkun, hän
 muistaa sen: nojaa sinuun kovemmin, työntää perästä, ampuu sinua ensin
 ja tukkii linjasi, kun tulet takaa. Edellä ajava kaunainen kuski jopa

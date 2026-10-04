@@ -171,7 +171,7 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
         bounty: me.bounty,
         ramCash: me.ramCash,
         place,
-        order: standings(s).map((c) => ({ name: c.driver.name, colour: c.def.colour, time: c.finishedAt, player: c === me })),
+        order: standings(s).map((c) => ({ name: c.driver.name, colour: c.driver.colour, time: c.finishedAt, player: c === me })),
       };
     };
 

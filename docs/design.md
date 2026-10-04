@@ -79,6 +79,19 @@ dash. Finland stays: gravel, spruce and birch, a barn, kilometre posts,
 power lines, a crowd at the line, but it is a dry evening in August and
 somebody is about to get wrecked.
 
+**The garage is the cast** (2026-10-04, after "the cars all look the
+same" for the third time). Vehicles are drawn in Hill Climb Racing's
+chunky, playful proportions inside the worn palette above: big wheels
+standing out of the arches, a thick dark outline, a bold two-tone
+livery, a big roof number, and whatever makes the body itself pushed
+too far. Every vehicle has its own silhouette, footprint, colour and
+number, from a 2.6 m microcar to a 5 m van with a ladder on the roof,
+and each rival has a vehicle of their own in every class
+(`content/rivals.ts`). What the shop fitted shows on the car. The
+proportions are the exception to "no rounded toy shapes"; the paint,
+the dust and the light are not. `make lineup` puts every vehicle on one
+canvas: if two could be confused at a glance, the look is not done.
+
 ## Shape
 
 The Räkkä architecture, copied: Vite + TypeScript + React for the garage

@@ -120,6 +120,9 @@ export function tuned(car: CarDef, parts: Parts): CarDef {
     armour: a,
     ram: r,
     gun: g,
+    // not read by the car model: the sprite draws them
+    tyres: t,
+    engine: e,
   };
 }
 

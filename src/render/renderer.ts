@@ -18,6 +18,7 @@ import {
   puffSprite,
   spruceSprite,
   wheelLayout,
+  tyre,
   SPRITE_PPM,
   SPRITE_PX,
   TREE_SPAN,
@@ -54,8 +55,6 @@ const DUST_TINTS = ['176,160,128', '168,150,104', '30,26,24', '96,90,84', '92,80
 const WIND_X = SHADOW_X * 0.45;
 const WIND_Y = SHADOW_Y * 0.45;
 const DUST_MAX = 150;
-/** the race numbers, player first */
-const NUMBERS = [7, 23, 41, 12, 5, 66];
 
 /** pixels per metre of the skid mark layer */
 const MARK_PPM = 4;
@@ -609,15 +608,15 @@ export class Renderer {
     const k = 1 / SPRITE_PPM;
     const fx = wh.frontX * k + (wh.wl * k) / 2 - L / 2;
     const ang = car.steer * 0.55;
-    g.fillStyle = '#121110';
     for (const y of [-wh.out * k + (wh.ww * k) / 2 - W / 2, (W - wh.ww + wh.out) * k + (wh.ww * k) / 2 - W / 2]) {
       g.save();
       g.translate(fx, y);
       g.rotate(ang);
-      g.fillRect((-wh.wl * k) / 2, (-wh.ww * k) / 2, wh.wl * k, wh.ww * k);
+      g.scale(k, k);
+      tyre(g, -wh.wl / 2, -wh.ww / 2, wh.wl, wh.ww, car.def.tyres ?? 0);
       g.restore();
     }
-    const spr = carSprite(car.def, { number: NUMBERS[i % NUMBERS.length], faded: i > 0, heading: car.heading, livery: i });
+    const spr = carSprite(car.def, { faded: i > 0, heading: car.heading });
     const sw = spr.width / SPRITE_PX;
     const sh = spr.height / SPRITE_PX;
     g.drawImage(spr, -sw / 2, -sh / 2, sw, sh);
@@ -667,7 +666,7 @@ export class Renderer {
     g.save();
     g.translate(car.x, car.y);
     g.rotate(car.heading);
-    const def = { ...car.def, colour: '#2a2420' };
+    const def = { ...car.def, colour: '#2a2420', accent: '#3a332c' };
     const spr = carSprite(def, { faded: true, heading: car.heading });
     const w = spr.width / SPRITE_PX;
     const h = spr.height / SPRITE_PX;
@@ -933,7 +932,7 @@ export class Renderer {
     for (let i = s.cars.length - 1; i >= 1; i--) {
       const car = s.cars[i];
       const r = 2.6 / k;
-      g.fillStyle = car.wreck > 0 ? '#3a3430' : car.def.colour;
+      g.fillStyle = car.wreck > 0 ? '#3a3430' : car.driver.colour;
       g.fillRect(car.x - r, car.y - r, r * 2, r * 2);
       g.strokeStyle = 'rgba(10,8,6,0.8)';
       g.lineWidth = 1 / k;

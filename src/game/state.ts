@@ -4,6 +4,8 @@ import type { Text } from '../i18n';
 import { PICKUP_OFFSET, PICKUP_OFFSET_CASH, PICKUP_SPACING, pickupOrder, type PickupKind } from './content/pickups';
 
 export interface Driver {
+  /** the key to what a rival drives (content/rivals.ts); the player has none */
+  id?: string;
   name: Text;
   /** 0..1: how hard the bot drives this car. 1 is the bot's own ceiling. */
   skill: number;
@@ -235,7 +237,7 @@ export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: nu
     // far enough apart that two cars side by side do not touch on a narrow road
     const d = side * Math.max(1.7, trackDef.width * 0.22);
     return {
-      def: { ...car, colour: driver.colour },
+      def: car,
       driver,
       x: p.x - p.ty * d,
       y: p.y + p.tx * d,

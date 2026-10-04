@@ -76,8 +76,21 @@ export interface TrackDef {
   points: [number, number][];
 }
 
-/** The body the sprite draws: an old three-box saloon, a boxy hatchback, a low coupe, a winged rally car. */
-export type CarShape = 'saloon' | 'hatch' | 'coupe' | 'rally';
+/**
+ * The body the sprite draws. Each has its own silhouette and one thing
+ * that reads at a glance: the saloon's three boxes, the hatch's tailgate,
+ * the coupe's long nose, the rally car's arches and wing, the estate's
+ * long roof and rails, the beetle's dome and fenders, the van's ladder,
+ * the pickup's open bed, the microcar's being tiny.
+ */
+export type CarShape = 'saloon' | 'hatch' | 'coupe' | 'rally' | 'estate' | 'beetle' | 'van' | 'pickup' | 'microcar';
+
+/**
+ * How the second colour is laid: a white roof, bands along the flanks,
+ * twin stripes over the top, a works livery, the nose in another colour,
+ * one broad stripe, primer-grey doors off a scrapyard, a chequered roof.
+ */
+export type Livery = 'roof' | 'band' | 'twin' | 'works' | 'split' | 'stripe' | 'primer' | 'checker';
 
 export interface CarDef {
   id: string;
@@ -108,8 +121,18 @@ export interface CarDef {
   ram: number;
   /** machine gun level 0..3: 0 is no gun at all, 1 the gun, then its rate and punch */
   gun: number;
+  /** tyre level 0..3, stamped by tuned() so the sprite can draw it; stock when absent */
+  tyres?: number;
+  /** engine level 0..3, stamped by tuned() for the sprite */
+  engine?: number;
   /** metres, nose to tail */
   length: number;
   width: number;
+  /** the paint: the hue the minimap and the standings know the car by */
   colour: string;
+  /** the livery's second colour */
+  accent: string;
+  livery: Livery;
+  /** the race number on the roof */
+  number: number;
 }

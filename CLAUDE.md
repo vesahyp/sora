@@ -67,6 +67,8 @@ src/
       weapons.ts      combat: the armoury's prices and the class each weapon arrives in, damage, gun,
                         missile, mine, oil, boost and ram numbers, the wreck bounty, the ram and oil credits
       pickups.ts      what lies on the road, how far apart, how fast it grows back
+      rivals.ts       what each rival drives per class: their own body, size, colour, livery and number
+                        on the class car's numbers (vehicleDef), so the grid is four different vehicles
       drivers.ts      the opponents: a name, a colour, a skill and an aggression for the bot; PACING, Death Rally's catch-up:
                         sim.ts scales an opponent's engine by its gap to the player, the bot its corners;
                         GRUDGE, Burnout's hostility: what a ram, shot or wreck costs and how the bot uses it
@@ -83,8 +85,9 @@ src/
                         posts, bales, a barn, a power line, the crowds. Cosmetic, never in the sim
     renderer.ts       camera and shake, ground chunks, pickups, mines, tracers, sights, cars
                         with damage and shadows, wrecks, nitro, dust and haze, minimap
-    sprites.ts        procedural sprite cache: car bodies lit per heading, liveries, damage
-                        stages, shadows, trees and roadside objects
+    sprites.ts        procedural sprite cache: nine car bodies in Hill Climb proportions lit per heading,
+                        liveries and numbers, the fitted parts on the car, damage stages, shadows,
+                        trees and roadside objects
   input/input.ts      one thumb (drag to steer, tap for nitro), the pedal, keyboard
   ui/                 React: Game (loop + HUD), Screens (title, result), Garage (garage, races, shop, dealer, licences),
                         Dash (the shared chrome: segmented lamps, inline SVG glyphs, the stencil-or-plain face() rule)
@@ -109,6 +112,7 @@ scripts/
   touch-check.mjs     drives the race by touch on an emulated phone: steer, brake, pause
   drive-log.mjs       set pieces by touch on an emulated phone, the physics logged frame by frame
   icon.mjs            render public/icon.svg to the PNG icons: 512, 192, the 180 iOS icon, a 32 favicon
+  lineup.mjs          every vehicle in the game on one canvas to shots/lineup.png, the race's own sprites
   pwa-check.mjs       the install check: manifest, every icon at its size, the service worker, offline
 infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs), see TRACKING.md
 ```
@@ -125,9 +129,10 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
    its own; that is inside `physics.ts` and nothing outside sees it.
 3. **Content is data.** A new track is a list of points in `tracks.ts`,
    its kickers, fords and shortcuts beside it. A new car is a `CarDef`,
-   a new race an `EventDef`. Balance changes are number changes in
-   `content/`. A part's effect is one line in `tuned()`; what a class
-   can buy and carry is a `from` on the part or the weapon.
+   a rival's vehicle a `Vehicle` in `rivals.ts`, a new race an
+   `EventDef`. Balance changes are number changes in `content/`. A
+   part's effect is one line in `tuned()`; what a class can buy and
+   carry is a `from` on the part or the weapon.
 4. **The bot is the opponent.** `tools/autoplayer.ts` drives the checks,
    the screenshots and the other cars, guns included. A change to it
    changes the race, so keep it readable. `sim-check` races it armed and
@@ -174,6 +179,11 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
   bot driving), never from a hand-held browser. `?bot=1&speed=3` makes the
   bot drive at triple speed for scripts. `make touch-check` drives the race
   by touch; run it when you touched `input.ts` or the HUD buttons.
+- **Every vehicle reads apart.** `make lineup` draws every vehicle in the
+  game, stock and built, on one canvas (`shots/lineup.png`). Look at it
+  after touching `sprites.ts`, `cars.ts` or `rivals.ts`: two vehicles
+  that could be confused at a glance are a bug. `sim-check` laps every
+  rival's vehicle alone, so a new footprint is checked on the road.
 - **The game installs as an app.** `public/manifest.webmanifest` and the
   icons are hand-written; `vite.config.ts` writes `sw.js` into the build
   with the list of that build's files, so the game opens offline and a new

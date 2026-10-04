@@ -170,10 +170,13 @@ for (const p of pieces) {
   let prev = [me.x, me.y, it.x, it.y];
   let vPrev = [speed(me), speed(it)];
   let mom1 = mom0;
+  // the contact is the first step the boxes touch, within a few centimetres: the substeps can
+  // resolve a hit before the step ends, so a bare overlap test misses it on some footprints
+  const grown = { ...me, def: { ...me.def, length: me.def.length + 0.06, width: me.def.width + 0.06 } };
   run(s, 1.5, () => [go(p.steer ?? 0, 0), go(0, 0)], (t) => {
     const o = overlap(me, it);
     const depth = o ? o.depth : 0;
-    if (o && contact < 0) {
+    if (contact < 0 && overlap(Object.assign(grown, { x: me.x, y: me.y, heading: me.heading }), it)) {
       contact = t;
     }
     if (contact >= 0) {

@@ -13,6 +13,8 @@ import { OPPONENTS } from '../src/game/content/drivers';
 import { PICKUPS } from '../src/game/content/pickups';
 import { standings } from '../src/game/state';
 import { STOCK, tuned } from '../src/game/content/parts';
+import { RIVAL_CARS, rivalCar, rivalField, vehicleDef } from '../src/game/content/rivals';
+import { CLASSES } from '../src/game/types';
 import { canCarry, carried } from '../src/game/content/weapons';
 
 /**
@@ -128,7 +130,8 @@ for (const track of TRACKS) {
     // chaos (a wreck early moves everything after it), so it is run in every grid order of the
     // three opponents, everyone must finish each, and the view is the average.
     const guns = canCarry(car.cls, 'mine');
-    const armed = guns ? tuned(car, { ...STOCK, gun: 1 }) : car;
+    const parts = guns ? { ...STOCK, gun: 1 } : STOCK;
+    const armed = tuned(car, parts);
     const boot = carried(car.cls, { oil: 2, mines: 2, missiles: 2 });
     let racing = 0;
     let onScreen = 0;
@@ -140,7 +143,8 @@ for (const track of TRACKS) {
     const orders = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
     for (const grid of orders) {
       const field = grid.map((k) => OPPONENTS[k]);
-      const race = createState(track, armed, 3, field.map((driver) => ({ driver, car: armed, ...boot })), boot);
+      // every rival in their own vehicle: the class car's numbers under their body and mass
+      const race = createState(track, armed, 3, field.map((driver) => ({ driver, car: rivalCar(driver, car.cls, parts), ...boot })), boot);
       let drifting = 0;
       let boosts = 0;
       let slicks = 0;
@@ -198,11 +202,39 @@ for (const track of TRACKS) {
     assert(seen > ON_SCREEN_MIN, `${track.id}/${car.id}: the race happens on screen (${(seen * 100).toFixed(0)}% > ${ON_SCREEN_MIN * 100}%)`);
     assert(aimed > IN_SIGHTS_MIN, `${track.id}/${car.id}: the player has someone ahead to go for (${(aimed * 100).toFixed(0)}% > ${IN_SIGHTS_MIN * 100}%)`);
     // unarmed the cars still lean on each other, so the order is not skill's alone; everyone must still get home
-    const clean = createState(track, car, 3, OPPONENTS.map((driver) => ({ driver, car })));
+    const clean = createState(track, car, 3, rivalField(car.cls, STOCK));
     while (clean.cars.some((c) => c.finishedAt < 0) && clean.time < 900) step(clean, clean.cars.map((c) => botInput(clean, c)), DT);
     const skills = standings(clean).map((c) => c.driver.skill);
     console.log(`  unarmed order by skill: ${skills.join(' > ')}`);
     assert(clean.cars.every((c) => c.finishedAt >= 0), `${track.id}/${car.id}: unarmed, the whole field finishes`);
+  }
+}
+
+// every rival's vehicle alone, on the class car's numbers under its own footprint: the widest
+// (the van, 2 m on a 6 m road) and the smallest (the microcar) must lap as cleanly as the class car
+for (const track of TRACKS) {
+  console.log(`\n${track.id}: the rivals' vehicles alone`);
+  for (const cls of CLASSES) {
+    for (const [who, byClass] of Object.entries(RIVAL_CARS)) {
+      const v = byClass[cls];
+      const def = vehicleDef(v, cls, STOCK);
+      const solo = createState(track, def, 3);
+      let offRoad = 0;
+      let hits = 0;
+      let steps = 0;
+      while (!solo.finished && solo.time < 600) {
+        step(solo, [botInput(solo)], DT);
+        if (solo.hold > 0) continue;
+        steps++;
+        if (!solo.cars[0].onRoad) offRoad++;
+        if (solo.cars[0].hit) hits++;
+      }
+      const laps = solo.cars[0].laps;
+      const name = `${cls} ${who} ${v.name.fi} (${v.shape} ${v.length} x ${v.width} m)`;
+      console.log(`  ${name.padEnd(46)} ${laps.map((l) => l.toFixed(2)).join('  ')}   off road ${((offRoad / Math.max(1, steps)) * 100).toFixed(1)}%   tree hits ${hits}`);
+      assert(solo.finished, `${track.id}/${name}: the bot finishes three laps alone`);
+      assert(offRoad / Math.max(1, steps) < 0.08 && hits < 30, `${track.id}/${name}: on the road and clear of the trees`);
+    }
   }
 }
 

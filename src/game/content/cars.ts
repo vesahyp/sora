@@ -7,6 +7,8 @@ import type { CarDef } from '../types';
  * a clear step apart with stock parts, and a fully built car of one class
  * should be close to a stock car of the next, so the choice at the dealer
  * is a real one. The career starts in the Tauno (docs/progression.md).
+ * All four are the player's red; the body, the livery and the number
+ * tell them apart. The footprint is real: the car model reads it.
  */
 export const CARS: CarDef[] = [
   {
@@ -25,9 +27,12 @@ export const CARS: CarDef[] = [
     armour: 0,
     ram: 0,
     gun: 0,
-    length: 4.4,
-    width: 1.7,
+    length: 4.6,
+    width: 1.75,
     colour: '#c8352a',
+    accent: '#e6dfcc',
+    livery: 'roof',
+    number: 7,
   },
   {
     id: 'kortteli',
@@ -45,9 +50,12 @@ export const CARS: CarDef[] = [
     armour: 0,
     ram: 0,
     gun: 0,
-    length: 3.9,
-    width: 1.7,
+    length: 3.7,
+    width: 1.65,
     colour: '#c8352a',
+    accent: '#e6dfcc',
+    livery: 'band',
+    number: 13,
   },
   {
     id: 'sorsa',
@@ -65,9 +73,12 @@ export const CARS: CarDef[] = [
     armour: 0,
     ram: 0,
     gun: 0,
-    length: 4.0,
+    length: 4.3,
     width: 1.7,
     colour: '#c8352a',
+    accent: '#e6dfcc',
+    livery: 'twin',
+    number: 22,
   },
   {
     id: 'kiila',
@@ -87,8 +98,11 @@ export const CARS: CarDef[] = [
     ram: 0,
     gun: 0,
     length: 4.2,
-    width: 1.8,
+    width: 1.9,
     colour: '#c8352a',
+    accent: '#e8c040',
+    livery: 'works',
+    number: 1,
   },
 ];
 

@@ -7,12 +7,12 @@ import { EVENTS, type EventDef } from '../game/content/events';
 import { LICENCES, type LicenceDef } from '../game/content/licences';
 import { WEAPONS, canCarry, type WeaponDef } from '../game/content/weapons';
 import { TRACK_BY_ID } from '../game/content/tracks';
-import { carSprite } from '../render/sprites';
+import { carPicture } from '../render/sprites';
 import type { CarDef } from '../game/types';
 import { fmt, recordKey, type Records } from '../records';
 import { Lamps, MineIcon, MissileIcon, OilIcon } from './Dash';
 
-/** The car, drawn big, as the sprite the race uses. */
+/** The car, drawn big, as the sprite the race uses, with what the shop fitted. */
 function CarPic({ car, size = 160 }: { car: CarDef; size?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -22,7 +22,7 @@ function CarPic({ car, size = 160 }: { car: CarDef; size?: number }) {
     c.height = size * 0.5 * dpr;
     const g = c.getContext('2d')!;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const spr = carSprite(car);
+    const spr = carPicture(car);
     const k = (size * 0.9) / spr.width;
     g.save();
     g.translate(size / 2, size * 0.25);

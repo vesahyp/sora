@@ -7,12 +7,13 @@ import type { Car, Driver, SimState } from '../state';
  * grudge builds and how hard the bot leans, blocks and punts: Jorma is
  * cold and fast and mostly just drives, Marko is the brawler who
  * remembers every knock, Tapsa is timid. The player is red; these
- * colours stay clear of it.
+ * colours stay clear of it, and each rival's vehicles (rivals.ts) are
+ * painted in their driver's hue.
  */
 export const OPPONENTS: Driver[] = [
-  { name: L('Jorma'), skill: 1.0, aggression: 0.6, colour: '#2f6fd6' },
-  { name: L('Marko'), skill: 0.92, aggression: 1.5, colour: '#e0b030' },
-  { name: L('Tapsa'), skill: 0.84, aggression: 0.4, colour: '#f2f2ea' },
+  { id: 'jorma', name: L('Jorma'), skill: 1.0, aggression: 0.6, colour: '#2f6fd6' },
+  { id: 'marko', name: L('Marko'), skill: 0.92, aggression: 1.5, colour: '#e0b030' },
+  { id: 'tapsa', name: L('Tapsa'), skill: 0.84, aggression: 0.4, colour: '#f2f2ea' },
 ];
 
 /**
