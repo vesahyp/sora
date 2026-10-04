@@ -5,7 +5,7 @@
  * build.
  */
 import { createState } from '../src/game/state';
-import { step, DT } from '../src/game/sim';
+import { step, DT, TOW_AFTER } from '../src/game/sim';
 import { TRACKS } from '../src/game/content/tracks';
 import { CARS, classCar } from '../src/game/content/cars';
 import { botInput, DEFAULT_BOT } from './autoplayer';
@@ -51,16 +51,15 @@ const results: { track: string; cls: CarClass; grid: string; place: number; gap:
 // the full workout on the class cars, the career's spine; the dealer's wild buys are lapped alone below
 for (const track of TRACKS) {
   for (const car of CLASSES.map(classCar)) {
-    // alone first: the clean lap, and the track's features on the way round: every jump flown
-    // and landed on the road, the ford crossed
+    // alone first: the clean lap, and the track's ground on the way round: every flight, from a
+    // river's lip or a crest, logged with where it left and where it came down
     const solo = createState(track, car, 3);
     let offRoad = 0;
     let hits = 0;
     let topSpeed = 0;
     let steps = 0;
-    let water = 0;
     let flight: { s0: number; v0: number; t0: number } | null = null;
-    const flights: { jump: number; v0: number; air: number; d: number; v1: number }[] = [];
+    const flights: { s0: number; v0: number; air: number; s1: number; d: number; wet: boolean }[] = [];
     let prevAir = false;
     while (!solo.finished && solo.time < 600) {
       step(solo, [botInput(solo)], DT);
@@ -69,21 +68,15 @@ for (const track of TRACKS) {
         const c = solo.cars[0];
         if (!c.onRoad) offRoad++;
         if (c.hit) hits++;
-        if (c.surface === 'water') water++;
         topSpeed = Math.max(topSpeed, c.speed);
         if (!prevAir && c.air) flight = { s0: c.s, v0: c.speed, t0: solo.time };
+        // the first touch ends a flight: a bounce after it is the landing, not a second jump
+        if (flight && c.air && c.vz <= 0 && c.z <= solo.track.groundAt(c.s, c.d) + 0.02) {
+          flights.push({ s0: flight.s0, v0: flight.v0, air: solo.time - flight.t0, s1: c.s, d: Math.abs(c.d), wet: c.surface === 'water' });
+          flight = null;
+        }
         if (prevAir && !c.air && flight) {
-          const jumps = track.jumps ?? [];
-          let jump = -1;
-          let near = Infinity;
-          for (let j = 0; j < jumps.length; j++) {
-            const gap = Math.abs(((flight.s0 - jumps[j].s + solo.track.length / 2) % solo.track.length) - solo.track.length / 2);
-            if (gap < near) {
-              near = gap;
-              jump = j;
-            }
-          }
-          flights.push({ jump, v0: flight.v0, air: solo.time - flight.t0, d: Math.abs(c.d), v1: c.speed });
+          flights.push({ s0: flight.s0, v0: flight.v0, air: solo.time - flight.t0, s1: c.s, d: Math.abs(c.d), wet: c.surface === 'water' });
           flight = null;
         }
         prevAir = c.air;
@@ -99,19 +92,20 @@ for (const track of TRACKS) {
       assert(offRoad / steps < 0.08, `${track.id}/${car.id}: the bot stays on the road (off ${((offRoad / steps) * 100).toFixed(1)}%)`);
       assert(hits < 30, `${track.id}/${car.id}: the bot rarely meets a tree (${hits} steps)`);
     }
-    // the jumps: each one flown on every lap, at racing speed, landing on the road
-    (track.jumps ?? []).forEach((j, k) => {
-      const f = flights.filter((x) => x.jump === k);
-      const line = f.map((x) => `${(x.v0 * 3.6).toFixed(0)} km/h ${x.air.toFixed(2)} s d ${x.d.toFixed(1)}`).join(', ');
-      console.log(`  jump ${k + 1} at ${j.s} m: ${line || 'never flown'}`);
-      assert(f.length >= 3, `${track.id}/${car.id}: the kicker at ${j.s} m throws the car every lap (${f.length} flights)`);
-      // racing speed: the bot did not slow for it, so the lip is taken at least as fast as the lap's average
-      const pace = solo.track.length / Math.min(...me.laps);
-      assert(f.every((x) => x.v0 > pace * 0.85), `${track.id}/${car.id}: the kicker at ${j.s} m is taken at racing speed (${f.map((x) => (x.v0 * 3.6).toFixed(0)).join('/')} km/h, over ${(pace * 0.85 * 3.6).toFixed(0)})`);
-      assert(f.every((x) => x.air > 0.3), `${track.id}/${car.id}: the kicker at ${j.s} m is a real flight (${f.map((x) => x.air.toFixed(2)).join('/')} s)`);
-      assert(f.every((x) => x.d < track.width / 2), `${track.id}/${car.id}: the kicker at ${j.s} m lands on the road (${f.map((x) => x.d.toFixed(1)).join('/')} m off the centreline)`);
+    // the ground: a river is cleared every lap at racing speed, the car coming down on the far
+    // bank or the road past it, never in the water; every flight, a crest's too, lands on the road
+    const near = (a: number, b: number) => Math.abs(((a - b + solo.track.length * 1.5) % solo.track.length) - solo.track.length / 2);
+    (track.rivers ?? []).forEach((r) => {
+      const f = flights.filter((x) => near(x.s0, r.s) < 3);
+      console.log(`  river at ${r.s} m, ${r.gap} m wide: ${f.map((x) => `${(x.v0 * 3.6).toFixed(0)} km/h ${x.air.toFixed(2)} s down at +${((x.s1 - r.s + solo.track.length) % solo.track.length).toFixed(0)} m d ${x.d.toFixed(1)}`).join(', ') || 'never flown'}`);
+      assert(f.length >= 3, `${track.id}/${car.id}: the river at ${r.s} m is jumped every lap (${f.length} flights)`);
+      assert(f.every((x) => !x.wet && (x.s1 - r.s + solo.track.length) % solo.track.length > r.gap), `${track.id}/${car.id}: the river at ${r.s} m is cleared, never landed in`);
     });
-    if (track.patches?.some((p) => p.surface === 'water')) assert(water > 10, `${track.id}/${car.id}: the ford is crossed (${(water / 60).toFixed(1)} s in the water)`);
+    (track.crests ?? []).forEach((c) => {
+      const f = flights.filter((x) => near(x.s0, c.s) < c.len / 2 + 2);
+      console.log(`  crest at ${c.s} m, ${c.h} m: ${f.map((x) => `${(x.v0 * 3.6).toFixed(0)} km/h ${x.air.toFixed(2)} s`).join(', ') || 'only lifted'}`);
+    });
+    assert(flights.every((x) => x.d < track.width / 2), `${track.id}/${car.id}: every flight lands on the road (${flights.map((x) => x.d.toFixed(1)).join('/')} m off the centreline)`);
     // the shortcut: the bot told to take it drives it without meeting the trees and gains on the
     // lap, but not a free lap: under three seconds, the rest is the driver's
     if (track.shortcuts?.length && me.laps.length) {
@@ -145,6 +139,7 @@ for (const track of TRACKS) {
     let inSights = 0;
     let playerWrecks = 0;
     let playerRams = 0;
+    let stalled = 0;
     let fightCredits = 0;
     let roadCredits = 0;
     const orders = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
@@ -154,8 +149,18 @@ for (const track of TRACKS) {
       let drifting = 0;
       let boosts = 0;
       let slicks = 0;
+      // stalled off the road: off it and not 3 m along the lap since the clock started, per car
+      const stalledFrom = race.cars.map(() => ({ t: -1, s: 0 }));
       while (race.cars.some((c) => c.finishedAt < 0) && race.time < 900) {
         step(race, race.cars.map((c) => botInput(race, c)), DT);
+        race.cars.forEach((c, k) => {
+          const st = stalledFrom[k];
+          const along = Math.abs(((c.s - st.s + race.track.length * 1.5) % race.track.length) - race.track.length / 2);
+          if (race.hold > 0 || c.finishedAt >= 0 || c.wreck > 0 || Math.abs(c.d) <= race.track.width / 2 || along >= 3 || st.t < 0) {
+            st.t = Math.abs(c.d) > race.track.width / 2 && c.wreck <= 0 && c.finishedAt < 0 && race.hold <= 0 ? race.time : -1;
+            st.s = c.s;
+          } else stalled = Math.max(stalled, race.time - st.t);
+        });
         for (const c of race.cars) {
           if (c.sliding && c.wreck <= 0) drifting++;
           if (c.boosting > 0) boosts++;
@@ -191,6 +196,9 @@ for (const track of TRACKS) {
     }
     const seen = onScreen / Math.max(1, racing);
     const aimed = inSights / Math.max(1, racing);
+    // the owner's stuck spot, 2026-10-04: nobody sits off the road going nowhere; the back-out
+    // frees a car nose first in the trees and the marshals tow whatever it cannot
+    assert(stalled <= TOW_AFTER + 0.1, `${track.id}/${car.id}: no car is stalled off the road more than ${TOW_AFTER} s in any race (longest ${stalled.toFixed(1)} s)`);
     console.log(`  view:  another car on screen ${(seen * 100).toFixed(0)}% of the race, a target in the sights ${(aimed * 100).toFixed(0)}%, the player wrecked ${playerWrecks} in ${orders.length} races`);
     // aggression against the road, the player's own, per race: wrecking and ramming must pay more
     // than driving over cash, or the race teaches the player to drive round the fight. The bot

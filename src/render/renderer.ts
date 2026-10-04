@@ -90,10 +90,12 @@ const PICKUP_SCALE = 1.25;
  * sits LEAD_SHARE of the screen from its centre, a third up from the
  * bottom of a portrait phone. LEAD_EASE is how fast the lead swings to
  * a new direction, per second, so it never snaps; the car itself is
- * followed exactly.
+ * followed exactly. The cars got a fifth faster on 2026-10-04 and the
+ * lead with them (it was 1 s and 14 m), so round a bend the camera aims
+ * as far down the road in metres as the car now covers.
  */
-const LEAD_S = 1.0;
-const LEAD_MIN = 14;
+const LEAD_S = 1.2;
+const LEAD_MIN = 17;
 const LEAD_SHARE = 1 / 6;
 const LEAD_EASE = 3;
 
@@ -267,8 +269,10 @@ export class Renderer {
       if (!visible(car.x, car.y)) continue;
       const sh = carShadow(car.def, car.heading);
       g.save();
-      // a car off the ground leaves its shadow behind on it, thrown away from the sun
-      g.translate(car.x + SHADOW_X * SHADOW_PER_M * car.z, car.y + SHADOW_Y * SHADOW_PER_M * car.z);
+      // a car off the ground leaves its shadow behind on it, thrown away from the sun; on a bank or
+      // down in a river the shadow is under the car, so the height is over the ground beneath it
+      const up = Math.max(0, car.z - t.groundAt(car.s, car.d));
+      g.translate(car.x + SHADOW_X * SHADOW_PER_M * up, car.y + SHADOW_Y * SHADOW_PER_M * up);
       g.rotate(car.heading);
       g.drawImage(sh.img, sh.x, sh.y, sh.w, sh.h);
       g.restore();
@@ -696,8 +700,8 @@ export class Renderer {
     g.save();
     g.translate(car.x, car.y);
     g.rotate(car.heading);
-    // in the air the car comes up toward the camera
-    if (car.z > 0.02) g.scale(1 + car.z * 0.1, 1 + car.z * 0.1);
+    // in the air the car comes up toward the camera, down in a river it sinks away from it
+    if (Math.abs(car.z) > 0.02) g.scale(1 + car.z * 0.1, 1 + car.z * 0.1);
     // the monster truck wallows on its balloon tyres: a bob that grows with speed
     if (car.def.shape === 'monster') {
       const bob = 1 + 0.035 * Math.min(1, car.speed / 15) * Math.sin(this.clock * 9 + i * 2);
@@ -1065,6 +1069,17 @@ export class Renderer {
       for (const lp of this.lanePaths) mg.stroke(lp);
       mg.setLineDash([]);
       mg.globalAlpha = 1;
+      // a river: a short bar of water across the road, so the jump is on the map before it is on screen
+      mg.strokeStyle = PAL.waterMap;
+      mg.lineWidth = 3 / k;
+      for (const r of t.def.rivers ?? []) {
+        const rp = t.at(r.s + r.gap / 2);
+        mg.beginPath();
+        mg.moveTo(rp.x + rp.ty * 9, rp.y - rp.tx * 9);
+        mg.lineTo(rp.x - rp.ty * 9, rp.y + rp.tx * 9);
+        mg.stroke();
+      }
+      mg.strokeStyle = PAL.hud;
       // the start line, a short bar across
       const sp = t.at(0);
       mg.lineWidth = 2 / k;

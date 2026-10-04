@@ -86,6 +86,6 @@ export const RAM_CREDIT = 25;
 /** the repair after a race: this share of the car's price at 100 damage */
 export const REPAIR_SHARE = 0.1;
 /** boost: full meter seconds of nitro, the pull and top speed it adds, what fills it */
-export const BOOST = { seconds: 2.4, accel: 1.8, top: 1.3, perDriftSecond: 0.22, perWreck: 1, perRam: 0.08, burst: 0.34 };
+export const BOOST = { seconds: 2.4, accel: 1.8, top: 1.3, perDriftSecond: 0.27, perWreck: 1, perRam: 0.1, burst: 0.34 };
 /** ramming: closing speed above this hurts; a shove past this throws the victim into a spin */
 export const RAM = { minClosing: 4, spinClosing: 11 };

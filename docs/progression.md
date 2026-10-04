@@ -114,11 +114,13 @@ field's cars get built one part at a time so the fifth race is the
 hardest.
 
 1. **Kiviahon jokkis**, Kiviaho, 3 laps. The field is stock with oil.
-   The race must be fun in its first ten seconds: the kicker on the
-   start straight throws the whole field on lap one, the first bend
-   is a long sweeper, and the ford crosses the road right after it.
-2. **Hirvisuon jokkis**, Hirvisuo, 3 laps. The kilometre lap, a jump
-   on its straight, a ford in the esses. The field has ram bars.
+   The race must be fun in its first ten seconds: the crest on the
+   start straight lifts the whole field on lap one, the first bend is
+   a long sweeper, and right after it the road jumps a river from its
+   bank.
+2. **Hirvisuon jokkis**, Hirvisuo, 3 laps. The kilometre lap, a crest
+   on its straight, a river on the long bottom straight. The field has
+   ram bars.
 3. **Kiviahon kahlaus**, Kiviaho, 4 laps. The field has ram bars,
    armour and engines, and more oil.
 4. **Hirvisuon pitkä**, Hirvisuo, 4 laps. The field has tyres too.
@@ -131,15 +133,19 @@ Tauno along the way.
 ## The first tracks
 
 What Vesa asked for (2026-10-04): at least one jump on track one, a
-river crossing early, and a shortcut worth taking. Kiviaho has all
-three; Hirvisuo has a jump and a ford. The shortcut is a gap in the
+river crossing early, and a shortcut worth taking; then, the same day,
+that the jumps be part of the track, a jump over a river, not planked
+kickers. Kiviaho has all three, the jump being its river; Hirvisuo has
+a river and a crest. The shortcut is a gap in the
 forest across the inside of Kiviaho's hairpin, a car and a half wide,
 on grass: shorter, slower underfoot, walled by the trees, and a gamble
 when the field is on your bumper. The bots drive the road; the
 shortcut is the player's.
 
-The checks: `sim-check` flies every jump with every car and asserts the
-car leaves the ground at racing speed and lands on the road, and drives
-the shortcut and asserts it saves time against the road without being a
-free lap; `make drive-log` takes the kicker by touch on an emulated
-phone and prints the flight.
+The checks: `sim-check` jumps every river with every car and asserts it
+is cleared every lap at racing speed and every flight lands on the road,
+and drives the shortcut and asserts it saves time against the road
+without being a free lap; `physics-check` holds that the Tauno flat out
+clears the river and at half speed falls in and drives out; `make
+drive-log` takes the river by touch on an emulated phone and prints the
+flight.

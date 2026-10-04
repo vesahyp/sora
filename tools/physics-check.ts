@@ -231,33 +231,70 @@ for (const p of pieces) {
   assert(late < 0.12, `a pack of four on a road three cars wide: bodies never more than ${f(late, 3)} m into each other`);
 }
 
-// 7. a jump: off the lip the car flies, cannot steer, lands; a crooked landing costs more
+// 7. a crest: fast over it the car flies, cannot steer, lands; a crooked landing costs more; slow it is only lifted
 {
-  const fly = (yaw: number) => {
-    const s = setup(oval(10, { jumps: [{ s: 60, len: 8, h: 1.2 }] }), { s: 20, v: 30 });
+  const crest = { crests: [{ s: 60, len: 24, h: 0.9 }] };
+  const fly = (v: number, yaw: number, throttle = 1) => {
+    const s = setup(oval(10, crest), { s: 20, v });
     const c = s.cars[0];
     let air = 0;
     let top = 0;
     let steered = 0;
-    let landed = -1;
-    run(s, 1.2, () => [go()]);
+    run(s, 0.6, () => [go(0, throttle)]);
     const vBefore = speed(c);
-    run(s, 2.5, () => [go(c.air ? 1 : 0)], (t) => {
+    run(s, 2.5, () => [go(c.air ? 1 : 0, throttle)], () => {
+      top = Math.max(top, c.z);
       if (c.air) {
         if (air === 0 && yaw) c.yaw = yaw;
         air += DT;
-        top = Math.max(top, c.z);
         steered = Math.max(steered, Math.abs(c.yaw - yaw * Math.pow(1 - 0.3 / 180, (air / DT) * 3)));
-      } else if (air > 0 && landed < 0) landed = t;
+      }
     });
     return { air, top, vBefore, v: speed(c), steered };
   };
-  const straight = fly(0);
-  const crooked = fly(1.2);
-  assert(straight.air > 0.4 && straight.top > 1.5, `a 1.2 m kicker at 108 km/h throws the car (${f(straight.air, 2)} s in the air, ${f(straight.top, 2)} m up)`);
+  const straight = fly(32, 0);
+  const crooked = fly(32, 1.2);
+  const slow = fly(15, 0, 0);
+  assert(straight.air > 0.5 && straight.top > 0.9, `a 0.9 m crest at ${f(32 * 3.6, 0)} km/h throws the car (${f(straight.air, 2)} s in the air, ${f(straight.top, 2)} m up)`);
+  assert(slow.air === 0 && slow.top > 0.85, `the same crest at ${f(15 * 3.6, 0)} km/h only lifts it (${f(slow.air, 2)} s in the air, up to ${f(slow.top, 2)} m with the ground)`);
   assert(straight.steered < 0.05, `full lock in the air turns nothing (${f(straight.steered, 3)} rad/s of yaw from it)`);
   assert(straight.v > straight.vBefore * 0.85, `a straight landing keeps the speed (${f(straight.vBefore * 3.6, 0)} -> ${f(straight.v * 3.6, 0)} km/h)`);
   assert(crooked.v < straight.v - 2, `a crooked landing costs more (${f(crooked.v * 3.6, 0)} against ${f(straight.v * 3.6, 0)} km/h)`);
+}
+
+// 7b. a river: the Tauno flat out clears it and comes down on the road past it; at half speed it
+// drops in, splashes, and drives out up the far bank
+{
+  const tauno = CAR_BY_ID.tauno;
+  const river = { s: 100, gap: 12, bank: 0.45 };
+  // the throttle on from the start flat out; coasting to the lip at half speed, then on to drive out
+  const jump = (v: number, from: number, coast = false) => {
+    const s = setup(oval(6, { rivers: [river] }), { s: from, v }, tauno);
+    const c = s.cars[0];
+    let lip = -1;
+    let down: { s: number; d: number; wet: boolean } | null = null;
+    let wetAt = -1;
+    let outAt = -1;
+    let splashes = 0;
+    let wasAir = false;
+    run(s, 6, () => [go(0, coast && !wasAir ? 0 : 1)], (t) => {
+      if (c.air && !wasAir && lip < 0) lip = speed(c);
+      if (wasAir && !down && c.air && c.vz <= 0 && c.z <= s.track.groundAt(c.s, c.d) + 0.02) down = { s: c.s - river.s, d: c.d, wet: c.surface === 'water' };
+      if (wasAir && !c.air && !down) down = { s: c.s - river.s, d: c.d, wet: c.surface === 'water' };
+      wasAir = wasAir || c.air;
+      if (!c.air && c.surface === 'water' && wetAt < 0) wetAt = t;
+      if (wetAt >= 0 && outAt < 0 && !c.air && c.surface !== 'water') outAt = t;
+      splashes += s.fx.filter((x) => x.kind === 'splash' && x.age <= DT + 1e-9).length;
+    });
+    return { lip, down: down as { s: number; d: number; wet: boolean } | null, wet: wetAt >= 0, out: outAt - wetAt, splashes };
+  };
+  const flat = jump(tauno.topSpeed, 20);
+  const half = jump(tauno.topSpeed / 2, 80, true);
+  const fd = flat.down;
+  const hd = half.down;
+  assert(!!fd && !flat.wet && fd.s > river.gap && Math.abs(fd.d) < 3, `the Tauno flat out (${f(flat.lip * 3.6, 0)} km/h at the lip) clears a ${river.gap} m river and lands on the road (down at +${f(fd?.s ?? 0, 1)} m, d ${f(fd?.d ?? 0, 1)})`);
+  assert(!!hd && hd.wet && half.splashes > 0, `at half speed (${f(half.lip * 3.6, 0)} km/h at the lip) it drops into the water (down at +${f(hd?.s ?? 0, 1)} m) and splashes (${half.splashes})`);
+  assert(half.out > 0 && half.out < 4, `and drives out up the far bank (${f(half.out, 2)} s in the water)`);
 }
 
 // 8. surfaces: water drags and splashes, ice slides further, the road's edge blends

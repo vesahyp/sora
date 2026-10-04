@@ -17,7 +17,7 @@ Super Cars II, with a career in the shape of Gran Turismo, for the
 browser, phones first. One thumb steers, a tap is nitro, the pedal
 brakes and swings the tail; the guns fire themselves. Cars slide, ram,
 wreck each other and come back. Finnish gravel roads, nineties cars.
-Two tracks with kickers, fords and a shortcut through the forest, four
+Two tracks with a river to jump, a crest and a shortcut through the forest, four
 classes with a car each and a wild buy beside it (a tractor, a monster
 truck, a hearse), rivals in tractors, buses and plough lorries, a field of four with the bot driving the other
 three, and a career that starts in jokamiesluokka (folk racing) in a
@@ -39,8 +39,9 @@ The Räkkä architecture, copied from `hoyry`:
   bicycle model) with a tyre that lets go smoothly, weight transfer and
   a friction circle; cars and the tree line meet through impulses at the
   contact point (`src/game/physics.ts`, `docs/adr/0003-rigid-body-cars.md`).
-  Each axle reads the surface under it, and a car has a height for
-  jumps. The track is a smoothed closed polyline with a width
+  Each axle reads the surface under it, and a car has a height: the
+  ground rises and falls along the lap (river banks, crests) and a car
+  fast enough leaves it. The track is a smoothed closed polyline with a width
   (`src/game/track.ts`), queried by arc length.
 
 ## Where things live
@@ -51,7 +52,8 @@ src/
     types.ts          CarInput, TrackDef, CarDef
     state.ts          SimState, Car (with its grudges and the race's credits), Driver, createState (the grid), standings
     sim.ts            step(): the automatic guns, bullets, missiles, mines, oil slicks, pickups,
-                        wrecks and respawns, the tow for a car wedged off the road, lap counting;
+                        wrecks and respawns, the back-out for any car wedged nose first in the
+                        trees and the tow for one stuck off the road (TOW_AFTER), lap counting;
                         hands the cars to the car model
     physics.ts        the car model: the tyres, the aids, height and landing, box-against-box
                         and tree contacts by impulse, in SUB substeps a frame
@@ -60,7 +62,8 @@ src/
     notes.ts          the co-driver: every bend on the lap as a pace note (direction, grade 1 hairpin
                         to 6 flat), and the next one for a car; the game loop shows it on the HUD
     track.ts          Track: smoothing, locate(x, y) -> (s, d), at(s), the forest,
-                        surfaceAt(s, d) from the patches, groundAt(s, d) from the jumps;
+                        surfaceAt(s, d) from the patches and the rivers, groundAt(s, d) from the
+                        rivers' banks and the crests (RIVER, riverHeight);
                         Lane: a shortcut as the sim drives it, its own arc length u
     rng.ts            seeded RNG and hashes
     content/
@@ -80,15 +83,15 @@ src/
                         sim.ts scales an opponent's engine by its gap to the player, the bot its corners,
                         both by catchUp(), skill squared;
                         GRUDGE, Burnout's hostility: what a ram, shot or wreck costs and how the bot uses it
-      tracks.ts       the tracks: a centreline in metres, a width, a surface, patches, jumps, shortcuts
+      tracks.ts       the tracks: a centreline in metres, a width, a surface, rivers, crests, patches, shortcuts
       surfaces.ts     what each surface does to a tyre and a car: grip, peak, slide, drag, top
   career/save.ts      the save: credits, cars owned with parts, licences; one object in localStorage
   render/
     look.ts           the one light: a low sun from the upper left; shadow direction and
                         length, the palette, the warm grade. Every other render file reads it
     ground.ts         the ground baked in 16 m chunks ahead of the camera: straw, ditch, verge,
-                        gravel with ruts and stones, a river where a ford crosses, a jump's
-                        kicker, static shadows, skid marks stamped in
+                        gravel with ruts and stones, a river's banks, lip and water, a ford,
+                        a crest's light, static shadows, skid marks stamped in
     scenery.ts        the roadside computed from the track: spruce, birch, juniper, boulders,
                         posts, bales, a barn, a power line, the crowds. Cosmetic, never in the sim
     renderer.ts       camera (24 m across, leading down the road) and shake, ground chunks, pickups, mines,
@@ -113,7 +116,8 @@ tools/
                         blocking, punting and waiting for whoever it holds a grudge against;
                         skill bites: a poor driver is slow, wobbles, brakes late and picks no fights
   physics-check.ts    npm run physics-check: the car model's promises as set pieces with numbers:
-                        a straight line, full lock, a pedal stab, tree hits, car hits, a jump, water
+                        a straight line, full lock, a pedal stab, tree hits, car hits, a crest,
+                        a river cleared flat out and dropped into at half speed, water
   sim-check.ts        npm run sim-check: the bot laps every track in every car, asserts;
                         asserts the field is on the player's screen and in the sights, that
                         aggression pays the player more than the road, and the career curve:
@@ -141,7 +145,7 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
    delta into `step`. The car model cuts each step into `SUB` substeps of
    its own; that is inside `physics.ts` and nothing outside sees it.
 3. **Content is data.** A new track is a list of points in `tracks.ts`,
-   its kickers, fords and shortcuts beside it. A new car is a `CarDef`,
+   its rivers, crests and shortcuts beside it. A new car is a `CarDef`,
    a rival's vehicle a `Vehicle` in `rivals.ts`, a new race an
    `EventDef`. Balance changes are number changes in `content/`. A
    part's effect is one line in `tuned()`; what a class can buy and
@@ -175,11 +179,15 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
   grid orders), `spin.ts` (the ground a blast costs). Build one like
   the tools: `npx vite build --ssr tools/dbg/matrix.ts --outDir .sim-check && node .sim-check/matrix.js`.
 - `?physics=old` plays the old car model, for one release, to compare.
-- **A track feature is checked before it is driven.** `sim-check` flies
-  every kicker with every car, crosses every ford and drives every
-  shortcut with the bot told to take it (`BotTuning.shortcuts`), and
-  asserts the flight, the landing on the road and the time the lane
-  saves. `make drive-log` adds the first kicker by touch.
+- **A track feature is checked before it is driven.** `sim-check` jumps
+  every river with every class car and asserts it is cleared every lap,
+  lands every flight (a crest's too) on the road, drives every shortcut
+  with the bot told to take it (`BotTuning.shortcuts`) and asserts the
+  time the lane saves, and asserts no car in any armed race sits off the
+  road going nowhere longer than `TOW_AFTER`. `physics-check` holds the
+  river's numbers (cleared flat out, dropped into at half speed, driven
+  out of) and the crest's (a fast car flies, a slow one is lifted).
+  `make drive-log` adds the first river by touch.
 - **Balance with `make balance`.** It prints the bot's laps per car, stock
   and fully built, per track. The bot is a floor, not a player: a human
   who looks through the corner beats it. A change that moves the bot's

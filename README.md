@@ -89,11 +89,18 @@ nousee, auto oikaisee itsensä. Poljin mutkassa heittää perän ympäri
 hiusneulaa varten. Puurivi ei pysäytä: viistossa osumassa auto liukuu
 puiden vartta ja jatkaa. Autot tönivät toisiaan oikeasti: osuma toisen
 takakulmaan pyöräyttää sen, ja painavampi auto siirtää kevyempää.
-Kummankin radan lähtösuoralla on **hyppyri**, Kiviaholla toinen
-hiusneulaan laskevalla suoralla: ilmassa auto ei ohjaa, joten linja
-valitaan ennen reunaa, ja vinossa alastulo maksaa vauhtia. Heti
-ensimmäisen kaarteen jälkeen tie ylittää **kahlaamon**: vesi jarruttaa,
-roiskuu ja liukastaa, joten sen ylittää suoraan ja lyhyesti. Kiviahon
+Kummankin radan lähtösuoralla on **mäennyppylä**: lujaa ajaen auto
+lähtee sen päältä lentoon, hitaasti se vain nousee ja laskee. Tie
+ylittää **joen**: penger nousee jyrkkenevänä reunalle, ja täydessä
+vauhdissa auto hyppää veden yli ja laskeutuu vastarannalle. Hidas auto
+putoaa jokeen, roiskuu ja ajaa rantaa ylös takaisin tielle. Ilmassa auto
+ei ohjaa, joten linja valitaan ennen reunaa, ja vinossa alastulo maksaa
+vauhtia. Kiviaholla joki on heti ensimmäisen pitkän kaarteen jälkeen,
+Hirvisuolla pitkällä alasuoralla.
+
+Jos auto juuttuu nokka edellä puihin, se **peruuttaa itse** irti ja
+kääntyy tielle päin. Jos se ei vieläkään pääse liikkeelle, ratamiehet
+**hinaavat** sen muutamassa sekunnissa takaisin tielle. Kiviahon
 hiusneulan sisäkautta menee **oikotie**, metsään hakattu ura nurmella:
 lyhyempi, hitaampi ja puiden reunustama, ja Jorma löytää sen, kun jää
 jälkeen.

@@ -35,8 +35,14 @@ import { tuned, type Parts } from './parts';
  *
  * `skill` is how hard the bot drives this vehicle in this class, 0..1.
  * It climbs with the class: JM rivals are weekend jokkis drivers who
- * wobble and brake late, A rivals are the bot's ceiling. The player's
+ * wobble and brake late, A rivals are near the bot's ceiling. The player's
  * first race is won by learning the car, the last by beating the bot.
+ * C sits just over JM (0.35 to 0.45) since the cars got faster on
+ * 2026-10-04: with the bot's margin raised to the tyres' real limit a
+ * skill-1 player gains less on a corner than before, and the C field at
+ * 0.5 to 0.6 held the bot player behind it for a race. A came down a
+ * touch (from 1, 0.92, 0.84) for the same reason: at the new speeds the
+ * field drew out of the guns' range.
  */
 export interface Vehicle {
   shape: CarShape;
@@ -66,21 +72,21 @@ export interface Vehicle {
 export const RIVAL_CARS: Record<string, Record<CarClass, Vehicle>> = {
   jorma: {
     JM: { shape: 'beetle', name: L('Kupla'), colour: '#2f6fd6', accent: '#e6dfcc', livery: 'stripe', number: 3, length: 2.9, width: 1.4, massScale: 0.9, skill: 0.4 },
-    C: { shape: 'saloon', name: L('Mosse'), colour: '#2a5bb0', accent: '#e6dfcc', livery: 'checker', number: 33, length: 4.1, width: 1.65, massScale: 1, skill: 0.6 },
+    C: { shape: 'saloon', name: L('Mosse'), colour: '#2a5bb0', accent: '#e6dfcc', livery: 'checker', number: 33, length: 4.1, width: 1.65, massScale: 1, skill: 0.45 },
     B: { shape: 'rally', name: L('Kiituri'), colour: '#2f6fd6', accent: '#e6dfcc', livery: 'split', number: 8, length: 4.4, width: 1.85, massScale: 1.05, skill: 0.8 },
-    A: { shape: 'hearse', name: L('Saattaja'), colour: '#22345e', accent: '#c9b07a', livery: 'band', number: 2, length: 5.2, width: 1.8, massScale: 1.1, pace: { top: 1.02 }, skill: 1.0 },
+    A: { shape: 'hearse', name: L('Saattaja'), colour: '#22345e', accent: '#c9b07a', livery: 'band', number: 2, length: 5.2, width: 1.8, massScale: 1.1, pace: { top: 1.02 }, skill: 0.96 },
   },
   marko: {
     JM: { shape: 'van', name: L('Pikkupaku'), colour: '#d8a428', accent: '#77756c', livery: 'primer', number: 66, length: 3.2, width: 1.5, massScale: 1.15, skill: 0.35 },
-    C: { shape: 'tractor', name: L('Valmet'), colour: '#d0a02c', accent: '#2c2a26', livery: 'roof', number: 99, length: 3.6, width: 1.9, massScale: 1.8, pace: { top: 0.6, accel: 1.15, turn: 1.4 }, offroad: 0.85, skill: 0.55 },
+    C: { shape: 'tractor', name: L('Valmet'), colour: '#d0a02c', accent: '#2c2a26', livery: 'roof', number: 99, length: 3.6, width: 1.9, massScale: 1.8, pace: { top: 0.6, accel: 1.15, turn: 1.4 }, offroad: 0.85, skill: 0.4 },
     B: { shape: 'monster', name: L('Monsteri'), colour: '#e0b030', accent: '#2c2a26', livery: 'split', number: 44, length: 4.6, width: 2.6, massScale: 2.1, pace: { top: 0.96, grip: 0.92 }, offroad: 0.6, spinOnShunt: true, skill: 0.74 },
-    A: { shape: 'plough', name: L('Aura-Sisu'), colour: '#d4a52c', accent: '#2c2a26', livery: 'band', number: 69, length: 6.0, width: 2.4, massScale: 3.2, pace: { top: 0.88, accel: 0.85, turn: 1.3 }, ram: 3, skill: 0.92 },
+    A: { shape: 'plough', name: L('Aura-Sisu'), colour: '#d4a52c', accent: '#2c2a26', livery: 'band', number: 69, length: 6.0, width: 2.4, massScale: 3.2, pace: { top: 0.88, accel: 0.85, turn: 1.3 }, ram: 3, skill: 0.9 },
   },
   tapsa: {
     JM: { shape: 'microcar', name: L('Mopoauto'), colour: '#ecebe0', accent: '#3c7a5a', livery: 'stripe', number: 12, length: 2.4, width: 1.3, massScale: 0.6, pace: { top: 0.88, accel: 0.85, turn: 1.4 }, skill: 0.3 },
-    C: { shape: 'niva', name: L('Niva'), colour: '#f2f2ea', accent: '#2a2a26', livery: 'stripe', number: 21, length: 3.7, width: 1.7, massScale: 1.15, pace: { top: 0.94, turn: 1.05 }, offroad: 0.3, skill: 0.5 },
+    C: { shape: 'niva', name: L('Niva'), colour: '#f2f2ea', accent: '#2a2a26', livery: 'stripe', number: 21, length: 3.7, width: 1.7, massScale: 1.15, pace: { top: 0.94, turn: 1.05 }, offroad: 0.3, skill: 0.35 },
     B: { shape: 'bus', name: L('Linja-auto'), colour: '#e6e4d8', accent: '#2f6f8a', livery: 'band', number: 18, length: 7.5, width: 2.3, massScale: 3.0, pace: { top: 0.86, accel: 0.8, turn: 1.3 }, skill: 0.68 },
-    A: { shape: 'coupe', name: L('Liitäjä'), colour: '#f2f2ea', accent: '#d06a2a', livery: 'split', number: 5, length: 4.7, width: 1.8, massScale: 1.05, skill: 0.84 },
+    A: { shape: 'coupe', name: L('Liitäjä'), colour: '#f2f2ea', accent: '#d06a2a', livery: 'split', number: 5, length: 4.7, width: 1.8, massScale: 1.05, skill: 0.82 },
   },
 };
 

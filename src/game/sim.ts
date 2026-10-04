@@ -5,14 +5,16 @@ import { PICKUPS, PICKUP_REACH, PICKUP_RESPAWN } from './content/pickups';
 import { CLASS_RANK } from './types';
 import { GRUDGE, hostility, leaderOf } from './content/drivers';
 import { anger, boom, clamp, hurt, spin, wrap } from './harm';
+import { LANE_VERGE } from './track';
 import { advanceOld } from './physics-old';
 import { advance } from './physics';
 
 export const DT = 1 / 60;
 
-/** steering lock at rest, radians per unit of turnRate, and the speed that halves it */
+/** steering lock at rest, radians per unit of turnRate, and the speed that halves it: 50 until the
+ * cars got a fifth faster (2026-10-04), raised with them so a car still turns at its new speeds */
 const LOCK = 0.17;
-const LOCK_FADE = 50;
+const LOCK_FADE = 60;
 /**
  * One fixed step. The car model moves the cars (physics.ts: the tyres,
  * the contacts between cars and with the trees, height; physics-old.ts
@@ -38,7 +40,7 @@ export function step(s: SimState, inputs: CarInput[], dt: number): void {
 
   // grudges fade, slowly
   for (const c of s.cars) for (let k = 0; k < c.grudge.length; k++) if (c.grudge[k] > 0) c.grudge[k] = Math.max(0, c.grudge[k] - GRUDGE.decay * dt);
-  const held = s.cars.map((_, i) => inputs[i] ?? { steer: 0, throttle: 0, brake: 1, boost: false });
+  const held = s.cars.map((c, i) => rescue(s, c, inputs[i] ?? { steer: 0, throttle: 0, brake: 1, boost: false }, dt));
   if (s.physics === 'old') advanceOld(s, held, dt);
   else advance(s, held, dt);
   for (let i = 0; i < s.cars.length; i++) {
@@ -371,8 +373,8 @@ function burn(s: SimState, c: Car, dt: number): void {
   onRoad(s, c);
 }
 
-/** Back on the centreline a little ahead, standing, the clocks reset: after a wreck or a tow. */
-function onRoad(s: SimState, c: Car): void {
+/** Back on the centreline a little ahead, standing, the clocks reset: after a wreck, or a tow without the flash. */
+function onRoad(s: SimState, c: Car, flash = true): void {
   const p = s.track.at(c.s + 3);
   c.x = p.x;
   c.y = p.y;
@@ -385,6 +387,10 @@ function onRoad(s: SimState, c: Car): void {
   c.stallX = c.x;
   c.stallY = c.y;
   c.slick = 0;
+  c.stuck = 0;
+  c.stuckS = c.s;
+  c.backOut = 0;
+  if (!flash) return;
   s.fx.push({ kind: 'flash', x: c.x, y: c.y, age: 0, colour: '#fff' });
   if (c === s.cars[0]) s.sounds.push('respawn');
 }
@@ -429,13 +435,95 @@ function settle(s: SimState, c: Car, player: boolean): void {
     c.stallX = c.x;
     c.stallY = c.y;
   }
-  // wedged off the road where backing out cannot free it (a bus shoved into a shortcut's mouth):
-  // the marshals tow it back, as a folk race's tractor would
-  if (c.stall > TOW_AFTER && Math.abs(c.d) > t.width / 2 && c.wreck <= 0) onRoad(s, c);
+  // off the road and getting nowhere along the lap: a bus shoved into a shortcut's mouth, a car the
+  // back-out could not free, one rocking against the trees. The marshals tow it back, as a folk
+  // race's tractor would, before the player has time to wonder what to do
+  if (s.hold <= 0 && c.finishedAt < 0 && Math.abs(c.d) > t.width / 2) {
+    let along = c.s - c.stuckS;
+    if (along < -L / 2) along += L;
+    if (along > L / 2) along -= L;
+    if (Math.abs(along) < TOW_ALONG) c.stuck += DT;
+    else {
+      c.stuck = 0;
+      c.stuckS = c.s;
+    }
+  } else {
+    c.stuck = 0;
+    c.stuckS = c.s;
+  }
+  if (c.stuck > TOW_AFTER && c.wreck <= 0) tow(s, c);
 }
 
-/** seconds stalled off the road before the marshals tow a car back on */
-const TOW_AFTER = 8;
+/** seconds off the road without getting TOW_ALONG metres along the lap before the marshals tow a car back on */
+export const TOW_AFTER = 4;
+const TOW_ALONG = 3;
+/** stalled this long, seconds, with the nose in the trees, a car reverses on its own for BACK_OUT seconds */
+const BACK_AFTER = 1.5;
+const BACK_OUT = 1.1;
+
+/** The marshals' tractor: back on the road facing forward, a toast and a sound, no flash. */
+function tow(s: SimState, c: Car): void {
+  onRoad(s, c, false);
+  if (c === s.cars[0]) {
+    s.sounds.push('tow');
+    s.toasts.push({ text: { fi: 'Hinaus', en: 'Towed' }, colour: '#e8c040', age: 0 });
+  }
+}
+
+/**
+ * A car wedged nose first in the trees backs out on its own: not a metre moved in BACK_AFTER
+ * seconds with the nose at a wall and pointing off the road, and the sim takes the wheel for
+ * BACK_OUT seconds, reversing with the wheel turned so the nose swings back to the road. It is
+ * the bot's back-out given to every car: the one-thumb player has the throttle on all the time
+ * and no reason to know the pedal reverses, so without it the car sits against the tree.
+ */
+function rescue(s: SimState, c: Car, input: CarInput, dt: number): CarInput {
+  if (c.wreck > 0 || c.finishedAt >= 0 || s.hold > 0) {
+    c.backOut = 0;
+    return input;
+  }
+  if (c.backOut > 0) {
+    c.backOut -= dt;
+    return { steer: c.backSteer, throttle: 0, brake: 1, boost: false };
+  }
+  if (c.stall < BACK_AFTER) return input;
+  const steer = backOutSteer(s, c);
+  if (steer === 0) return input;
+  c.backOut = BACK_OUT;
+  c.backSteer = steer;
+  if (c === s.cars[0]) s.toasts.push({ text: { fi: 'Peruuta', en: 'Backing out' }, colour: '#e6dfcc', age: 0 });
+  return { steer, throttle: 0, brake: 1, boost: false };
+}
+
+/**
+ * The wheel that backs a car's nose out of the trees, or 0 when the nose is not at a wall or
+ * already points along the way out. The way out is the road's direction, or a shortcut's when
+ * the nose is in a lane. Reversing swings the nose against the wheel, so the wheel goes the
+ * other way from where that direction lies.
+ */
+function backOutSteer(s: SimState, c: Car): number {
+  const t = s.track;
+  const fx = Math.cos(c.heading);
+  const fy = Math.sin(c.heading);
+  const nx = c.x + fx * c.def.length * 0.5;
+  const ny = c.y + fy * c.def.length * 0.5;
+  const loc = t.locate(nx, ny);
+  const roadRoom = t.width / 2 + t.verge - Math.abs(loc.d);
+  let room = roadRoom;
+  let dir = t.at(loc.s);
+  const l = t.laneAt(nx, ny);
+  if (l) {
+    const laneRoom = l.lane.width / 2 + LANE_VERGE - l.dist;
+    if (laneRoom > roadRoom) {
+      room = laneRoom;
+      dir = l.lane.at(l.u);
+    }
+  }
+  if (room > 0.8) return 0;
+  const ang = Math.atan2(fx * dir.ty - fy * dir.tx, fx * dir.tx + fy * dir.ty);
+  if (Math.abs(ang) < 0.4) return 0;
+  return ang > 0 ? -1 : 1;
+}
 
 export function wheelbase(def: Car['def']): number {
   return def.length * 0.62;

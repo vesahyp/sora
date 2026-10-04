@@ -93,10 +93,16 @@ export interface Car {
   tailed: number;
   /** seconds left of being a passenger after a hit */
   spin: number;
-  /** seconds the car has gone nowhere since the lights: not a metre from where it was; the bot reverses on it */
+  /** seconds the car has gone nowhere since the lights: not a metre from where it was; the back-out runs on it */
   stall: number;
   stallX: number;
   stallY: number;
+  /** seconds left of the reverse the sim gives a car wedged nose first in the trees, and the wheel it holds */
+  backOut: number;
+  backSteer: number;
+  /** seconds off the road without getting 3 m along the lap, and where along it the clock started: the tow's clock */
+  stuck: number;
+  stuckS: number;
   /** the race's tally: wrecks dealt and taken, rams dealt and taken above RAM.minClosing */
   wrecks: number;
   wrecked: number;
@@ -291,6 +297,10 @@ export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: nu
       stall: 0,
       stallX: 0,
       stallY: 0,
+      backOut: 0,
+      backSteer: 0,
+      stuck: 0,
+      stuckS: 0,
       wrecks: 0,
       wrecked: 0,
       rams: 0,

@@ -5,7 +5,8 @@
 import { chromium, devices } from 'playwright';
 import { spawn } from 'node:child_process';
 
-const port = 5197;
+// PORT=5187 when another repo's dev server holds the default
+const port = Number(process.env.PORT) || 5197;
 const server = spawn('npx', ['vite', '--port', String(port), '--strictPort'], { stdio: 'ignore' });
 await new Promise((r) => setTimeout(r, 2500));
 const browser = await chromium.launch();

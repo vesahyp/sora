@@ -39,11 +39,16 @@ export interface BotTuning {
   wide: number;
   /** take every shortcut */
   shortcuts?: boolean;
+  /** metres over which a bend's turn is measured for its radius, 30 when absent */
+  span?: number;
 }
 
 // Tuned on the 6 m road: a short look and a firm hand keep it on a road three cars wide;
-// the long look of a wide road cut the corners into the grass.
-export const DEFAULT_BOT: BotTuning = { look: 6, lookPerSpeed: 0.4, gain: 5, margin: 0.7, inside: 0.15, wide: 0.25 };
+// the long look of a wide road cut the corners into the grass. Retuned for the faster cars of
+// 2026-10-04: a bend's radius read over 12 m instead of 30 (the long chord made a quick kink
+// look like a sweeper, and the A car ran wide out of it at 140 km/h), which lets the margin rise
+// past the old 0.7 to the grip the tyres really have, and a firmer hand for the higher speeds.
+export const DEFAULT_BOT: BotTuning = { look: 6, lookPerSpeed: 0.4, gain: 7, margin: 1.1, inside: 0.15, wide: 0.25, span: 12 };
 
 /**
  * What a poor driver does wrong, at skill 0; it fades to nothing at skill 1.
@@ -191,7 +196,7 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
   const stop = Math.min(c.def.brake, c.def.grip) * 0.7;
   const brakeDist = 8 + (speed * speed) / (2 * stop);
   let sharpest = 0;
-  let span = 30;
+  let span = tune.span ?? 30;
   if (lane) {
     // the lane's bends, over a shorter span: it is narrow, and its mouth is a turn off the road
     span = 16;
@@ -208,7 +213,7 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
     }
   } else {
     for (let a = 5; a <= brakeDist + 30; a += 5) {
-      const k = Math.abs(t.curvatureAhead(c.s + a, 30));
+      const k = Math.abs(t.curvatureAhead(c.s + a, span));
       if (k > sharpest) sharpest = k;
     }
   }

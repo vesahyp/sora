@@ -47,6 +47,30 @@ try {
     await shot(name);
   };
   await at(6, '03-straight');
+  // Kiviaho's river from the near bank: the lip, the water and the far bank must all be on screen
+  // before the car leaves the ground. At triple speed the car covers metres while the shot is
+  // taken, so the field is held where it is for it
+  await page.waitForFunction(() => {
+    const s = window.__sim;
+    const c = s && s.cars[0];
+    const r = s && s.track.def.rivers?.[0];
+    const there = s && (s.finished || !r || (c.lap === 1 && c.s > r.s - 9 && c.s < r.s - 3));
+    if (there && !s.finished && r) window.__hold = s.cars.map((o) => ({ x: o.x, y: o.y, vx: o.vx, vy: o.vy }));
+    return there;
+  }, null, { timeout: 300000, polling: 'raf' });
+  await page.evaluate(() => {
+    const s = window.__sim;
+    const held = window.__hold;
+    if (!held) return;
+    const pin = () => {
+      s.cars.forEach((o, i) => Object.assign(o, held[i]));
+      if (window.__hold) requestAnimationFrame(pin);
+    };
+    pin();
+  });
+  await page.waitForTimeout(120);
+  await shot('03c-river');
+  await page.evaluate(() => (window.__hold = null));
   await at(14, '04-corner');
   // the approach to Kiviaho's hairpin (it starts at about 362 m): the camera must show the whole
   // bend before the car turns in, and the co-driver's arrow must already be up

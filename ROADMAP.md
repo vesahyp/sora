@@ -12,6 +12,19 @@ The design is in `docs/design.md`.
   `events.ts`, `START_CREDITS` in `save.ts`. Then the shortcut by
   hand: is a second a lap the right gain for a lane that narrow, and
   should Marko take it too (`laneFor` in `autoplayer.ts`).
+- **Playtest the faster pace and the river** (2026-10-04): the cars are
+  a third quicker off the line and a fifth faster flat out, and the
+  kickers are gone for a river jumped from its bank and a crest. The
+  questions: does the pace feel right or now too twitchy on a phone,
+  does a thumb clear Kiviaho's river and land on the road, does falling
+  in read as a mistake and not a trap, does the crest lift the field
+  in a way that is fun, and does the player still ever sit stuck at
+  the hairpin, or does the back-out and the tow (`PERUUTA`, `HINAUS`)
+  get them going before they wonder what to do. Knobs: `accel` and
+  `topSpeed` in `cars.ts`, `LOCK_FADE` in `sim.ts`, the rivers and
+  crests in `tracks.ts`, `RIVER` in `track.ts`, `LAND_*` in
+  `physics.ts`, `BACK_AFTER`, `BACK_OUT` and `TOW_AFTER` in `sim.ts`,
+  `DEFAULT_BOT` in `autoplayer.ts`.
 - **Delete the old car model in the next release.** Vesa played the
   new one (2026-10-03) and it is better, so `?physics=old` has done its
   job. Remove `src/game/physics-old.ts`, `SimState.physics` and the
@@ -43,8 +56,7 @@ The design is in `docs/design.md`.
   the monster truck's throw feel fair or cheap, is the bus a fun wall or
   a wall, does anyone buy the hearse. Knobs: `pace`, `massScale`,
   `offroad` and `spinOnShunt` in `rivals.ts`, the wild buys in
-  `cars.ts`, the root of the mass in `harm.ts`'s `ram`, `TOW_AFTER` in
-  `sim.ts`.
+  `cars.ts`, the root of the mass in `harm.ts`'s `ram`.
 - The whole Kiviaho hairpin is 70 m across and the camera 24 m: the
   approach shows the entry and the turn, the arrow the rest. A zoom
   that widens with speed or into a hairpin is the next knob if the
@@ -68,12 +80,20 @@ the track features below need. All of it is data in `tracks.ts`:
   another surface from `s` to `to` metres along the lap, optionally
   only across `d: [from, to]` metres off the centreline. Each axle
   reads the surface under it (`Track.surfaceAt`, looked up in 4 m tiles).
-- **Height** (`TrackDef.jumps`): a kicker rises over `len` metres to
-  `h` at `s` and drops straight back (`Track.groundAt`). A car carries
-  `z`, `vz` and `air`; in the air it has no grip and no steering, and
-  it lands with a bounce that scrubs the sideways speed. Cars more than
-  0.9 m apart in height pass over each other. The renderer lifts a car
-  in the air and leaves its shadow on the ground.
+- **Height** (`Track.groundAt`), a profile along `s` across the road
+  and the verge. A river (`TrackDef.rivers`: `s`, `gap`, `bank`): the
+  road climbs a bank over `RIVER.ramp` metres, steepening to `bank` at
+  the lip, the ground drops to the water (`RIVER.water`, under the road)
+  for `gap` metres, and the far bank climbs back over `RIVER.out`
+  metres, steep at the water and flattening toward the road; its water
+  is a patch. A crest (`TrackDef.crests`: `s`, `len`, `h`): a smooth
+  brow. A car carries `z`, `vz` and `air`; it leaves the ground when
+  the ground falls away faster than gravity can follow, has no grip and
+  no steering in the air, and lands with a bounce that scrubs the
+  sideways speed; a rising bank catches it without a bounce, and water
+  swallows the landing in spray. Cars more than 0.9 m apart in height
+  pass over each other. The renderer lifts a car in the air, sinks it
+  in the river and throws its shadow by its height over the ground.
 - **Shortcuts** (`TrackDef.shortcuts`): a lane through the forest along
   an open polyline, with a width and a surface. `Track.lanes` drives
   it: the walls are the union of the road's verge and the lanes'
@@ -83,31 +103,43 @@ the track features below need. All of it is data in `tracks.ts`:
   (`autoplayer.ts`, `laneFor`): told to, or as the best driver when it
   is well behind the player; any bot that finds itself in one drives
   it to the end.
-- **Drawn** (`src/render/ground.ts`, `bakeFeatures`): a water patch
-  across the whole road as a river that runs on under the trees,
-  shallow over the road, and each kicker as planks, a lit lip and the
-  drop's shadow. `splash` fx and the `splash` and `land` sounds exist.
-- **On the tracks:** Kiviaho has a 0.9 m kicker on the start straight,
-  a 0.7 m one on the diagonal, a ford after the first sweeper and the
-  grass shortcut across the hairpin; Hirvisuo a 0.8 m kicker on the
-  straight and a ford in the esses.
-- **Checked:** `tools/physics-check.ts` flies a 1.2 m kicker, holds
-  that full lock does nothing in the air, that a crooked landing costs
-  more than a straight one, that water drags and splashes, and that ice
-  slides where gravel grips. `sim-check` flies every kicker with every
-  car at racing speed and lands it on the road, crosses every ford,
-  and drives every shortcut: it must save time and not a free lap.
-  `make drive-log` takes the first kicker by touch on a phone.
+- **Drawn** (`src/render/ground.ts`, `bakeFeatures`): a river's near
+  bank as bare earth either side of a road that pales toward a worn
+  lip, the drop's shadow on the water, deep water that runs on under
+  the trees, the far bank wet where it comes out; a water patch (a
+  ford) shallow over the road; a crest as the light on its two slopes.
+  The minimap marks a river with a bar of water. `splash` fx and the
+  `splash`, `land` and `tow` sounds exist.
+- **On the tracks:** Kiviaho has a 0.9 m crest on the start straight, a
+  12 m river with a 0.45 m bank after the first sweeper (where the ford
+  was) and the grass shortcut across the hairpin, and nothing that
+  throws a car into the hairpin; Hirvisuo a 0.9 m crest on the straight
+  and the same river on the long bottom straight (s 560: in the esses,
+  where the ford was, a flight landed off the bending road).
+- **Stuck:** any car not a metre along in 1.5 s with its nose at the
+  trees reverses on its own for a second, the wheel turned to bring the
+  nose round to the road (`sim.ts`, `rescue`); a car off the road and
+  not 3 m along the lap in 4 s is towed back on facing forward.
+- **Checked:** `tools/physics-check.ts` flies a crest fast and only
+  lifts a slow car over it, holds that full lock does nothing in the
+  air, that a crooked landing costs more than a straight one, that the
+  Tauno flat out clears a river onto the road and at half speed drops
+  in, splashes and drives out, that water drags and splashes, and that
+  ice slides where gravel grips. `sim-check` jumps every river every
+  lap with every class car, lands every flight on the road, drives
+  every shortcut (it must save time and not a free lap), and asserts
+  no car in any armed race is stalled off the road over `TOW_AFTER`.
+  `make drive-log` takes the first river by touch on a phone.
 
 ## Heights and surfaces: what is left
 
 - **Drawing for the other surfaces.** Mud, ice and a tarmac patch work
-  in the sim but `bakeFeatures` draws only water across the road and
-  kickers. A patch with `d` (part of the road) is not drawn at all.
-- **Ground that is not a kicker.** `groundAt` knows only ramps with a
-  sheer drop. Crests, dips, a landing ramp and a bridge deck over water
-  need a height profile along `s`, and a bridge needs the car's height
-  to decide whether it is on the deck or in the river.
+  in the sim but `bakeFeatures` draws only water, river banks and
+  crests. A patch with `d` (part of the road) is not drawn at all.
+- **Ground across the road.** `groundAt` ignores `d`: a bank or a crest
+  spans the road and the verge alike. A camber, a ditch with depth or a
+  bridge deck over the river (where the car's height decides deck or
+  water) need it.
 - **Walls that are not the tree line.** The only walls are the forest
   at `width / 2 + verge` and a lane's trees. Gates, bridge rails, log
   piles need obstacles in the sim: boxes or circles that `treeContacts`
@@ -117,11 +149,13 @@ the track features below need. All of it is data in `tracks.ts`:
   river past the forest edge, though it is drawn running on under the
   trees. Fine for a ford; a river to drive along would need its own
   corridor.
-- **The bot does not know fords or kickers.** It slows for bends only,
-  so it crosses the ford flat out and takes the kicker at whatever
-  speed it has, which the checks show is fine on these tracks.
-- **The minimap** shows the shortcuts but neither the kickers nor the
-  fords.
+- **The bot does not know rivers or crests.** It slows for bends only
+  and takes a lip at whatever speed it has, which the checks show
+  clears both rivers in every class car. A damaged or paced-down rival
+  can fall in; it drives out.
+- **A flight is straight.** The road keeps bending under a car in the
+  air, so a river or a crest needs a straight after it; a car on
+  nitro flies far enough to land on the verge on Kiviaho's diagonal.
 
 ## Track features
 
@@ -130,7 +164,7 @@ surfaces above:
 
 - **Bridges.** A narrow deck over the river, a car and a half wide,
   with rails that are walls: the dry line is quick but one car at a
-  time, the ford beside it is slow but wide, and the pack splits.
+  time, the river beside it is slow but wide, and the pack splits.
 - **Narrow gates.** Two posts or a barn's doorway on the road, a car
   and a half apart: a place to block, to be punted into the post, and
   to get through first.
@@ -152,7 +186,7 @@ surfaces above:
 - More tracks; tracks reused across classes with a different car.
 - Reverse layouts of the two tracks as cheap extra events.
 - Spikes and a ram plate as armour's look; a rear missile.
-- Boost pads and jumps on the road (Death Rally's acceleration zones).
+- Boost pads on the road (Death Rally's acceleration zones).
 - The rest of what the research found and Sora has not taken: a market
   with bad ideas in it (sabotage, rocket fuel, a loan shark), a league
   of drivers that moves on its own between races, a harpoon. See

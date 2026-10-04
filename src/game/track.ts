@@ -1,4 +1,4 @@
-import type { ShortcutDef, Surface, SurfacePatch, TrackDef } from './types';
+import type { RiverDef, ShortcutDef, Surface, SurfacePatch, TrackDef } from './types';
 import { hash32 } from './rng';
 
 /**
@@ -152,6 +152,8 @@ export class Track {
   readonly bounds: { minX: number; minY: number; maxX: number; maxY: number };
   private cell = 20;
   private grid = new Map<number, number[]>();
+  /** the track's patches and its rivers' water, as patches */
+  readonly patches: SurfacePatch[];
   /** the patches that touch each TILE metres of the lap, for surfaceAt */
   private tiles: SurfacePatch[][] = [];
 
@@ -202,7 +204,9 @@ export class Track {
     }
     const nt = Math.ceil(this.length / TILE);
     for (let k = 0; k < nt; k++) this.tiles.push([]);
-    for (const p of def.patches ?? []) {
+    // a river's water is a patch like a ford's, across the road and the verge, from the lip over the gap
+    this.patches = [...(def.patches ?? []), ...(def.rivers ?? []).map((r): SurfacePatch => ({ surface: 'water', s: r.s, to: r.s + r.gap }))];
+    for (const p of this.patches) {
       for (let a = p.s; a < p.to; a += TILE) this.tiles[Math.floor((((a % this.length) + this.length) % this.length) / TILE)].push(p);
       const last = this.tiles[Math.floor((((p.to - 0.01) % this.length) + this.length) % this.length / TILE)];
       if (!last.includes(p)) last.push(p);
@@ -234,7 +238,7 @@ export class Track {
 
   /** In a river that crosses the road, between the tree lines: nothing grows or stands there. */
   inRiver(x: number, y: number): boolean {
-    if (!this.def.patches?.some((p) => p.surface === 'water' && !p.d)) return false;
+    if (!this.patches.some((p) => p.surface === 'water' && !p.d)) return false;
     const loc = this.locate(x, y);
     return Math.abs(loc.d) < this.width / 2 + this.verge && this.surfaceAt(loc.s, loc.d) === 'water';
   }
@@ -258,14 +262,21 @@ export class Track {
     return Math.abs(d) <= this.width / 2 ? this.def.surface : 'grass';
   }
 
-  /** The ground's height at (s, d), metres: zero but on a jump's ramp, which spans the road and a metre either side. */
-  groundAt(s: number, d: number): number {
-    const jumps = this.def.jumps;
-    if (!jumps || Math.abs(d) > this.width / 2 + 1) return 0;
-    for (const j of jumps) {
-      let x = s - (j.s - j.len);
-      x = ((x % this.length) + this.length) % this.length;
-      if (x < j.len) return (j.h * x) / j.len;
+  /**
+   * The ground's height at (s, d), metres over the road: a river's banks and water, a crest's
+   * brow, zero elsewhere. Both span the road and the verge, so `d` does not matter; it is kept
+   * for a feature that will not.
+   */
+  groundAt(s: number, _d: number): number {
+    const L = this.length;
+    for (const r of this.def.rivers ?? []) {
+      const x = ((((s - (r.s - RIVER.ramp)) % L) + L) % L);
+      if (x >= RIVER.ramp + r.gap + RIVER.out) continue;
+      return riverHeight(r, x);
+    }
+    for (const c of this.def.crests ?? []) {
+      const x = ((((s - (c.s - c.len / 2)) % L) + L) % L);
+      if (x < c.len) return (c.h * (1 - Math.cos((2 * Math.PI * x) / c.len))) / 2;
     }
     return 0;
   }
@@ -373,6 +384,25 @@ export class Track {
       }
     }
   }
+}
+
+/**
+ * A river's shape along the lap (RiverDef): the near bank's climb in metres, the water's level
+ * under the road, the far bank's climb back out in metres.
+ */
+export const RIVER = { ramp: 12, water: -0.6, out: 8 };
+
+/**
+ * The height at x metres from the foot of a river's near bank. The climb steepens toward the
+ * lip, so the car leaves it rising, the way a bank thrown up by a road does; the far bank is a
+ * plain slope a car in the water drives up.
+ */
+export function riverHeight(r: RiverDef, x: number): number {
+  if (x < 0) return 0;
+  if (x < RIVER.ramp) return r.bank * (x / RIVER.ramp) ** 2;
+  if (x < RIVER.ramp + r.gap) return RIVER.water;
+  const k = (x - RIVER.ramp - r.gap) / RIVER.out;
+  return k < 1 ? RIVER.water * (1 - k) ** 2 : 0;
 }
 
 /** metres of lap per tile of the surface lookup */

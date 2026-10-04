@@ -180,6 +180,12 @@ class Audio {
         beep(660, 0.1, 0.1, 'triangle', 0.12);
         beep(880, 0.2, 0.2, 'triangle', 0.12);
         break;
+      case 'tow':
+        // the marshals' tractor: two low honks, then the chain taking up
+        beep(196, 0, 0.16, 'sawtooth', 0.09);
+        beep(196, 0.22, 0.16, 'sawtooth', 0.09);
+        beep(98, 0.45, 0.25, 'triangle', 0.25);
+        break;
       case 'spin':
         beep(300, 0, 0.1, 'square', 0.1);
         beep(240, 0.1, 0.1, 'square', 0.1);

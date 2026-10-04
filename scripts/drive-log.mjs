@@ -165,7 +165,7 @@ try {
   await page.evaluate(SAMPLER);
   const st = await straight();
   console.log(`physics=${physics}; the longest straight starts at s=${st.s.toFixed(0)} m, ${st.len.toFixed(0)} m long`);
-  // past the ford that crosses the straight's start on Kiviaho
+  // a little way into the straight
   const S = st.s + 20;
 
   // 1. hands off: does a straight line hold
@@ -220,12 +220,12 @@ try {
   await page.waitForTimeout(1500);
   pieces.push('T-bone at 20 m/s');
 
-  // 9. the first kicker at racing speed, hands off: the flight and the landing
-  const jump = await page.evaluate(() => window.__sim.track.def.jumps?.[0]?.s ?? -1);
-  if (jump >= 0) {
-    await place({ name: 'the kicker at 22 m/s', s: jump - 40, v: 22 });
+  // 9. the first river at racing speed, hands off: the flight over the water and the landing
+  const river = await page.evaluate(() => window.__sim.track.def.rivers?.[0]?.s ?? -1);
+  if (river >= 0) {
+    await place({ name: 'the river at 26 m/s', s: river - 40, v: 26 });
     await page.waitForTimeout(3000);
-    pieces.push('the kicker at 22 m/s');
+    pieces.push('the river at 26 m/s');
   }
 
   const log = await page.evaluate(() => window.__log);

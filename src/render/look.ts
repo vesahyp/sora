@@ -34,8 +34,8 @@ export const PAL = {
   waterLit: '#5d6b62',
   foam: '#c8cbbc',
   wetBank: '#3b3626',
-  plank: '#7b6547',
-  plankDark: '#4f3f2b',
+  /** water on the minimap: lighter than the river itself, to read on the dark plate */
+  waterMap: '#7f9faa',
   spruce: ['#0f140f', '#151b13', '#1b2317', '#26301f'],
   spruceLit: '#3a4429',
   birchLeaf: ['#5b5a2e', '#6e6a35', '#7f763b', '#8e8142'],

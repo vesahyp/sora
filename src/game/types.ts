@@ -29,11 +29,27 @@ export interface SurfacePatch {
 }
 
 /**
- * A kicker: the road rises over `len` metres to `h` metres at `s`, then
- * drops straight back to the ground. A car that reaches the lip faster
- * than gravity can pull it down leaves the ground.
+ * A river across the road, jumped from a bank. Ahead of `s` the road
+ * climbs a bank over RIVER.ramp metres to `bank` metres at the lip; past
+ * the lip the ground drops to the water (RIVER.water, below the road)
+ * for `gap` metres; then the far bank rises back to the road over
+ * RIVER.out metres. A car at racing speed clears the water and lands on
+ * the far bank; a slow one drops in, splashes and drives out. It spans
+ * the road and the verge to the trees.
  */
-export interface JumpDef {
+export interface RiverDef {
+  s: number;
+  gap: number;
+  bank: number;
+}
+
+/**
+ * A crest: a brow of the land that rises and falls smoothly over `len`
+ * metres, `h` metres high at `s`. Fast enough over the top and the ground
+ * falls away quicker than gravity can follow: the car flies. A slow car
+ * is only lifted.
+ */
+export interface CrestDef {
   s: number;
   len: number;
   h: number;
@@ -68,9 +84,11 @@ export interface TrackDef {
   width: number;
   /** the road's surface; off the road is grass */
   surface: 'gravel' | 'tarmac';
-  /** stretches of another surface, in arc length: fords, mud, ice */
+  /** stretches of another surface, in arc length: mud, ice, a ford */
   patches?: SurfacePatch[];
-  jumps?: JumpDef[];
+  /** rivers jumped from a bank, and crests: the ground's height along the lap */
+  rivers?: RiverDef[];
+  crests?: CrestDef[];
   shortcuts?: ShortcutDef[];
   /** the centreline, metres, closed: the last point joins the first. Driven in index order. */
   points: [number, number][];

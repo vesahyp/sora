@@ -3,8 +3,8 @@ import type { TrackDef } from '../types';
 
 /**
  * The tracks. A track is its centreline in metres, a width and a surface,
- * with jumps and patches of another surface (a ford, mud, ice) by arc
- * length, and shortcuts as lanes through the forest in world metres;
+ * with its ground by arc length (rivers jumped from a bank, crests),
+ * patches of another surface (mud, ice) and shortcuts as lanes through the forest in world metres;
  * track.ts smooths the line and the renderer draws the road from it, so a
  * new track is a new list of points and nothing else. Points run
  * clockwise on screen (y grows downward). The first point is the start
@@ -18,17 +18,16 @@ export const TRACKS: TrackDef[] = [
     name: L('Kiviaho'),
     width: 6,
     surface: 'gravel',
-    // The first track, about 680 m, built to be fun in its first ten
-    // seconds (docs/progression.md): a kicker on the start straight throws
-    // the whole field on lap one, a long right sweeper, then the ford right
-    // after it; a second kicker on the diagonal down to the hairpin, where
-    // a gap in the forest cuts across the inside on grass, a car and a half
-    // wide between the trees; then esses home up the left.
-    jumps: [
-      { s: 48, len: 8, h: 0.9 },
-      { s: 292, len: 7, h: 0.7 },
-    ],
-    patches: [{ surface: 'water', s: 215, to: 224 }],
+    // The first track, about 700 m, built to be fun in its first ten
+    // seconds (docs/progression.md): a crest on the start straight lifts
+    // the whole field on lap one, a long right sweeper, then a river
+    // jumped from its bank right after it; the diagonal runs flat down to
+    // the hairpin, where a gap in the forest cuts across the inside on
+    // grass, a car and a half wide between the trees; then esses home up
+    // the left. Nothing throws a car into the hairpin: a car lands where
+    // it can still steer for it.
+    crests: [{ s: 26, len: 24, h: 0.9 }],
+    rivers: [{ s: 214, gap: 12, bank: 0.45 }],
     shortcuts: [{ points: [[4, 168], [-10, 182], [-28, 190], [-46, 192], [-60, 184], [-65, 174], [-66, 164]], width: 4, surface: 'grass' }],
     points: [
       [0, 0],
@@ -59,10 +58,10 @@ export const TRACKS: TrackDef[] = [
     name: L('Hirvisuo'),
     width: 6,
     surface: 'gravel',
-    // About a kilometre: a long start straight with a kicker, a hairpin, an
-    // esses section with a ford at its foot, a fast sweeper home.
-    jumps: [{ s: 50, len: 8, h: 0.8 }],
-    patches: [{ surface: 'water', s: 346, to: 355 }],
+    // About a kilometre: a long start straight over a crest, a hairpin, an
+    // esses section with a river at its foot, a fast sweeper home.
+    crests: [{ s: 50, len: 24, h: 0.9 }],
+    rivers: [{ s: 560, gap: 12, bank: 0.45 }],
     points: [
       [0, 0],
       [74, 0],

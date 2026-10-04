@@ -72,6 +72,9 @@ const TREE_FRICTION = 0.12;
 const CLEAR_HEIGHT = 0.9;
 /** a landing harder than this, m/s down, bounces; harder than LAND_HURT it costs damage */
 const LAND_BOUNCE = 2.5;
+/** the bounce: the share of the impact that comes back, and the most it can be, m/s. A landing on a bank's slope would otherwise throw the car into a second jump */
+const LAND_REBOUND = 0.25;
+const LAND_REBOUND_MAX = 1.5;
 const LAND_HURT = 7;
 
 const bitten = new Map<string, SurfaceDef>();
@@ -223,7 +226,7 @@ function integrate(s: SimState, c: Car, a: Ask, h: number, last: boolean): void 
   if (c.air) {
     c.vz -= G * h;
     c.z += c.vz * h;
-    if (c.z <= ground && c.vz < vzGround) land(s, c, vx, vy, ground, vzGround);
+    if (c.z <= ground && c.vz < vzGround) land(s, c, vx, vy, ground, vzGround, sc.splash === true);
     vx = c.vx * fx + c.vy * fy;
     vy = c.vx * -fy + c.vy * fx;
   }
@@ -346,8 +349,8 @@ function integrate(s: SimState, c: Car, a: Ask, h: number, last: boolean): void 
   }
 }
 
-/** Touching down: the tyres take the sideways speed the car came down with, and a hard landing bounces. */
-function land(s: SimState, c: Car, vx: number, vy: number, ground: number, vzGround: number): void {
+/** Touching down: the tyres take the sideways speed the car came down with, and a hard landing bounces, but not in water. */
+function land(s: SimState, c: Car, vx: number, vy: number, ground: number, vzGround: number, wet: boolean): void {
   const impact = c.vz - vzGround;
   const fx = Math.cos(c.heading);
   const fy = Math.sin(c.heading);
@@ -360,8 +363,14 @@ function land(s: SimState, c: Car, vx: number, vy: number, ground: number, vzGro
   c.vx = vx * fx + vy * -fy;
   c.vy = vx * fy + vy * fx;
   c.z = ground;
-  if (impact < -LAND_BOUNCE) {
-    c.vz = vzGround - impact * 0.3;
+  // a car coming down onto a rising bank is caught by it and rides it up; water swallows the
+  // landing in a sheet of spray; on the flat it bounces
+  if (wet) {
+    for (let k = 0; k < 4; k++) s.fx.push({ kind: 'splash', x: c.x + Math.cos(c.heading + k * 1.6) * 1.2, y: c.y + Math.sin(c.heading + k * 1.6) * 1.2, age: 0 });
+    if (c === s.cars[0]) s.sounds.push('splash');
+  }
+  if (impact < -LAND_BOUNCE && vzGround < 0.5 && !wet) {
+    c.vz = vzGround + Math.min(LAND_REBOUND_MAX, -impact * LAND_REBOUND);
     c.z = ground + 0.01;
   } else {
     c.vz = vzGround;
