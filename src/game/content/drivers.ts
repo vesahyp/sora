@@ -1,19 +1,22 @@
 import { L } from '../../i18n';
 import type { Car, Driver, SimState } from '../state';
 
+/** A rival before the race: the skill comes with the vehicle they drive in that class (rivals.ts). */
+export type Rival = Omit<Driver, 'skill' | 'id'> & { id: string };
+
 /**
- * The field. Three to race against; skill is how hard the bot drives
- * that car, 1 being the bot's own ceiling. Aggression is how fast a
+ * The field. Three to race against; how hard the bot drives each one is
+ * the vehicle's `skill` in rivals.ts, per class. Aggression is how fast a
  * grudge builds and how hard the bot leans, blocks and punts: Jorma is
  * cold and fast and mostly just drives, Marko is the brawler who
  * remembers every knock, Tapsa is timid. The player is red; these
  * colours stay clear of it, and each rival's vehicles (rivals.ts) are
  * painted in their driver's hue.
  */
-export const OPPONENTS: Driver[] = [
-  { id: 'jorma', name: L('Jorma'), skill: 1.0, aggression: 0.6, colour: '#2f6fd6' },
-  { id: 'marko', name: L('Marko'), skill: 0.92, aggression: 1.5, colour: '#e0b030' },
-  { id: 'tapsa', name: L('Tapsa'), skill: 0.84, aggression: 0.4, colour: '#f2f2ea' },
+export const OPPONENTS: Rival[] = [
+  { id: 'jorma', name: L('Jorma'), aggression: 0.6, colour: '#2f6fd6' },
+  { id: 'marko', name: L('Marko'), aggression: 1.5, colour: '#e0b030' },
+  { id: 'tapsa', name: L('Tapsa'), aggression: 0.4, colour: '#f2f2ea' },
 ];
 
 /**
@@ -65,7 +68,9 @@ export const GRUDGE = {
  * hard the bot takes a bend. Read off sim-check and three drivers: a bot
  * player that drives worse than the field (margin 0.55) finishes behind
  * it, one that drives better (0.85) wins most Kiviaho races. Skill still
- * orders the bots among themselves.
+ * orders the bots among themselves. Both are times catchUp(), the
+ * driver's skill squared: a JM rival barely rubber-bands, an A rival
+ * gets the whole push.
  */
 export const PACING = {
   pushRange: 20,
@@ -89,7 +94,16 @@ export function paceToPlayer(s: SimState, c: Car): number {
 /** The factor on a car's top speed and pull from its gap to the player: 1 for the player. */
 export function enginePace(s: SimState, c: Car): number {
   const pace = paceToPlayer(s, c);
-  return 1 + pace * (pace > 0 ? PACING.engine.push : PACING.engine.ease);
+  return 1 + pace * catchUp(c) * (pace > 0 ? PACING.engine.push : PACING.engine.ease);
+}
+
+/**
+ * How much of PACING a driver gets: skill squared, so a JM rival (0.3 to 0.4) barely
+ * rubber-bands, a C rival gets about a third and an A rival all of it. Linear in skill
+ * handed a C rival back the player's pace whenever it fell behind (sim-check, 2026-10-04).
+ */
+export function catchUp(c: Car): number {
+  return c.driver.skill * c.driver.skill;
 }
 
 /** Index of the car leading the race on the road, or -1 once someone has the flag. */

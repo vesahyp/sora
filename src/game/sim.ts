@@ -1,6 +1,6 @@
 import type { Car, SimState } from './state';
 import type { CarInput } from './types';
-import { BOOST, DAMAGE, GUN, MINE, MISSILE, OIL, OIL_CREDIT, RESPAWN_DAMAGE, WRECK_BOUNTY, WRECK_TIME } from './content/weapons';
+import { BOOST, DAMAGE, FUMBLE, GUN, MINE, MISSILE, OIL, OIL_CREDIT, RESPAWN_DAMAGE, WRECK_BOUNTY, WRECK_TIME } from './content/weapons';
 import { PICKUPS, PICKUP_REACH, PICKUP_RESPAWN } from './content/pickups';
 import { CLASS_RANK } from './types';
 import { GRUDGE, hostility, leaderOf } from './content/drivers';
@@ -105,7 +105,8 @@ function guns(s: SimState, c: Car, i: number, dt: number): void {
     c.gunWait -= dt;
     if (c.gunWait <= 0) {
       c.gunWait += 1 / rate;
-      const spread = (Math.sin(s.time * 97 + i * 13) * 0.5 + Math.sin(s.time * 41) * 0.5) * 0.06;
+      // a poor driver sprays: the spread widens by SPRAY x (1 - skill)
+      const spread = (Math.sin(s.time * 97 + i * 13) * 0.5 + Math.sin(s.time * 41) * 0.5) * 0.06 * (1 + GUN.spray * (1 - c.driver.skill));
       const h = c.heading + spread;
       const nose = c.def.length * 0.55;
       const v = 70 + Math.max(0, c.speed);
@@ -141,13 +142,19 @@ function guns(s: SimState, c: Car, i: number, dt: number): void {
     return false;
   };
   const tail = -c.def.length * 0.7;
-  if (canFire && c.mines > 0 && c.mineWait <= 0 && Math.abs(c.speed) > 5 && behind(MINE.behind)) {
+  // a poor driver fumbles: the can or the mine goes down only after a car has sat on its tail
+  // for FUMBLE x (1 - skill) seconds, so a slow field is passed before it lays much
+  const mineBehind = behind(MINE.behind);
+  const oilBehind = behind(OIL.behind);
+  c.tailed = mineBehind || oilBehind ? c.tailed + dt : 0;
+  const ready = c.tailed >= FUMBLE * (1 - c.driver.skill);
+  if (canFire && ready && c.mines > 0 && c.mineWait <= 0 && Math.abs(c.speed) > 5 && mineBehind) {
     c.mines--;
     c.mineWait = MINE.every;
     s.mines.push({ x: c.x + Math.cos(c.heading) * tail, y: c.y + Math.sin(c.heading) * tail, age: 0, owner: i });
     if (i === 0) s.sounds.push('mine');
   }
-  if (canFire && c.oil > 0 && c.oilWait <= 0 && Math.abs(c.speed) > 5 && behind(OIL.behind)) {
+  if (canFire && ready && c.oil > 0 && c.oilWait <= 0 && Math.abs(c.speed) > 5 && oilBehind) {
     c.oil--;
     c.oilWait = OIL.every;
     s.oils.push({ x: c.x + Math.cos(c.heading) * tail, y: c.y + Math.sin(c.heading) * tail, age: 0, owner: i });

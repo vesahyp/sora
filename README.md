@@ -28,6 +28,13 @@ lähtee, kun auto on pysynyt tähtäimessä puoli sekuntia. Miina putoaa, kun
 auto on ihan takana. Sinä päätät, mihin ajat ja milloin nitro palaa.
 Jokkisautossa on vain öljy; muut aseet tulevat luokkien myötä.
 
+**Kartanlukija** kertoo, minne tie menee, ennen kuin mutka näkyy
+ruudulla: ruudun yläreunaan tulee iso nuoli ja numero noin kaksi ja puoli
+sekuntia ennen mutkaa. Nuoli kääntyy mutkan suuntaan, ja numero kertoo,
+kuinka jyrkkä se on: 1 on hiusneula, 6 menee täysillä. Uusi merkintä
+naksahtaa. Kamera katsoo tietä eteenpäin, joten auto on ruudun
+alakolmanneksessa ja mutka tulee näkyviin ajoissa.
+
 **Näppäimistöllä:** nuolet tai A ja D kääntävät, alas, S tai välilyönti
 on poljin, X tai ylös on nitro.
 
@@ -36,14 +43,22 @@ on poljin, X tai ylös on nitro.
 Kolme kierrosta, neljä autoa, ja kaikki yrittävät romuttaa toisensa.
 **Lähdet viimeisenä**: kisa on nousu kentän läpi. Jorma ajaa kovaa ja
 kylmästi, Marko on tappelija, Tapsa on arka kuski jonka ohitat ensin.
+Kuskit paranevat luokka luokalta: jokkiksessa he ovat viikonloppukuskeja,
+jotka heiluvat, jarruttavat myöhään, ajavat leveäksi ja unohtavat öljyn,
+ja A-luokassa he ajavat niin kovaa kuin osaavat ja kostavat kaiken.
 Kaikki nojaavat viereiseen autoon. Kenttä pysyy lähelläsi: edellä ajava
 hiljentää ja takana tuleva painaa.
 
+**Aloitat pienestä.** Jokkiksessa autot ovat pikkuruisia laatikoita,
+alle kolmemetrisiä, ja jokainen luokka on kokoa isompi: C-luokan autot
+ovat tavallisia pikkuautoja, B-luokassa ajetaan pakulla ja ralliautolla,
+ja A-luokan autot ovat viisimetrisiä.
+
 **Jokainen auto on omansa.** Jokaisella kuskilla on joka luokassa oma
-autonsa, omat värinsä ja oma numeronsa: Jorma ajaa coupéta, ralliautoa
-tai kuumaa pikkuautoa, Marko farmaria, pakua, lava-autoa tai laivaa,
-Tapsa kuplaa, mopoautoa tai pientä viistoperää. Paku on painava ja
-mopoauto kevyt, kun autot törmäävät. Omasi on aina punainen, ja siitä
+autonsa, omat värinsä ja oma numeronsa: Jorma ajaa pientä coupéta,
+sedania, ralliautoa ja kuumaa viistoperää, Marko pientä farmaria,
+lava-autoa, pakua ja laivaa, Tapsa kuplaa, farmaria, viistoperää ja
+coupéta. Paku on painava ja kupla kevyt, kun autot törmäävät. Omasi on aina punainen, ja siitä
 näkee, mitä olet siihen ostanut: puskurin, panssarilevyt, konekiväärin
 konepellillä, nappularenkaat ja ilmanottimen.
 
@@ -80,8 +95,12 @@ https://vesahyp.github.io/sora/?physics=old.
   erityisesti toisen auton romuttaminen, joka täyttää tankin kerralla.
 - **Törmäys** sattuu siihen, johon osutaan. Painavampi ja panssaroitu
   auto voittaa. Kova töytäisy pyöräyttää.
-- **Vauriot** hidastavat autoa. Sadassa auto on **romu**: se palaa
-  hetken ja palaa sitten tielle puolikuntoisena.
+- **Vauriot** hidastavat autoa, ja ne näkyvät: ensin lommo oveen,
+  roikkuva puskuri ja rikki mennyt valo, sitten rypistynyt konepelti ja
+  ohut savu, sitten vääntynyt kori, puuttuva ovi, musta savu ja kipinät,
+  lopulta noki ja liekit konepellin alla. Osuma välähtää valkoisena.
+  Sadassa auto on **romu**: se palaa hetken ja palaa sitten tielle
+  puolikuntoisena.
 - **Romuttaminen maksaa.** Romuttaja saa palkkion heti, ja töytäisy,
   joka pyöräyttää toisen, tuo pienen summan. Tappelu maksaa enemmän
   kuin tieltä kerätty raha.
@@ -96,8 +115,8 @@ kierros, ja **Hirvisuo**, kilometrin lenkki.
 
 ## Ura
 
-Ura alkaa jokamiesluokasta: tallissa on Tauno 2.0, vanha takavetoinen
-jokkisauto, kolme kanisteria öljyä ja 150 krediittiä, eli juuri
+Ura alkaa jokamiesluokasta: tallissa on Tauno 2.0, pieni kulmikas
+takavetoinen jokkisauto, kolme kanisteria öljyä ja 150 krediittiä, eli juuri
 puskurin hinta. Kisat tuovat rahaa sijoituksen mukaan, ja raha menee
 kolmeen paikkaan:
 

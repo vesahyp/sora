@@ -128,6 +128,8 @@ export interface CarDef {
   /** metres, nose to tail */
   length: number;
   width: number;
+  /** the wheels drawn, on the body's own size: a cosmetic scale for a vehicle that stands tall. 1 when absent */
+  wheel?: number;
   /** the paint: the hue the minimap and the standings know the car by */
   colour: string;
   /** the livery's second colour */

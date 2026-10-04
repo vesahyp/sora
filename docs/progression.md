@@ -14,10 +14,20 @@ enter its own class or any below it, never above.
 
 | Class | Car | What it is | Weapons that exist in it |
 |---|---|---|---|
-| JM | Tauno 2.0 | A jokkis saloon: rear drive, soft, heavy, slow | Oil |
+| JM | Tauno 2.0 | A tiny boxy jokkis saloon: rear drive, soft, slow | Oil |
 | C | Kortteli 1.3 | A tired town car on gravel tyres | Oil, mines, the machine gun |
 | B | Sorsa 1.6 GT | Light and sharp | All of the above and missiles |
 | A | Kiila 4x4 Turbo | Four-wheel drive and a turbo | All |
+
+Size climbs with the class, Hill Climb Racing's first jeep to its
+monster (Vesa, 2026-10-04): JM cars are tiny boxes, 2.8 to 3.2 m long
+(a Fiat 126, a Mini), C 3.6 to 4.1 m, B 4.1 to 4.7 m, A 4.5 to 5.0 m;
+the rivals' vehicles sit on the same ladder (`rivals.ts`). So does the
+field's skill: JM rivals are weekend drivers at 0.3 to 0.4, C 0.5 to
+0.6, B 0.68 to 0.8, A 0.84 to 1.0. `sim-check` holds the curve: the bot
+player wins every JM race by 3 s or more, finishes top two in all but
+one of six C races and
+does not win every A race.
 
 The stock cars should sit about 10% apart on a lap, and a fully built
 car should reach the next class's stock pace (`make balance` is the
@@ -97,7 +107,7 @@ it.
 
 ## The first five races
 
-All in JM, in the Tauno, against Jorma, Marko and Tapsa in Taunos. The
+All in JM, in the Tauno, against Jorma, Marko and Tapsa in their own tiny cars. The
 field's cars get built one part at a time so the fifth race is the
 hardest.
 

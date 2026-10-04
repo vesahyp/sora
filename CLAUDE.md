@@ -55,6 +55,8 @@ src/
                         and tree contacts by impulse, in SUB substeps a frame
     physics-old.ts    the model before 2026-10-03, at ?physics=old for one release. Delete after
     harm.ts           what a hit costs, for both models: damage, grudge, a blast's spin, a ram
+    notes.ts          the co-driver: every bend on the lap as a pace note (direction, grade 1 hairpin
+                        to 6 flat), and the next one for a car; the game loop shows it on the HUD
     track.ts          Track: smoothing, locate(x, y) -> (s, d), at(s), the forest,
                         surfaceAt(s, d) from the patches, groundAt(s, d) from the jumps;
                         Lane: a shortcut as the sim drives it, its own arc length u
@@ -67,10 +69,12 @@ src/
       weapons.ts      combat: the armoury's prices and the class each weapon arrives in, damage, gun,
                         missile, mine, oil, boost and ram numbers, the wreck bounty, the ram and oil credits
       pickups.ts      what lies on the road, how far apart, how fast it grows back
-      rivals.ts       what each rival drives per class: their own body, size, colour, livery and number
-                        on the class car's numbers (vehicleDef), so the grid is four different vehicles
-      drivers.ts      the opponents: a name, a colour, a skill and an aggression for the bot; PACING, Death Rally's catch-up:
-                        sim.ts scales an opponent's engine by its gap to the player, the bot its corners;
+      rivals.ts       what each rival drives per class: their own body, size, colour, livery, number
+                        and skill on the class car's numbers (vehicleDef, rivalEntry), so the grid is four
+                        different vehicles; size and skill climb with the class
+      drivers.ts      the opponents: a name, a colour and an aggression for the bot; PACING, Death Rally's catch-up:
+                        sim.ts scales an opponent's engine by its gap to the player, the bot its corners,
+                        both by catchUp(), skill squared;
                         GRUDGE, Burnout's hostility: what a ram, shot or wreck costs and how the bot uses it
       tracks.ts       the tracks: a centreline in metres, a width, a surface, patches, jumps, shortcuts
       surfaces.ts     what each surface does to a tyre and a car: grip, peak, slide, drag, top
@@ -83,8 +87,9 @@ src/
                         kicker, static shadows, skid marks stamped in
     scenery.ts        the roadside computed from the track: spruce, birch, juniper, boulders,
                         posts, bales, a barn, a power line, the crowds. Cosmetic, never in the sim
-    renderer.ts       camera and shake, ground chunks, pickups, mines, tracers, sights, cars
-                        with damage and shadows, wrecks, nitro, dust and haze, minimap
+    renderer.ts       camera (24 m across, leading down the road) and shake, ground chunks, pickups, mines,
+                        tracers, sights, cars with damage, the hit flash, smoke, sparks and shadows, wrecks,
+                        nitro, dust and haze, minimap
     sprites.ts        procedural sprite cache: nine car bodies in Hill Climb proportions lit per heading,
                         liveries and numbers, the fitted parts on the car, damage stages, shadows,
                         trees and roadside objects
@@ -100,19 +105,22 @@ src/
 tools/
   autoplayer.ts       the bot driver: yaw-rate steering through the wheelbase, braking to
                         the speed a bend allows, a running-wide reflex, leaning on neighbours,
-                        blocking, punting and waiting for whoever it holds a grudge against
+                        blocking, punting and waiting for whoever it holds a grudge against;
+                        skill bites: a poor driver is slow, wobbles, brakes late and picks no fights
   physics-check.ts    npm run physics-check: the car model's promises as set pieces with numbers:
                         a straight line, full lock, a pedal stab, tree hits, car hits, a jump, water
   sim-check.ts        npm run sim-check: the bot laps every track in every car, asserts;
-                        asserts the field is on the player's screen and in the sights, and that
-                        aggression pays the player more than the road
+                        asserts the field is on the player's screen and in the sights, that
+                        aggression pays the player more than the road, and the career curve:
+                        the bot player wins every JM race, is top two in C, does not win every A
   balance.ts          npm run balance: lap times per car, side by side
 scripts/
   shots.mjs           phone screenshots with Playwright, the bot driving
   touch-check.mjs     drives the race by touch on an emulated phone: steer, brake, pause
   drive-log.mjs       set pieces by touch on an emulated phone, the physics logged frame by frame
   icon.mjs            render public/icon.svg to the PNG icons: 512, 192, the 180 iOS icon, a 32 favicon
-  lineup.mjs          every vehicle in the game on one canvas to shots/lineup.png, the race's own sprites
+  lineup.mjs          every vehicle in the game on one canvas to shots/lineup.png, a row per class,
+                        the race's own sprites, and the Tauno at five levels of damage
   pwa-check.mjs       the install check: manifest, every icon at its size, the service worker, offline
 infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs), see TRACKING.md
 ```

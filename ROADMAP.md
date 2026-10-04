@@ -22,12 +22,25 @@ The design is in `docs/design.md`.
   `tools/physics-check.ts`, `PHYSICS=` in the Makefile and
   `scripts/drive-log.mjs`, and the `?physics=old` lines in `README.md`
   and `CLAUDE.md`. ADR 0003 already says so.
-- **Playtest the race by hand on a phone.** The questions: does it feel
-  like Death Rally, is the field close enough or too close, and the
-  frame rate on a device: the frame draws in about 11 ms portrait in
-  headless Chromium, a chunk bake takes 5 to 11 ms, and the first frame
-  about 700 ms during the countdown. Knobs: `PACING` and `GRUDGE` in
-  `drivers.ts`, `CARS_ACROSS` in `renderer.ts`.
+- **Playtest the new start on the phone** (2026-10-04): the camera at
+  24 m across with the lead down the road, the co-driver's arrow, the
+  tiny JM cars and a crap JM field. The questions: can the road be read
+  now, does the arrow get looked at or ignored, is the first race won
+  by a margin that feels earned rather than handed over, does damage
+  read in the race, and the frame rate on a device with more ground on
+  screen. Knobs: `CARS_ACROSS` and `LEAD_*` in `renderer.ts`, `WARN`
+  and `GRADE_R` in `notes.ts`, the skills in `rivals.ts`, `WOBBLE` and
+  `LATE` in `autoplayer.ts`, `FUMBLE` and `GUN.spray` in `weapons.ts`,
+  `DAMAGE_AT` in `sprites.ts`.
+- **C is a coin toss for the bot player.** With the field at skill 0.5
+  to 0.6 the default bot finishes top two in 10 of 12 C races; a mine
+  or a wreck on lap one costs the rest. The bot passes poorly in a pack
+  and can sit in the trees; a better bot driver would make the career
+  curve checkable to the second.
+- The whole Kiviaho hairpin is 70 m across and the camera 24 m: the
+  approach shows the entry and the turn, the arrow the rest. A zoom
+  that widens with speed or into a hairpin is the next knob if the
+  phone playtest says the hairpin still surprises.
 - The look, what is still short: the birch crowns are too yellow-green
   and their limbs too stark, the spruce reads as a dark bush more than
   a conifer, the hurt-engine smoke leaves a row of spots, the haze

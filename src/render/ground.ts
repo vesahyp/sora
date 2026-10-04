@@ -2,7 +2,7 @@ import { RIVER_REACH, type Track } from '../game/track';
 import { hash32 } from '../game/rng';
 import type { Scenery } from './scenery';
 import { PAL, SHADOW_ALPHA, SHADOW_INK, SHADOW_PER_M, SHADOW_X, SHADOW_Y, faded } from './look';
-import { carSprite, damageSprite, SPRITE_PX } from './sprites';
+import { carSprite, damageSprite, DAMAGE_WORST, SPRITE_PX } from './sprites';
 import { CARS } from '../game/content/cars';
 
 /**
@@ -1104,7 +1104,7 @@ export class Ground {
       const hy = b.y + Math.sin(b.a) * 1 + Math.cos(b.a) * (b.wid / 2 + 2.6);
       const def = { ...CARS[CARS.length - 1], colour: '#7a4a2e' };
       const spr = carSprite(def, { faded: true, heading: b.a + 0.4 });
-      const dmg = damageSprite(def, 3)!;
+      const dmg = damageSprite(def, DAMAGE_WORST)!;
       g.save();
       g.translate(hx, hy);
       g.rotate(b.a + 0.4);

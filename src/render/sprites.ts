@@ -106,8 +106,8 @@ export function wheelLayout(def: CarDef): { wl: number; ww: number; out: number;
   const sp = SPEC[def.shape];
   const t = def.tyres ?? 0;
   // Hill Climb wheels: bigger than life and standing out of the arches, fatter with every set of tyres
-  const wl = (0.52 + 0.07 * def.length) * sp.wheel * (1 + 0.04 * t) * SPRITE_PPM;
-  const ww = 0.34 * sp.tread * (1 + 0.12 * t) * SPRITE_PPM;
+  const wl = (0.52 + 0.07 * def.length) * sp.wheel * (def.wheel ?? 1) * (1 + 0.04 * t) * SPRITE_PPM;
+  const ww = 0.34 * sp.tread * (def.wheel ?? 1) * (1 + 0.12 * t) * SPRITE_PPM;
   const out = ww * (def.shape === 'rally' ? 0.85 : 0.75);
   return { wl, ww, out, frontX: L * sp.frontX, rearX: L * sp.rearX };
 }
@@ -161,7 +161,7 @@ const geoCache = new Map<string, Geo>();
 
 /** The body: chamfered, the arches flared where the wheels sit, the beetle round. */
 function geometry(def: CarDef): Geo {
-  const gk = `${def.shape}:${def.length}:${def.width}:${def.tyres ?? 0}`;
+  const gk = `${def.shape}:${def.length}:${def.width}:${def.wheel ?? 1}:${def.tyres ?? 0}`;
   const hit = geoCache.get(gk);
   if (hit) return hit;
   const L = def.length * SPRITE_PPM;
@@ -425,7 +425,7 @@ function roofLivery(g: CanvasRenderingContext2D, def: CarDef, geo: Geo, tone: st
 
 /** Everything a car's picture depends on: the body, the paint, every fitted part, the light. */
 function carKey(def: CarDef, look: CarLook): string {
-  return `${def.shape}:${def.length}:${def.width}:${def.colour}:${def.accent}:${def.livery}:${def.number}:${def.ram}:${def.armour}:${def.gun}:${def.tyres ?? 0}:${def.engine ?? 0}:${look.faded ? 1 : 0}:${lightBin(look.heading ?? -0.3)}`;
+  return `${def.shape}:${def.length}:${def.width}:${def.wheel ?? 1}:${def.colour}:${def.accent}:${def.livery}:${def.number}:${def.ram}:${def.armour}:${def.gun}:${def.tyres ?? 0}:${def.engine ?? 0}:${look.faded ? 1 : 0}:${lightBin(look.heading ?? -0.3)}`;
 }
 
 export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
@@ -1044,7 +1044,7 @@ export function carPicture(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
  */
 export function carShadow(def: CarDef, heading: number): { img: HTMLCanvasElement; x: number; y: number; w: number; h: number } {
   const bin = lightBin(heading);
-  const key = `shadow:${def.shape}:${def.length}:${def.width}:${def.tyres ?? 0}:${bin}`;
+  const key = `shadow:${def.shape}:${def.length}:${def.width}:${def.wheel ?? 1}:${def.tyres ?? 0}:${bin}`;
   const geo = geometry(def);
   const sun = localSun(bin);
   const reach = SPEC[def.shape].height * SHADOW_PER_M * SPRITE_PPM;
@@ -1078,18 +1078,33 @@ export function carShadow(def: CarDef, heading: number): { img: HTMLCanvasElemen
   return { img, x: x0 * k - def.length / 2, y: y0 * k - def.width / 2, w: (x1 - x0) * k, h: (y1 - y0) * k };
 }
 
-/** Damage stages: 0 clean, then dents, then a cracked screen and torn paint, then a wreck in waiting. */
+/**
+ * Damage stages by the damage gauge: 0 clean, then 1 from DAMAGE_AT[0] and so
+ * on. Each has to read at race zoom, where a car is about forty pixels long:
+ * a mark smaller than a hand on the panel is not there. Stage 1 is a big dent
+ * in a door, the rear bumper hanging off and a cracked lamp; 2 crumples the
+ * bonnet and cracks the screen (the renderer adds a thin smoke trail); 3
+ * buckles the body and loses a door (thick black smoke and sparks); 4 is soot
+ * and a sprung boot, a wreck that still runs (fire under the bonnet).
+ */
+export const DAMAGE_AT = [10, 35, 60, 85];
+/** the worst stage: what a wreck wears */
+export const DAMAGE_WORST = DAMAGE_AT.length;
+
 export function damageStage(damage: number): number {
-  return damage < 22 ? 0 : damage < 48 ? 1 : damage < 72 ? 2 : 3;
+  let n = 0;
+  while (n < DAMAGE_AT.length && damage >= DAMAGE_AT[n]) n++;
+  return n;
 }
 
 /**
  * The damage overlay, the same size as the car sprite. It peels like an
- * onion: each stage keeps the last stage's marks and adds its own.
+ * onion: each stage keeps the last stage's marks and adds its own. Sizes are
+ * shares of the body, so a JM box and an A-class land yacht read the same.
  */
 export function damageSprite(def: CarDef, stage: number): HTMLCanvasElement | null {
   if (stage <= 0) return null;
-  const key = `dmg:${def.shape}:${def.length}:${def.width}:${def.tyres ?? 0}:${stage}`;
+  const key = `dmg:${def.shape}:${def.length}:${def.width}:${def.wheel ?? 1}:${def.tyres ?? 0}:${stage}`;
   const hit = cache.get(key);
   if (hit) return hit;
   const geo = geometry(def);
@@ -1100,70 +1115,162 @@ export function damageSprite(def: CarDef, stage: number): HTMLCanvasElement | nu
   const g = c.getContext('2d')!;
   g.scale(SPRITE_RES, SPRITE_RES);
   g.translate(PAD, PAD);
-  g.save();
-  g.clip(geo.body);
-  const rnd = (i: number) => hash32(i * 2246822519) / 4294967296;
-  // dents: a dark hollow with a lit lip, along the flanks and the corners
-  for (let i = 0; i < stage * 4; i++) {
-    const side = rnd(i * 5) < 0.5;
-    const x = rnd(i * 5 + 1) * L;
-    const y = side ? rnd(i * 5 + 2) * W * 0.25 : W - rnd(i * 5 + 2) * W * 0.25;
-    const r = 2 + rnd(i * 5 + 3) * 3.5;
-    const a = rnd(i * 5 + 4) * 3;
-    g.fillStyle = 'rgba(10,6,4,0.45)';
+  const rnd = (i: number) => hash32(i * 2246822519 + Math.round(L * 7)) / 4294967296;
+  // a crumple: a dark hollow pushed in from an edge, creased, with the lit lip of torn metal
+  const crumple = (x: number, y: number, len: number, depth: number, side: 1 | -1) => {
+    g.fillStyle = 'rgba(8,5,3,0.8)';
     g.beginPath();
-    g.ellipse(x, y, r * 1.4, r, a, 0, Math.PI * 2);
+    g.moveTo(x - len / 2, y);
+    g.bezierCurveTo(x - len / 4, y + side * depth * 1.1, x + len / 4, y + side * depth * 1.1, x + len / 2, y);
+    g.closePath();
     g.fill();
-    g.strokeStyle = 'rgba(255,236,204,0.35)';
-    g.lineWidth = 0.6;
-    g.beginPath();
-    g.ellipse(x - 0.6, y - 0.6, r * 1.4, r, a, Math.PI * 0.9, Math.PI * 1.6);
-    g.stroke();
-  }
-  // scrapes to the primer, rust where it has been bare a while
-  for (let i = 0; i < stage * 6; i++) {
-    const x = rnd(100 + i * 3) * L;
-    const y = rnd(101 + i * 3) * W;
-    g.strokeStyle = i % 3 === 0 ? 'rgba(110,60,30,0.7)' : 'rgba(150,145,130,0.6)';
-    g.lineWidth = 0.7 + rnd(102 + i * 3);
-    g.beginPath();
-    g.moveTo(x, y);
-    g.lineTo(x + 4 + rnd(103 + i) * 8, y + (rnd(104 + i) - 0.5) * 2);
-    g.stroke();
-  }
-  if (stage >= 2) {
-    // the screen cracks from a stone strike
-    const sx = (geo.screen[0][0] + geo.screen[1][0]) / 2;
-    const sy = W * (0.3 + rnd(300) * 0.3);
-    g.strokeStyle = 'rgba(225,230,225,0.75)';
-    g.lineWidth = 0.4;
-    g.beginPath();
-    for (let i = 0; i < 7; i++) {
-      const a = (i / 7) * Math.PI * 2 + rnd(301 + i);
-      const r = 3 + rnd(310 + i) * 5;
-      g.moveTo(sx, sy);
-      g.lineTo(sx + Math.cos(a) * r * 0.5 + 0.6, sy + Math.sin(a) * r * 0.5);
-      g.lineTo(sx + Math.cos(a) * r, sy + Math.sin(a) * r);
-    }
-    g.stroke();
-  }
-  if (stage >= 3) {
-    // a buckled bonnet, a lamp gone, soot round the engine
-    g.strokeStyle = 'rgba(10,6,4,0.6)';
+    g.strokeStyle = 'rgba(255,236,204,0.55)';
     g.lineWidth = 0.9;
     g.beginPath();
-    g.moveTo(geo.bonnetX + 2, W * 0.2);
-    for (let i = 1; i <= 6; i++) g.lineTo(geo.bonnetX + 2 + i * (L - geo.bonnetX) * 0.13, W * (0.2 + i * 0.1) + (i % 2 ? 2 : -2));
+    g.moveTo(x - len / 2, y + side * 0.6);
+    g.bezierCurveTo(x - len / 4, y + side * (depth * 1.1 + 0.6), x + len / 4, y + side * (depth * 1.1 + 0.6), x + len / 2, y + side * 0.6);
     g.stroke();
-    const soot = g.createRadialGradient(L * 0.85, W / 2, 0, L * 0.85, W / 2, W * 0.6);
-    soot.addColorStop(0, 'rgba(14,10,8,0.65)');
-    soot.addColorStop(1, 'rgba(14,10,8,0)');
+    // creases fanning from the deepest point
+    g.strokeStyle = 'rgba(8,5,3,0.75)';
+    g.lineWidth = 0.8;
+    g.beginPath();
+    for (let k = -2; k <= 2; k++) {
+      g.moveTo(x + k * len * 0.12, y + side * depth * 0.8);
+      g.lineTo(x + k * len * 0.2, y + side * depth * 0.1);
+    }
+    g.stroke();
+  };
+  // a scrape to bare metal, rust at its root
+  const scrape = (i: number) => {
+    const x = rnd(100 + i * 3) * L * 0.8 + L * 0.1;
+    const y = rnd(101 + i * 3) < 0.5 ? W * (0.08 + rnd(102 + i) * 0.12) : W * (0.8 + rnd(102 + i) * 0.12);
+    g.strokeStyle = i % 3 === 0 ? 'rgba(120,64,30,0.8)' : 'rgba(196,190,176,0.75)';
+    g.lineWidth = 0.9 + rnd(103 + i);
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x - L * (0.12 + rnd(104 + i) * 0.15), y + (rnd(105 + i) - 0.5) * 2);
+    g.stroke();
+  };
+  // a lamp smashed: the glass gone dark and a starburst of cracks round it
+  const lamp = (x: number, y: number) => {
+    g.fillStyle = '#0c0a08';
+    g.beginPath();
+    g.arc(x, y, W * 0.07, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = 'rgba(240,240,232,0.9)';
+    g.lineWidth = 0.6;
+    g.beginPath();
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2 + rnd(400 + k);
+      g.moveTo(x, y);
+      g.lineTo(x + Math.cos(a) * W * 0.13, y + Math.sin(a) * W * 0.13);
+    }
+    g.stroke();
+  };
+
+  g.save();
+  g.clip(geo.body);
+  // stage 1: a big dent in the near door, a cracked lamp, scrapes
+  crumple(L * 0.5, 0, L * 0.4, W * 0.42, 1);
+  for (let i = 0; i < 4; i++) scrape(i);
+  lamp(L - W * 0.08, W * 0.18);
+  if (stage >= 2) {
+    // the bonnet crumpled: bands of crease across it, the nose pushed in
+    const b0 = geo.bonnetX;
+    const span = L - b0;
+    g.fillStyle = 'rgba(8,5,3,0.4)';
+    g.fillRect(L - span * 0.22, 0, span * 0.22, W);
+    for (let k = 0; k < 4; k++) {
+      const x = b0 + span * (0.2 + k * 0.2);
+      g.strokeStyle = k % 2 ? 'rgba(255,236,204,0.5)' : 'rgba(8,5,3,0.75)';
+      g.lineWidth = 1.2;
+      g.beginPath();
+      g.moveTo(x, W * 0.12);
+      g.lineTo(x + span * 0.08, W * 0.35);
+      g.lineTo(x - span * 0.04, W * 0.6);
+      g.lineTo(x + span * 0.06, W * 0.88);
+      g.stroke();
+    }
+    // the screen cracks from the impact
+    const sx = (geo.screen[0][0] + geo.screen[1][0]) / 2;
+    g.strokeStyle = 'rgba(230,236,230,0.85)';
+    g.lineWidth = 0.6;
+    g.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + rnd(301 + i);
+      const r = W * (0.15 + rnd(310 + i) * 0.2);
+      g.moveTo(sx, W * 0.45);
+      g.lineTo(sx + Math.cos(a) * r * 0.5 + 0.8, W * 0.45 + Math.sin(a) * r * 0.5);
+      g.lineTo(sx + Math.cos(a) * r, W * 0.45 + Math.sin(a) * r);
+    }
+    g.stroke();
+    crumple(L * 0.2, W, L * 0.26, W * 0.32, -1);
+    for (let i = 4; i < 8; i++) scrape(i);
+  }
+  if (stage >= 3) {
+    // the body buckled: a fold right across the roof, and the far door gone, the cabin open to the gravel
+    g.strokeStyle = 'rgba(8,5,3,0.8)';
+    g.lineWidth = 1.6;
+    g.beginPath();
+    g.moveTo(L * 0.42, 0);
+    g.lineTo(L * 0.5, W * 0.45);
+    g.lineTo(L * 0.44, W);
+    g.stroke();
+    g.strokeStyle = 'rgba(255,236,204,0.45)';
+    g.lineWidth = 0.8;
+    g.beginPath();
+    g.moveTo(L * 0.44, 0);
+    g.lineTo(L * 0.52, W * 0.45);
+    g.lineTo(L * 0.46, W);
+    g.stroke();
+    const d0 = L * 0.4;
+    const d1 = L * 0.62;
+    g.fillStyle = '#16120e';
+    g.fillRect(d0, W * 0.7, d1 - d0, W * 0.3 + 1);
+    // the seat inside, and the bare edge of the opening
+    g.fillStyle = '#4a3a2c';
+    g.fillRect(d0 + (d1 - d0) * 0.2, W * 0.74, (d1 - d0) * 0.4, W * 0.14);
+    g.strokeStyle = 'rgba(196,190,176,0.8)';
+    g.lineWidth = 0.8;
+    g.strokeRect(d0, W * 0.7, d1 - d0, W * 0.3 + 1);
+    lamp(L - W * 0.08, W * 0.82);
+    for (let i = 8; i < 12; i++) scrape(i);
+  }
+  if (stage >= 4) {
+    // soot over the engine and the roof, the boot lid sprung open a hand
+    const soot = g.createRadialGradient(L * 0.8, W / 2, 0, L * 0.8, W / 2, L * 0.55);
+    soot.addColorStop(0, 'rgba(12,9,7,0.9)');
+    soot.addColorStop(1, 'rgba(12,9,7,0.35)');
     g.fillStyle = soot;
-    g.fillRect(geo.bonnetX - 4, 0, L, W);
-    g.fillStyle = '#121010';
-    g.fillRect(L - 3, W * 0.72, 3, W * 0.2);
+    g.fillRect(0, 0, L, W);
+    g.fillStyle = '#0c0a08';
+    g.fillRect(geo.bootX - 1.5, W * 0.1, 2.5, W * 0.8);
   }
   g.restore();
+  // outside the body: the rear bumper hanging off one corner, scraping the road
+  g.strokeStyle = INK;
+  g.lineWidth = 4.2;
+  g.lineCap = 'round';
+  g.beginPath();
+  g.moveTo(1, W * 0.12);
+  g.lineTo(-W * 0.22, W * 0.62);
+  g.stroke();
+  g.strokeStyle = STEEL;
+  g.lineWidth = 2.4;
+  g.stroke();
+  if (stage >= 3) {
+    // and the front bumper half off the other way
+    g.strokeStyle = INK;
+    g.lineWidth = 4.2;
+    g.beginPath();
+    g.moveTo(L - 1, W * 0.9);
+    g.lineTo(L + W * 0.2, W * 0.45);
+    g.stroke();
+    g.strokeStyle = STEEL;
+    g.lineWidth = 2.4;
+    g.stroke();
+  }
+  g.lineCap = 'butt';
   cache.set(key, c);
   return c;
 }

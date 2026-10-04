@@ -89,6 +89,8 @@ export interface Car {
   missileWait: number;
   mineWait: number;
   oilWait: number;
+  /** seconds a car has sat on this one's tail: a poor driver needs a while to get the can or the mine out */
+  tailed: number;
   /** seconds left of being a passenger after a hit */
   spin: number;
   /** seconds the car has gone nowhere since the lights: not a metre from where it was; the bot reverses on it */
@@ -284,6 +286,7 @@ export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: nu
       missileWait: 0,
       mineWait: 0,
       oilWait: 0,
+      tailed: 0,
       spin: 0,
       stall: 0,
       stallX: 0,

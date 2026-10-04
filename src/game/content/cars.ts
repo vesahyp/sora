@@ -8,7 +8,9 @@ import type { CarDef } from '../types';
  * should be close to a stock car of the next, so the choice at the dealer
  * is a real one. The career starts in the Tauno (docs/progression.md).
  * All four are the player's red; the body, the livery and the number
- * tell them apart. The footprint is real: the car model reads it.
+ * tell them apart. The footprint is real: the car model reads it, and
+ * it climbs with the class (the ladder is in rivals.ts): the Tauno is a
+ * tiny boxy old saloon, a Fiat 126 of a car.
  */
 export const CARS: CarDef[] = [
   {
@@ -17,7 +19,7 @@ export const CARS: CarDef[] = [
     cls: 'JM',
     shape: 'saloon',
     price: 1200,
-    blurb: L('Jokkisauto: takaveto, pehmeä ja painava. Vuotaa öljyä, ja se on ainoa aseesi.', 'A folk-racing saloon: rear drive, soft and heavy. It leaks oil, and that is your only weapon.'),
+    blurb: L('Pieni kulmikas jokkisauto: takaveto, pehmeä ja väsynyt. Vuotaa öljyä, ja se on ainoa aseesi.', 'A tiny boxy folk-racing saloon: rear drive, soft and tired. It leaks oil, and that is your only weapon.'),
     accel: 10.5,
     topSpeed: 31,
     brake: 13,
@@ -27,8 +29,8 @@ export const CARS: CarDef[] = [
     armour: 0,
     ram: 0,
     gun: 0,
-    length: 4.6,
-    width: 1.75,
+    length: 2.9,
+    width: 1.35,
     colour: '#c8352a',
     accent: '#e6dfcc',
     livery: 'roof',
@@ -73,8 +75,8 @@ export const CARS: CarDef[] = [
     armour: 0,
     ram: 0,
     gun: 0,
-    length: 4.3,
-    width: 1.7,
+    length: 4.4,
+    width: 1.75,
     colour: '#c8352a',
     accent: '#e6dfcc',
     livery: 'twin',
@@ -97,7 +99,7 @@ export const CARS: CarDef[] = [
     armour: 0,
     ram: 0,
     gun: 0,
-    length: 4.2,
+    length: 4.7,
     width: 1.9,
     colour: '#c8352a',
     accent: '#e8c040',

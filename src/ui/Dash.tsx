@@ -83,3 +83,36 @@ export function WheelIcon() {
     </svg>
   );
 }
+
+/** how far each pace-note grade's arrow turns, degrees: a 1 is a hairpin, a 6 barely bends */
+const NOTE_TURN = [175, 135, 100, 72, 48, 26];
+
+/**
+ * The co-driver's arrow: a thick stencil stroke that runs up and turns
+ * the way the bend goes, as far as the grade says. Drawn for a right
+ * bend and mirrored for a left.
+ */
+export function NoteArrow({ dir, grade }: { dir: 1 | -1; grade: number }) {
+  const turn = (NOTE_TURN[Math.max(1, Math.min(6, grade)) - 1] * Math.PI) / 180;
+  const r = 22;
+  const cx = 34 + r;
+  const cy = 58;
+  const a = Math.PI + turn;
+  const ex = cx + r * Math.cos(a);
+  const ey = cy + r * Math.sin(a);
+  // the tangent at the end, the way the arrow points
+  const tx = -Math.sin(a);
+  const ty = Math.cos(a);
+  const h = 15;
+  const w = 13;
+  const head = `${ex + tx * h},${ey + ty * h} ${ex - ty * w},${ey + tx * w} ${ex + ty * w},${ey - tx * w}`;
+  const large = turn > Math.PI ? 1 : 0;
+  return (
+    <svg viewBox="0 0 100 100" aria-hidden>
+      <g transform={dir < 0 ? 'translate(100 0) scale(-1 1)' : undefined}>
+        <path d={`M34 96 V${cy} A${r} ${r} 0 ${large} 1 ${ex.toFixed(1)} ${ey.toFixed(1)}`} fill="none" stroke="currentColor" strokeWidth="12" strokeDasharray="30 3" />
+        <polygon points={head} fill="currentColor" />
+      </g>
+    </svg>
+  );
+}

@@ -17,5 +17,6 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src", "tools"],
+  "exclude": ["tools/dbg"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

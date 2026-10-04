@@ -11,7 +11,8 @@ import { audio } from '../audio';
 import { botInput } from '../../tools/autoplayer';
 import { fmt, track } from '../records';
 import { t, tr } from '../i18n';
-import { Lamps, MineIcon, MissileIcon, OilIcon, PauseIcon, SoundIcon, WheelIcon } from './Dash';
+import { Lamps, MineIcon, MissileIcon, NoteArrow, OilIcon, PauseIcon, SoundIcon, WheelIcon } from './Dash';
+import { nextNote, type PaceNote } from '../game/notes';
 
 export interface RaceResult {
   trackId: string;
@@ -58,6 +59,8 @@ interface Hud {
   speed: number;
   hold: number;
   finished: boolean;
+  /** the co-driver's call for the next bend, or none on a straight */
+  note: { dir: 1 | -1; grade: number; s: number } | null;
 }
 
 /**
@@ -125,6 +128,14 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
 
     let lastCount = Math.ceil(s.hold);
     let finishedAt = -1;
+    // the pace note, read off the track in the loop; a new one ticks
+    let note: PaceNote | null = null;
+    const callNote = () => {
+      const me = s.cars[0];
+      const next = s.finished || me.wreck > 0 ? null : nextNote(s.track, me.s, me.speed);
+      if (next && next !== note && s.hold <= 0) audio.play('note');
+      note = next;
+    };
     const publishHud = () => {
       const me = s.cars[0];
       setHud({
@@ -148,6 +159,7 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
         speed: Math.max(0, me.speed),
         hold: s.hold,
         finished: s.finished,
+        note: note && { dir: note.dir, grade: note.grade, s: note.s },
       });
     };
     const result = (): RaceResult => {
@@ -210,6 +222,7 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
         }
       }
       if (acc > DT * 4 * speed) acc = 0;
+      callNote();
       renderer.draw(s, dt);
       audio.engineAt(Math.min(1, Math.max(0, s.cars[0].speed) / s.cars[0].def.topSpeed), s.cars[0].slip);
       // the wheel ghost
@@ -341,6 +354,13 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
               </span>
             </div>
           </div>
+          {hud.note && (
+            <div className={`pacenote g${hud.note.grade}`} key={hud.note.s} aria-label={`${hud.note.dir > 0 ? tr('oikea', 'right') : tr('vasen', 'left')} ${hud.note.grade}`}>
+              <NoteArrow dir={hud.note.dir} grade={hud.note.grade} />
+              <b>{hud.note.grade}</b>
+              <span>{hud.note.dir > 0 ? tr('oikea', 'right') : tr('vasen', 'left')}</span>
+            </div>
+          )}
           <div className="toasts">
             {hud.toasts.map((x, i) => (
               <div key={i} className="tape" style={{ opacity: Math.min(1, (2.6 - x.age) * 2) }}>

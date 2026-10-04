@@ -1,6 +1,8 @@
 // Every vehicle in the game on one dark canvas, to the same scale, names
-// under them: the player's four cars stock and fully built, then every
-// rival's vehicle class by class. `make lineup` writes shots/lineup.png.
+// under them: one row per class, the player's car first and the rivals'
+// vehicles beside it, so each row reads a size up from the one above;
+// then the player's cars fully built, then the Tauno at five levels of
+// damage so the stages sit side by side. `make lineup` writes shots/lineup.png.
 // If two vehicles in it could be confused at a glance, the look is not
 // done. Starts its own dev server on port 5198 and draws with the race's
 // own sprites, so what it shows is what the race shows.
@@ -20,7 +22,7 @@ page.on('pageerror', (e) => errors.push(String(e)));
 try {
   await page.goto(`http://localhost:${port}/?lang=fi`);
   const size = await page.evaluate(async () => {
-    const { carPicture, carShadow, SPRITE_PX } = await import('/src/render/sprites.ts');
+    const { carPicture, carShadow, damageSprite, damageStage, SPRITE_PX } = await import('/src/render/sprites.ts');
     const { CARS } = await import('/src/game/content/cars.ts');
     const { RIVAL_CARS, vehicleDef } = await import('/src/game/content/rivals.ts');
     const { OPPONENTS } = await import('/src/game/content/drivers.ts');
@@ -29,15 +31,19 @@ try {
     const PPM = 44;
     const COL = 6.4 * PPM;
     const ROW = 4.3 * PPM;
+    const stock = { ram: 0, armour: 0, engine: 0, tyres: 0, weight: 0, brakes: 0, gun: 0 };
     const rows = [
-      { title: 'Sinun autosi, vakiona', cars: CARS.map((c) => ({ def: c, who: `${c.cls}`, faded: false })) },
+      ...CLASSES.map((cls) => {
+        const mine = CARS.find((c) => c.cls === cls);
+        return {
+          title: `Luokka ${cls}`,
+          cars: [{ def: mine, who: 'sinä', faded: false }, ...OPPONENTS.map((d) => ({ def: vehicleDef(RIVAL_CARS[d.id][cls], cls, stock), who: d.name.fi, faded: true }))],
+        };
+      }),
       { title: 'Sinun autosi, täysin rakennettuina', cars: CARS.map((c) => ({ def: tuned(c, fullFor(c.cls)), who: `${c.cls}, kaikki osat`, faded: false })) },
-      ...CLASSES.map((cls) => ({
-        title: `Luokka ${cls}: kilpailijat`,
-        cars: OPPONENTS.map((d) => ({ def: vehicleDef(RIVAL_CARS[d.id][cls], cls, { ram: 0, armour: 0, engine: 0, tyres: 0, weight: 0, brakes: 0, gun: 0 }), who: d.name.fi, faded: true })),
-      })),
+      { title: 'Vauriot: Tauno 0, 20, 45, 70, 95', cars: [0, 20, 45, 70, 95].map((d) => ({ def: CARS[0], who: `vauriot ${d} · vaihe ${damageStage(d)}`, faded: false, damage: d })) },
     ];
-    const W = Math.round(COL * 4 + 80);
+    const W = Math.round(COL * Math.max(...rows.map((r) => r.cars.length)) + 80);
     const H = Math.round(ROW * rows.length + 40);
     const c = document.createElement('canvas');
     c.width = W;
@@ -72,6 +78,8 @@ try {
         const w = (spr.width / SPRITE_PX) * PPM;
         const h = (spr.height / SPRITE_PX) * PPM;
         g.drawImage(spr, cx - w / 2, cy - h / 2, w, h);
+        const dmg = v.damage ? damageSprite(v.def, damageStage(v.damage)) : null;
+        if (dmg) g.drawImage(dmg, cx - w / 2, cy - h / 2, w, h);
         g.textAlign = 'center';
         g.fillStyle = '#e8dfc8';
         g.font = '700 17px "Big Shoulders Text", "Arial Narrow", Arial, sans-serif';

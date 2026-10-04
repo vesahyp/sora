@@ -48,6 +48,14 @@ try {
   };
   await at(6, '03-straight');
   await at(14, '04-corner');
+  // the approach to Kiviaho's hairpin (it starts at about 362 m): the camera must show the whole
+  // bend before the car turns in, and the co-driver's arrow must already be up
+  await page.waitForFunction(() => {
+    const s = window.__sim;
+    const c = s && s.cars[0];
+    return s && (s.finished || (c.lap === 1 && c.s > 354 && c.s < 366));
+  }, null, { timeout: 300000, polling: 'raf' });
+  await shot('03b-approach');
   await at(40, '05-later');
   await page.waitForFunction(() => window.__sim && window.__sim.finished, null, { timeout: 600000 });
   await page.waitForTimeout(200);

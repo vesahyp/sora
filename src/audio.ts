@@ -88,6 +88,11 @@ class Audio {
       case 'go':
         beep(880, 0, 0.4);
         break;
+      case 'note':
+        // the co-driver's tick: a new pace note is up
+        beep(1500, 0, 0.025, 'square', 0.05);
+        beep(1900, 0.035, 0.03, 'square', 0.04);
+        break;
       case 'lap':
         beep(660, 0, 0.1);
         beep(880, 0.1, 0.18);

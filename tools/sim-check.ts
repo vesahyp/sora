@@ -10,29 +10,32 @@ import { TRACKS } from '../src/game/content/tracks';
 import { CARS } from '../src/game/content/cars';
 import { botInput, DEFAULT_BOT } from './autoplayer';
 import { OPPONENTS } from '../src/game/content/drivers';
+import type { CarClass } from '../src/game/types';
 import { PICKUPS } from '../src/game/content/pickups';
 import { standings } from '../src/game/state';
 import { STOCK, tuned } from '../src/game/content/parts';
-import { RIVAL_CARS, rivalCar, rivalField, vehicleDef } from '../src/game/content/rivals';
+import { RIVAL_CARS, rivalEntry, rivalField, vehicleDef } from '../src/game/content/rivals';
 import { CLASSES } from '../src/game/types';
 import { canCarry, carried } from '../src/game/content/weapons';
 
 /**
- * A phone's view of the world in metres, portrait: the renderer shows ten
- * cars across the short side (CARS_ACROSS in renderer.ts), so 17 m by
- * 37 m. The shares of the race that another car must be on it and that
- * a target must be in the sights, averaged over six races (every grid
- * order). On the rigid-body car model (ADR 0003) with the catch-up in
- * PACING the race sat at 42 to 65% on screen and 35 to 41% in the
- * sights across the tracks and cars; the old model gave 27 to 50% and
- * 15 to 37%. With the longer Kiviaho and Jorma on its shortcut
- * (2026-10-04) the armed classes sit at 29 to 44% and JM at 66 to 75%,
- * so the floor is a quarter; the target is still a half, and PACING is
- * the knob.
+ * A phone's view of the world in metres, portrait: the renderer shows
+ * fourteen cars across the short side (CARS_ACROSS in renderer.ts), so
+ * 24 m by 52 m. The shares of the race that another car must be on it
+ * and that a target must be in the sights, averaged over six races
+ * (every grid order). On the closer camera (17 by 37 m) with the field
+ * at the bot's ceiling the armed classes sat at 29 to 44% and JM at 66
+ * to 75%; the floor is a quarter, the target still a half, and PACING
+ * is the knob. JM's field is slow on purpose since 2026-10-04 (skill per
+ * class, rivals.ts): the player leaves it behind, at 17 to 36% on
+ * screen and 5 to 11% in the sights, so JM's floors are 15% and 3%.
  */
-const VIEW = { w: 17, h: 37 };
+const VIEW = { w: 24, h: 52 };
 const ON_SCREEN_MIN = 0.25;
+const ON_SCREEN_MIN_JM = 0.15;
 const IN_SIGHTS_MIN = 0.1;
+/** JM has no gun, so the sights only say someone is ahead; the player leaves a slow field behind */
+const IN_SIGHTS_MIN_JM = 0.03;
 
 declare const process: { argv: string[]; exitCode?: number };
 
@@ -41,6 +44,9 @@ const assert = (ok: boolean, what: string) => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`);
   if (!ok) failed = true;
 };
+
+/** The player's result in each armed race, the default bot at the wheel: place, and the gap to the best rival (negative is ahead). */
+const results: { track: string; cls: CarClass; grid: string; place: number; gap: number }[] = [];
 
 for (const track of TRACKS) {
   for (const car of CARS) {
@@ -142,9 +148,8 @@ for (const track of TRACKS) {
     let roadCredits = 0;
     const orders = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
     for (const grid of orders) {
-      const field = grid.map((k) => OPPONENTS[k]);
-      // every rival in their own vehicle: the class car's numbers under their body and mass
-      const race = createState(track, armed, 3, field.map((driver) => ({ driver, car: rivalCar(driver, car.cls, parts), ...boot })), boot);
+      // every rival in their own vehicle at its class's skill: the class car's numbers under their body and mass
+      const race = createState(track, armed, 3, grid.map((k) => ({ ...rivalEntry(OPPONENTS[k], car.cls, parts), ...boot })), boot);
       let drifting = 0;
       let boosts = 0;
       let slicks = 0;
@@ -180,6 +185,8 @@ for (const track of TRACKS) {
       const order = standings(race);
       console.log(`  race:  ${order.map((c) => `${c.driver.name.en} ${c.finishedAt >= 0 ? c.finishedAt.toFixed(1) : 'DNF'}`).join('  ')}`);
       assert(race.cars.every((c) => c.finishedAt >= 0), `${track.id}/${car.id}: the whole field finishes, guns and all`);
+      const rivals = race.cars.slice(1).map((c) => (c.finishedAt >= 0 ? c.finishedAt : Infinity));
+      results.push({ track: track.id, cls: car.cls, grid: grid.map((k) => OPPONENTS[k].name.en[0]).join(''), place: order.indexOf(me) + 1, gap: me.finishedAt - Math.min(...rivals) });
     }
     const seen = onScreen / Math.max(1, racing);
     const aimed = inSights / Math.max(1, racing);
@@ -199,8 +206,10 @@ for (const track of TRACKS) {
       assert(fight > road, `${track.id}/${car.id}: aggression pays more than the road (${Math.round(fight)} > ${Math.round(road)} cr)`);
       assert(fight > allCash, `${track.id}/${car.id}: aggression pays more than taking every cash (${Math.round(fight)} > ${allCash} cr)`);
     } else assert(fight > 0, `${track.id}/${car.id}: oil and rams pay something (${Math.round(fight)} cr a race)`);
-    assert(seen > ON_SCREEN_MIN, `${track.id}/${car.id}: the race happens on screen (${(seen * 100).toFixed(0)}% > ${ON_SCREEN_MIN * 100}%)`);
-    assert(aimed > IN_SIGHTS_MIN, `${track.id}/${car.id}: the player has someone ahead to go for (${(aimed * 100).toFixed(0)}% > ${IN_SIGHTS_MIN * 100}%)`);
+    const floor = car.cls === 'JM' ? ON_SCREEN_MIN_JM : ON_SCREEN_MIN;
+    assert(seen > floor, `${track.id}/${car.id}: the race happens on screen (${(seen * 100).toFixed(0)}% > ${floor * 100}%)`);
+    const sights = car.cls === 'JM' ? IN_SIGHTS_MIN_JM : IN_SIGHTS_MIN;
+    assert(aimed > sights, `${track.id}/${car.id}: the player has someone ahead to go for (${(aimed * 100).toFixed(0)}% > ${sights * 100}%)`);
     // unarmed the cars still lean on each other, so the order is not skill's alone; everyone must still get home
     const clean = createState(track, car, 3, rivalField(car.cls, STOCK));
     while (clean.cars.some((c) => c.finishedAt < 0) && clean.time < 900) step(clean, clean.cars.map((c) => botInput(clean, c)), DT);
@@ -211,7 +220,8 @@ for (const track of TRACKS) {
 }
 
 // every rival's vehicle alone, on the class car's numbers under its own footprint: the widest
-// (the van, 2 m on a 6 m road) and the smallest (the microcar) must lap as cleanly as the class car
+// (the van, 2 m on a 6 m road), the smallest (the JM boxes) and, at their own skill, the
+// sloppiest (a JM driver, wobbling and braking late) must get round without living in the trees
 for (const track of TRACKS) {
   console.log(`\n${track.id}: the rivals' vehicles alone`);
   for (const cls of CLASSES) {
@@ -219,6 +229,10 @@ for (const track of TRACKS) {
       const v = byClass[cls];
       const def = vehicleDef(v, cls, STOCK);
       const solo = createState(track, def, 3);
+      // JM and C at the vehicle's own skill: a poor driver wobbles and runs wide, and must still get
+      // round. B and A at the bot's ceiling: the footprint is what is checked there
+      const sloppy = cls === 'JM' || cls === 'C';
+      if (sloppy) solo.cars[0].driver = { ...solo.cars[0].driver, skill: v.skill };
       let offRoad = 0;
       let hits = 0;
       let steps = 0;
@@ -230,11 +244,29 @@ for (const track of TRACKS) {
         if (solo.cars[0].hit) hits++;
       }
       const laps = solo.cars[0].laps;
-      const name = `${cls} ${who} ${v.name.fi} (${v.shape} ${v.length} x ${v.width} m)`;
+      const name = `${cls} ${who} ${v.name.fi} (${v.shape} ${v.length} x ${v.width} m${sloppy ? `, skill ${v.skill}` : ''})`;
       console.log(`  ${name.padEnd(46)} ${laps.map((l) => l.toFixed(2)).join('  ')}   off road ${((offRoad / Math.max(1, steps)) * 100).toFixed(1)}%   tree hits ${hits}`);
       assert(solo.finished, `${track.id}/${name}: the bot finishes three laps alone`);
-      assert(offRoad / Math.max(1, steps) < 0.08 && hits < 30, `${track.id}/${name}: on the road and clear of the trees`);
+      // a poor driver runs wide onto the verge now and then: that is the point, the trees are not
+      assert(offRoad / Math.max(1, steps) < 0.15 && hits < 30, `${track.id}/${name}: mostly on the road and clear of the trees (off ${((offRoad / Math.max(1, steps)) * 100).toFixed(1)}%, ${hits} tree steps)`);
     }
+  }
+}
+
+// the career's curve, read off the player's results: the default bot (skill 1) is a fair
+// stand-in for a player who has learnt the car. JM must be won easily from the back of the
+// grid, C fought for, A not handed over
+console.log('\nthe player against the field, the default bot driving, every grid order (J M T = Jorma Marko Tapsa)');
+for (const track of TRACKS) {
+  for (const cls of CLASSES) {
+    const rs = results.filter((r) => r.track === track.id && r.cls === cls);
+    if (!rs.length) continue;
+    const cells = rs.map((r) => `${r.grid} P${r.place} ${r.gap <= 0 ? '+' : '-'}${Math.abs(r.gap).toFixed(1)}s`);
+    console.log(`  ${track.id.padEnd(9)} ${cls.padEnd(3)} ${cells.join('   ')}`);
+    if (cls === 'JM') assert(rs.every((r) => r.place === 1 && r.gap <= -3), `${track.id}/JM: the player wins every race by 3 s or more`);
+    // C is a fight with mines and guns: one race in six can still go to a wreck on lap one
+    if (cls === 'C') assert(rs.filter((r) => r.place <= 2).length >= rs.length - 1, `${track.id}/C: the player finishes in the top two in all races but one (${rs.filter((r) => r.place <= 2).length} of ${rs.length})`);
+    if (cls === 'A') assert(rs.some((r) => r.place > 1), `${track.id}/A: the player does not win every race`);
   }
 }
 

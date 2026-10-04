@@ -14,6 +14,7 @@ import {
   PICKUP_TURNS,
   damageSprite,
   damageStage,
+  DAMAGE_WORST,
   propSprite,
   puffSprite,
   spruceSprite,
@@ -30,8 +31,8 @@ import { Ground } from './ground';
 import { PAL, SHADOW_ALPHA, SHADOW_INK, SHADOW_PER_M, SHADOW_X, SHADOW_Y } from './look';
 
 /**
- * Draws the world. North-up camera that follows the car and leads it a
- * little in the direction of travel, the Super Cars II view. A frame is
+ * Draws the world. North-up camera that follows the car and looks down
+ * the road ahead of it, the Super Cars II view. A frame is
  * mostly drawImage: the ground and everything static on it is baked in
  * chunks (ground.ts), the sprites are cached (sprites.ts), and per frame
  * there are only the shadows of what moves, the cars, the air and the
@@ -55,20 +56,61 @@ const DUST_TINTS = ['176,160,128', '168,150,104', '30,26,24', '96,90,84', '92,80
 const WIND_X = SHADOW_X * 0.45;
 const WIND_Y = SHADOW_Y * 0.45;
 const DUST_MAX = 150;
+/** the smoke of a hurt engine at damage stages 2, 3 and 4: puffs a second each, how many, life, size, tint */
+const SMOKE = [
+  { rate: 9, n: 1, life: 1.3, r: 0.4, tint: 3 },
+  { rate: 18, n: 2, life: 2.0, r: 0.75, tint: 2 },
+  { rate: 24, n: 3, life: 2.4, r: 0.95, tint: 2 },
+];
+/** seconds a spark off a dragging bumper lives */
+const SPARK_LIFE = 0.28;
+/** seconds a car flashes white when it is hit, so a hit reads even when the dent is on the far side */
+const HIT_FLASH = 0.12;
 
 /** pixels per metre of the skid mark layer */
 const MARK_PPM = 4;
 /**
- * The camera's scale: a car is about a tenth of the screen's short side,
- * Death Rally's view, so the cars beside you and the gaps between them
- * are the picture. A 1.7 m car, so the short side shows about 17 m.
+ * The camera's scale: fourteen car widths across the screen's short
+ * side, a 1.7 m car, so a phone in portrait shows about 24 m by 52 m.
+ * Ten across (17 m) was Death Rally's close view and on a phone it hid
+ * every bend until the car was in it (Vesa, 2026-10-04): the road ahead
+ * is the picture, the cars beside you are in it.
  */
-const CARS_ACROSS = 10;
+const CARS_ACROSS = 14;
 const CAR_WIDTH = 1.7;
 /** pickups are drawn larger than life, so the thing reads at a glance at this camera */
 const PICKUP_SCALE = 1.25;
-/** seconds of travel the camera looks ahead of the car */
-const LEAD = 0.35;
+/**
+ * The camera looks down the road: its target is the point on the track
+ * LEAD_S seconds of speed ahead of the car (at least LEAD_MIN metres) of
+ * arc length, so round a bend it swings to where the road goes, not
+ * where the car points. It is pulled back toward the car until the car
+ * sits LEAD_SHARE of the screen from its centre, a third up from the
+ * bottom of a portrait phone. LEAD_EASE is how fast the lead swings to
+ * a new direction, per second, so it never snaps; the car itself is
+ * followed exactly.
+ */
+const LEAD_S = 1.0;
+const LEAD_MIN = 14;
+const LEAD_SHARE = 1 / 6;
+const LEAD_EASE = 3;
+
+/** a sprite's silhouette in flat white, made once per sprite canvas: the hit flash */
+const whites = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
+function whiteOf(spr: HTMLCanvasElement): HTMLCanvasElement {
+  let w = whites.get(spr);
+  if (w) return w;
+  w = document.createElement('canvas');
+  w.width = spr.width;
+  w.height = spr.height;
+  const g = w.getContext('2d')!;
+  g.drawImage(spr, 0, 0);
+  g.globalCompositeOperation = 'source-in';
+  g.fillStyle = '#fff6e4';
+  g.fillRect(0, 0, w.width, w.height);
+  whites.set(spr, w);
+  return w;
+}
 
 export class Renderer {
   private g: CanvasRenderingContext2D;
@@ -80,7 +122,15 @@ export class Renderer {
   private camX = 0;
   private camY = 0;
   private camInit = false;
+  /** the camera's lead over the car, metres, eased toward camTarget() */
+  private leadX = 0;
+  private leadY = 0;
   private dust: Dust[] = [];
+  private sparks: { x: number; y: number; vx: number; vy: number; age: number }[] = [];
+  /** per car: the damage last frame and the flash left, seconds */
+  private hurt = new WeakMap<Car, { damage: number; flash: number }>();
+  /** the frame's real seconds, for the flash */
+  private frameDt = 0;
   /** dust puffs a second, smoothed: how thick the haze hangs */
   private activity = 0;
   private roadPath: Path2D | null = null;
@@ -117,7 +167,8 @@ export class Renderer {
     this.canvas.width = Math.round(this.w * this.dpr);
     this.canvas.height = Math.round(this.h * this.dpr);
     const short = Math.min(this.w, this.h);
-    const ppm = Math.max(16, Math.min(40, short / (CAR_WIDTH * CARS_ACROSS)));
+    // a small phone keeps the 24 m; a desktop window in landscape stops at 40 px a metre
+    const ppm = Math.max(12, Math.min(40, short / (CAR_WIDTH * CARS_ACROSS)));
     // snapped so a 16 m ground chunk is a whole number of device pixels: the ground then
     // blits 1:1 with no resampling. The zoom moves by less than a pixel across the chunk
     this.ppm = Math.round(16 * ppm * this.dpr) / (16 * this.dpr);
@@ -164,20 +215,23 @@ export class Renderer {
     const g = this.g;
     const c = s.cars[0];
     const t = s.track;
+    this.frameDt = dt;
     this.ensureTrack(t);
     const sc = this.scenery!;
-    // camera: lead the car a little in the direction of travel
-    const tx = c.x + c.vx * LEAD;
-    const ty = c.y + c.vy * LEAD;
+    // camera: down the road, the car a third up from the bottom. The lead is smoothed, not the
+    // camera: easing the position itself trails a fast car by its speed over the rate, metres
+    const { x: tx, y: ty } = this.camTarget(c, t);
     if (!this.camInit) {
-      this.camX = tx;
-      this.camY = ty;
+      this.leadX = tx - c.x;
+      this.leadY = ty - c.y;
       this.camInit = true;
     } else {
-      const k = 1 - Math.exp(-dt * 5);
-      this.camX += (tx - this.camX) * k;
-      this.camY += (ty - this.camY) * k;
+      const k = 1 - Math.exp(-dt * LEAD_EASE);
+      this.leadX += (tx - c.x - this.leadX) * k;
+      this.leadY += (ty - c.y - this.leadY) * k;
     }
+    this.camX = c.x + this.leadX;
+    this.camY = c.y + this.leadY;
 
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.globalAlpha = 1;
@@ -404,16 +458,45 @@ export class Renderer {
       g.restore();
     }
 
-    // smoke out of a hurt engine, from the bonnet
+    // smoke out of a hurt engine, from the bonnet, by the damage stage: a thin grey trail at 2,
+    // thick black at 3 and 4; sparks off the hanging bumper from 3 when the car is moving
     for (const car of s.cars) {
-      if (car.damage < 50 || car.wreck > 0 || s.hold > 0) continue;
-      const n = car.damage > 78 ? 2 : 1;
-      for (let i = 0; i < n; i++) {
-        if (Math.random() > dt * 16) continue;
-        const fwd = car.def.length * 0.3;
-        this.puff(car.x + Math.cos(car.heading) * fwd, car.y + Math.sin(car.heading) * fwd, car.vx * 0.3 + (Math.random() - 0.5), car.vy * 0.3 + (Math.random() - 0.5), 1.6, 0.6, car.damage > 78 ? 2 : 3);
+      const stage = damageStage(car.damage);
+      if (stage < 2 || car.wreck > 0 || s.hold > 0) continue;
+      const smoke = SMOKE[stage - 2];
+      const fwd = car.def.length * 0.3;
+      const ch = Math.cos(car.heading);
+      const sh = Math.sin(car.heading);
+      for (let i = 0; i < smoke.n; i++) {
+        if (Math.random() > dt * smoke.rate) continue;
+        this.puff(car.x + ch * fwd, car.y + sh * fwd, car.vx * 0.3 + (Math.random() - 0.5), car.vy * 0.3 + (Math.random() - 0.5), smoke.life, smoke.r, smoke.tint);
+      }
+      if (stage >= 3 && car.speed > 6 && Math.random() < dt * 14 && this.sparks.length < 60) {
+        // from the tail corner where the bumper drags
+        const bx = car.x - ch * car.def.length * 0.5 - sh * car.def.width * 0.2;
+        const by = car.y - sh * car.def.length * 0.5 + ch * car.def.width * 0.2;
+        for (let k = 0; k < 3; k++) this.sparks.push({ x: bx, y: by, vx: car.vx * 0.5 + (Math.random() - 0.5) * 6, vy: car.vy * 0.5 + (Math.random() - 0.5) * 6, age: 0 });
       }
     }
+    g.globalCompositeOperation = 'lighter';
+    g.lineCap = 'round';
+    g.lineWidth = 0.09;
+    for (let i = this.sparks.length - 1; i >= 0; i--) {
+      const p = this.sparks[i];
+      p.age += dt;
+      if (p.age > SPARK_LIFE) {
+        this.sparks.splice(i, 1);
+        continue;
+      }
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      g.strokeStyle = `rgba(255,${200 - Math.round(p.age * 400)},90,${1 - p.age / SPARK_LIFE})`;
+      g.beginPath();
+      g.moveTo(p.x, p.y);
+      g.lineTo(p.x - p.vx * 0.035, p.y - p.vy * 0.035);
+      g.stroke();
+    }
+    g.globalCompositeOperation = 'source-over';
 
     // bursts: the fire stays saturated; the dust and smoke they throw go into the air below
     for (const f of s.fx) {
@@ -620,8 +703,30 @@ export class Renderer {
     const sw = spr.width / SPRITE_PX;
     const sh = spr.height / SPRITE_PX;
     g.drawImage(spr, -sw / 2, -sh / 2, sw, sh);
-    const dmg = damageSprite(car.def, damageStage(car.damage));
+    const stage = damageStage(car.damage);
+    const dmg = damageSprite(car.def, stage);
     if (dmg) g.drawImage(dmg, -sw / 2, -sh / 2, sw, sh);
+    // a hit flashes the whole car white for a moment: the damage went up since last frame
+    const h = this.hurt.get(car) ?? { damage: car.damage, flash: 0 };
+    if (car.damage > h.damage + 0.25) h.flash = HIT_FLASH;
+    else h.flash = Math.max(0, h.flash - this.frameDt);
+    h.damage = car.damage;
+    this.hurt.set(car, h);
+    if (h.flash > 0) {
+      g.globalAlpha = 0.85 * (h.flash / HIT_FLASH);
+      g.drawImage(whiteOf(spr), -sw / 2, -sh / 2, sw, sh);
+      g.globalAlpha = 1;
+    }
+    if (stage >= 4) {
+      // fire licking out from under the bonnet
+      const f = fireSprite();
+      const r = car.def.width * (0.28 + Math.random() * 0.12);
+      g.globalCompositeOperation = 'lighter';
+      g.globalAlpha = 0.7;
+      g.drawImage(f, car.def.length * 0.28 - r, -r, r * 2, r * 2);
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+    }
     if (car.boosting > 0) {
       // the nitro flame out of the back, and the air shimmering behind it
       const len = 1.6 + Math.random() * 1.4;
@@ -655,6 +760,38 @@ export class Renderer {
     g.restore();
   }
 
+  /**
+   * Where the camera wants to be: the road LEAD_S seconds ahead, pulled
+   * back so the car stays LEAD_SHARE of the screen from the centre in
+   * that direction. Down a shortcut the track's road is the wrong way, so
+   * there it leads along the car's own travel.
+   */
+  private camTarget(c: Car, t: Track): { x: number; y: number } {
+    const ahead = Math.max(LEAD_MIN, Math.max(0, c.speed) * LEAD_S);
+    let ax: number;
+    let ay: number;
+    if (t.inLane(c.x, c.y)) {
+      const v = Math.hypot(c.vx, c.vy);
+      const ux = v > 1 ? c.vx / v : Math.cos(c.heading);
+      const uy = v > 1 ? c.vy / v : Math.sin(c.heading);
+      ax = c.x + ux * ahead;
+      ay = c.y + uy * ahead;
+    } else {
+      const p = t.at(c.s + ahead);
+      ax = p.x;
+      ay = p.y;
+    }
+    const dx = ax - c.x;
+    const dy = ay - c.y;
+    const len = Math.hypot(dx, dy) || 1;
+    // how far the car may sit from the centre along that line: a share of the screen's extent that way
+    const vw = this.w / this.ppm;
+    const vh = this.h / this.ppm;
+    const extent = Math.min(Math.abs(dx) > 1e-6 ? vw / (Math.abs(dx) / len) : Infinity, Math.abs(dy) > 1e-6 ? vh / (Math.abs(dy) / len) : Infinity);
+    const k = Math.min(1, (extent * LEAD_SHARE) / len);
+    return { x: c.x + dx * k, y: c.y + dy * k };
+  }
+
   /** A wreck: the body charred black, fire on it, black smoke rising. */
   /** a pickup's lie on the road: one of the fixed turns, picked by where it is */
   private pickupTurn(x: number, y: number): number {
@@ -671,7 +808,7 @@ export class Renderer {
     const w = spr.width / SPRITE_PX;
     const h = spr.height / SPRITE_PX;
     g.drawImage(spr, -w / 2, -h / 2, w, h);
-    g.drawImage(damageSprite(def, 3)!, -w / 2, -h / 2, w, h);
+    g.drawImage(damageSprite(def, DAMAGE_WORST)!, -w / 2, -h / 2, w, h);
     g.restore();
   }
 
