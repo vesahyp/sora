@@ -15,6 +15,7 @@
 #   make touch-check   # drives the race by touch on an emulated phone
 #   make drive-log     # set pieces by touch on a phone, the physics logged (PHYSICS=old for the old model)
 #   make stuck-check   # a wedged car frees itself, on the phone layout (PORT=5187 if 5197 is taken)
+#   make rotate-check  # turning the phone must not break the view (PORT=5187 if 5197 is taken)
 #   make pwa-check     # manifest, icons, service worker, offline (URL ?= the live site)
 #   make plan          # terraform plan for the pixel infra (no changes)
 #   make apply         # terraform apply (creates AWS resources), then make env
@@ -75,6 +76,10 @@ drive-log:
 # the owner's stuck spot, driven on the phone layout: a wedged car must free itself
 stuck-check:
 	node scripts/stuck-check.mjs
+
+# turning the phone mid-race and in the menus, with iOS's late layout played in
+rotate-check:
+	node scripts/rotate-check.mjs
 
 URL ?= https://vesahyp.github.io/sora/
 pwa-check:

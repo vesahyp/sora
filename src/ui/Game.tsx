@@ -118,6 +118,14 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
     };
     window.addEventListener('resize', onResize);
     window.visualViewport?.addEventListener('resize', onResize);
+    // a turn of the phone: iOS Safari fires resize while the canvas still measures the old
+    // layout and sends nothing once it has settled, so size again a little later, twice
+    const timers: number[] = [];
+    const onTurn = () => {
+      for (const ms of [60, 350]) timers.push(window.setTimeout(onResize, ms));
+    };
+    window.addEventListener('orientationchange', onTurn);
+    screen.orientation?.addEventListener('change', onTurn);
     layoutPedal();
 
     const params = new URLSearchParams(location.search);
@@ -193,6 +201,9 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
     let hudAt = 0;
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
+      // the belt to the braces above: whatever event was missed, a canvas that no longer
+      // measures its size is resized before it is drawn
+      if (!renderer.fits()) onResize();
       const t0 = performance.now();
       let dt = Math.min(0.1, (now - last) / 1000);
       last = now;
@@ -264,6 +275,9 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
       audio.stopEngine();
       window.removeEventListener('resize', onResize);
       window.visualViewport?.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onTurn);
+      screen.orientation?.removeEventListener('change', onTurn);
+      for (const t of timers) clearTimeout(t);
       void wake?.release();
     };
   }, [trackId, car, field, laps, ammo, onEnd]);

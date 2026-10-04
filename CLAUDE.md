@@ -200,6 +200,9 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
   bot driving), never from a hand-held browser. `?bot=1&speed=3` makes the
   bot drive at triple speed for scripts. `make touch-check` drives the race
   by touch; run it when you touched `input.ts` or the HUD buttons.
+  `make rotate-check` turns the phone mid-race and in the menus with
+  iOS's late layout played in; run it when you touched the canvas
+  sizing, the resize path or the dash layout.
 - **Every vehicle reads apart.** `make lineup` draws every vehicle in the
   game, stock and built, on one canvas (`shots/lineup.png`). Look at it
   after touching `sprites.ts`, `cars.ts` or `rivals.ts`: two vehicles

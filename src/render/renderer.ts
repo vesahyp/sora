@@ -165,6 +165,12 @@ export class Renderer {
     this.resize();
   }
 
+  /** Does the canvas still measure what it was last sized to? iOS fires the resize before the
+   *  turn's layout has settled and nothing after, so the loop asks this every frame. */
+  fits(): boolean {
+    return Math.round(this.canvas.clientWidth) === this.w && Math.round(this.canvas.clientHeight) === this.h;
+  }
+
   resize(): void {
     const r = this.canvas.getBoundingClientRect();
     this.dpr = Math.min(2, window.devicePixelRatio || 1);
