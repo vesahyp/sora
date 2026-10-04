@@ -130,7 +130,9 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
 
     const params = new URLSearchParams(location.search);
     const bot = params.get('bot') === '1';
-    const speed = Math.max(1, Number(params.get('speed') ?? 1));
+    // ?speed=3 runs the bot at triple speed for screenshots; under 1 is slow motion, for a
+    // script that drives by touch and cannot keep up with sixty frames a second
+    const speed = Math.max(0.25, Number(params.get('speed') ?? 1));
     const perf = { frames: 0, ms: 0, worst: 0 };
     (window as unknown as { __perf: typeof perf }).__perf = perf;
 

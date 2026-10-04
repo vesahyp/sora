@@ -16,6 +16,7 @@
 #   make drive-log     # set pieces by touch on a phone, the physics logged (PHYSICS=old for the old model)
 #   make stuck-check   # a wedged car frees itself, on the phone layout (PORT=5187 if 5197 is taken)
 #   make rotate-check  # turning the phone must not break the view (PORT=5187 if 5197 is taken)
+#   make playthrough   # the first hour by thumb on a phone, a video per race (RACES=jm-kiviaho,... for a subset)
 #   make pwa-check     # manifest, icons, service worker, offline (URL ?= the live site)
 #   make plan          # terraform plan for the pixel infra (no changes)
 #   make apply         # terraform apply (creates AWS resources), then make env
@@ -29,7 +30,7 @@ PROFILE ?= personal
 AWS      = AWS_PROFILE=$(PROFILE) aws
 TF       = AWS_PROFILE=$(PROFILE) terraform -chdir=infra
 
-.PHONY: dev build preview check balance shots-setup shots shots-en icon lineup touch-check drive-log pwa-check plan apply outputs env deploy-pixel
+.PHONY: dev build preview check balance shots-setup shots shots-en icon lineup touch-check drive-log stuck-check rotate-check playthrough pwa-check plan apply outputs env deploy-pixel
 
 dev:
 	npm run dev
@@ -80,6 +81,13 @@ stuck-check:
 # turning the phone mid-race and in the menus, with iOS's late layout played in
 rotate-check:
 	node scripts/rotate-check.mjs
+
+# the first hour of the career on an emulated iPhone, every input a touch, a hand that is not the
+# bot at the wheel: a video, a result sheet and frame sheets per race into shots/playthrough/,
+# summary.md with the places and laps. The proof a handling or balance change is read against
+RACES ?=
+playthrough:
+	RACES=$(RACES) node scripts/playthrough.mjs
 
 URL ?= https://vesahyp.github.io/sora/
 pwa-check:

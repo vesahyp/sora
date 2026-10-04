@@ -134,6 +134,11 @@ scripts/
                         the race's own sprites, the Tauno at five levels of damage, then a row per part
                         at levels 0-3, the armoury's load and the paints
   pwa-check.mjs       the install check: manifest, every icon at its size, the service worker, offline
+  playthrough.mjs     the first hour by thumb: every folk race on an emulated iPhone in landscape, every
+                        input a touch through input.ts, a hand with a reaction delay and a thumb's speed
+                        at the wheel (not the bot), parts bought between races; a video, a result sheet
+                        and frame sheets per race, summary.md with the places and laps, and the rules of
+                        a fun hour asserted at the end
 infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs), see TRACKING.md
 ```
 
@@ -182,6 +187,13 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
   grid orders), `spin.ts` (the ground a blast costs). Build one like
   the tools: `npx vite build --ssr tools/dbg/matrix.ts --outDir .sim-check && node .sim-check/matrix.js`.
 - `?physics=old` plays the old car model, for one release, to compare.
+- **A handling or balance change is proved by thumb, on video.** `make playthrough`
+  plays the first hour on an emulated phone with a hand that is not the bot
+  (`scripts/playthrough.mjs`: a reaction delay, a thumb that moves at a thumb's
+  speed, a margin it does not know) and leaves a video and frame sheets per race
+  in `shots/playthrough/`. Read the sheets before claiming a change is felt: the
+  bot laps 30 s where that thumb laps 35, and a dozen fixes checked only against
+  the bot left the game playing badly (2026-10-04). `RACES=jm-kiviaho` for one race.
 - **A track feature is checked before it is driven.** `sim-check` jumps
   every river with every class car and asserts it is cleared every lap,
   lands every flight (a crest's too) on the road, drives every shortcut
