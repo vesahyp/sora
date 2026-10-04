@@ -122,7 +122,7 @@ try {
   await page.locator('.card.part').first().tap();
   await page.waitForTimeout(200);
   const lvl = await page.locator('.card.part').first().locator('.ic').innerText();
-  check(lvl.startsWith('1'), `a tap in the shop buys tyres (level ${lvl.trim()})`);
+  check(lvl.startsWith('1'), `a tap in the shop buys the first part, the ram bar (level ${lvl.trim()})`);
 } catch (e) {
   check(false, String(e));
 } finally {

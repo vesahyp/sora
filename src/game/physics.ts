@@ -1,6 +1,6 @@
 import type { Car, SimState } from './state';
 import type { CarInput } from './types';
-import { BOOST, DAMAGE, DAMAGE_PACE, SPIN_TIME } from './content/weapons';
+import { BOOST, DAMAGE, DAMAGE_PACE, OIL, SPIN_TIME } from './content/weapons';
 import { enginePace } from './content/drivers';
 import { SURFACES, type SurfaceDef } from './content/surfaces';
 import { clamp, hurt, ram } from './harm';
@@ -111,6 +111,7 @@ function ask(s: SimState, c: Car, input: CarInput, dt: number): Ask {
   // damage costs pull and top speed; an opponent's engine is also paced to the player (PACING)
   const pace = (1 - DAMAGE_PACE * (c.damage / 100)) * enginePace(s, c);
   if (c.spin > 0) c.spin -= dt;
+  if (c.slick > 0) c.slick -= dt;
   const spinning = c.spin > 0;
   if (input.boost && !done && !spinning && c.boost > 0.05 && c.boosting <= 0) {
     c.boosting = Math.min(BOOST.seconds * BOOST.burst, c.boost * BOOST.seconds);
@@ -215,8 +216,10 @@ function integrate(s: SimState, c: Car, a: Ask, h: number, last: boolean): void 
     // braking loads the nose fully; the engine squats the tail only half as much, or the pedal-less
     // throttle the thumb gives would make every car push
     const shift = clamp((CG_OVER_L * (c.ax < 0 ? c.ax : c.ax * 0.5)) / G, -SHIFT_MAX, SHIFT_MAX);
-    const capF = def.grip * sf.grip * (0.5 - shift) * loose;
-    const capR = def.grip * sr.grip * REAR_GRIP * (0.5 + shift) * loose;
+    // oil under the tyres: little hold on the front, less on the rear, so the tail goes first
+    const oiled = c.slick > 0;
+    const capF = def.grip * sf.grip * (0.5 - shift) * loose * (oiled ? OIL.grip : 1);
+    const capR = def.grip * sr.grip * REAR_GRIP * (0.5 + shift) * loose * (oiled ? OIL.rearGrip : 1);
 
     // drive: the engine's push fades toward the top speed the surface allows
     const top = a.top * Math.min(sf.top, sr.top);

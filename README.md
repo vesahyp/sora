@@ -21,10 +21,12 @@ Vasemmassa alakulmassa on **poljin**, ja toinen sormi missä tahansa on
 sama poljin: se jarruttaa ja irrottaa perän, eli jarrutus mutkaan heittää
 auton sivuluisuun. Pysähdyksissä pohjaan painettuna auto peruuttaa.
 
-**Aseet laukeavat itse.** Konekivääri ampuu, kun auto on edessä
-tähtäimen kartiossa, ja kuumenee parin sekunnin sarjasta. Ohjus lähtee,
-kun auto on pysynyt tähtäimessä puoli sekuntia. Miina putoaa, kun auto on
-ihan takana. Sinä päätät, mihin ajat ja milloin nitro palaa.
+**Aseet laukeavat itse.** Öljy vuotaa tielle, kun auto on ihan takana:
+lätäkössä renkaat eivät pidä ja perä lähtee. Konekivääri ampuu, kun auto
+on edessä tähtäimen kartiossa, ja kuumenee parin sekunnin sarjasta. Ohjus
+lähtee, kun auto on pysynyt tähtäimessä puoli sekuntia. Miina putoaa, kun
+auto on ihan takana. Sinä päätät, mihin ajat ja milloin nitro palaa.
+Jokkisautossa on vain öljy; muut aseet tulevat luokkien myötä.
 
 **Näppäimistöllä:** nuolet tai A ja D kääntävät, alas, S tai välilyönti
 on poljin, X tai ylös on nitro.
@@ -82,22 +84,29 @@ kierros, ja **Hirvisuo**, kilometrin lenkki.
 
 ## Ura
 
-Ura alkaa tallista: Kortteli 1.3 ja 600 krediittiä. Kisat tuovat rahaa
-sijoituksen mukaan, ja raha menee kolmeen paikkaan:
+Ura alkaa jokamiesluokasta: tallissa on Tauno 2.0, vanha takavetoinen
+jokkisauto, kolme kanisteria öljyä ja 150 krediittiä, eli juuri
+puskurin hinta. Kisat tuovat rahaa sijoituksen mukaan, ja raha menee
+kolmeen paikkaan:
 
-- **Osakauppa**: renkaat, kevennys, moottori, jarrut, panssari ja
-  konekivääri, kolme tasoa kukin. Renkaat ensin, se on paras raha.
-  Panssari kestää osumia ja painaa kolarissa.
-- **Autokauppa**: kolme autoa, luokat C, B ja A. Vanha auto jää talliin.
-  Täyteen rakennettu auto on lähes seuraavan luokan vakioauton veroinen.
-- **Asevarasto**: ohjuksia ja miinoja kappaleittain. Mitä jää, se jää
-  seuraavaan kisaan. Ura alkaa kolmella kummallakin.
+- **Osakauppa**: puskuri, panssari, moottori ja renkaat, kolme tasoa
+  kukin. Puskuri tekee töytäisystä kipeän heille eikä sinulle. C-luokan
+  autoon sopii lisäksi kevennys, jarrut ja konekivääri, jonka
+  ensimmäinen taso on itse ase.
+- **Autokauppa**: neljä autoa, luokat JM, C, B ja A. Vanha auto jää
+  talliin. Täyteen rakennettu auto on seuraavan luokan vakioauton
+  veroinen.
+- **Asevarasto**: öljyä, miinoja ja ohjuksia kappaleittain. Mitä jää,
+  se jää seuraavaan kisaan. Auto kantaa vain luokkansa aseet: öljyä
+  jokkiksesta, miinoja C-luokasta, ohjuksia B-luokasta.
 - **Ajokortit**: B- ja A-luokan kisoihin pitää ajaa kortti: yksi kierros
-  yksin omalla autolla alle rajan. Kello käy lähtövaloista.
+  yksin omalla autolla alle rajan. Kello käy lähtövaloista. C-luokkaan
+  pääsee ostamalla auton.
 
 Kisat on jaettu luokkiin. Kentän autot ovat luokan autoja, ja saman luokan
 myöhemmät kisat ajetaan rakennetummilla autoilla. Luokan C kisoihin ei
-pääse B-autolla: se olisi liian helppoa.
+pääse B-autolla: se olisi liian helppoa. Luokan viisi ensimmäistä kisaa,
+rahat ja kaupan järjestys ovat [`docs/progression.md`](docs/progression.md).
 
 Suunnitelma on [`docs/design.md`](docs/design.md), seuraavat askeleet
 [`ROADMAP.md`](ROADMAP.md).

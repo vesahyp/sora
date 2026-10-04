@@ -39,6 +39,18 @@ export function MineIcon() {
   );
 }
 
+/** An oil can: a drum with a spout, a drip under it. */
+export function OilIcon() {
+  return (
+    <svg className="glyph" viewBox="0 0 24 24" aria-hidden>
+      <path d="M6 8h9v11H6z" fill="currentColor" />
+      <path d="M15 10l5-3v4l-5 1z" fill="currentColor" />
+      <rect x="8" y="5" width="5" height="3" fill="currentColor" />
+      <path d="M10.5 20c-1.2 1.4-1.2 2.6 0 3 1.2-.4 1.2-1.6 0-3z" fill="currentColor" opacity="0.7" />
+    </svg>
+  );
+}
+
 export function PauseIcon() {
   return (
     <svg className="glyph" viewBox="0 0 24 24" aria-hidden>

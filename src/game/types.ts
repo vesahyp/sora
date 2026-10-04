@@ -39,10 +39,14 @@ export interface JumpDef {
   h: number;
 }
 
-/** The classes, slowest first. A car has one; an event is run in one. */
-export type CarClass = 'C' | 'B' | 'A';
-export const CLASSES: CarClass[] = ['C', 'B', 'A'];
-export const CLASS_RANK: Record<CarClass, number> = { C: 0, B: 1, A: 2 };
+/**
+ * The classes, slowest first. A car has one; an event is run in one. JM is
+ * jokamiesluokka, folk racing in old saloons, where a career starts
+ * (docs/adr/0004-career-starts-in-jokamiesluokka.md).
+ */
+export type CarClass = 'JM' | 'C' | 'B' | 'A';
+export const CLASSES: CarClass[] = ['JM', 'C', 'B', 'A'];
+export const CLASS_RANK: Record<CarClass, number> = { JM: 0, C: 1, B: 2, A: 3 };
 
 export interface TrackDef {
   id: string;
@@ -58,8 +62,8 @@ export interface TrackDef {
   points: [number, number][];
 }
 
-/** The body the sprite draws: a boxy hatchback, a low coupe, a winged rally car. */
-export type CarShape = 'hatch' | 'coupe' | 'rally';
+/** The body the sprite draws: an old three-box saloon, a boxy hatchback, a low coupe, a winged rally car. */
+export type CarShape = 'saloon' | 'hatch' | 'coupe' | 'rally';
 
 export interface CarDef {
   id: string;
@@ -84,9 +88,11 @@ export interface CarDef {
   frontDrive?: number;
   /** tonnes-ish: who wins a shunt */
   mass: number;
-  /** armour level 0..3: less damage taken, more dealt */
+  /** armour level 0..3: less damage taken */
   armour: number;
-  /** gun level 0..3: rate and punch */
+  /** ram bar level 0..3: a shunt hurts the other car more and this one less */
+  ram: number;
+  /** machine gun level 0..3: 0 is no gun at all, 1 the gun, then its rate and punch */
   gun: number;
   /** metres, nose to tail */
   length: number;

@@ -283,6 +283,30 @@ export class Renderer {
       g.globalAlpha = 1;
     }
 
+    // oil slicks: a dark wet blot with a cold sheen, fading as it soaks into the gravel
+    for (const o of s.oils) {
+      if (!visible(o.x, o.y)) continue;
+      const k = Math.max(0.35, 1 - o.age / 40);
+      g.save();
+      g.translate(o.x, o.y);
+      g.rotate(hash32(Math.round(o.x * 10) * 7919 + Math.round(o.y * 10)) % 6);
+      g.globalAlpha = 0.85 * k;
+      g.fillStyle = '#17130f';
+      g.beginPath();
+      g.ellipse(0, 0, 1.55, 1.1, 0, 0, Math.PI * 2);
+      g.fill();
+      g.beginPath();
+      g.ellipse(0.9, 0.5, 0.7, 0.45, 0.6, 0, Math.PI * 2);
+      g.fill();
+      g.globalAlpha = 0.35 * k;
+      g.fillStyle = '#5a6e82';
+      g.beginPath();
+      g.ellipse(-0.4, -0.3, 0.7, 0.3, -0.4, 0, Math.PI * 2);
+      g.fill();
+      g.restore();
+    }
+    g.globalAlpha = 1;
+
     // mines: a dark disc with a red eye
     for (const m of s.mines) {
       if (!visible(m.x, m.y)) continue;

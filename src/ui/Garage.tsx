@@ -1,16 +1,16 @@
 import { useEffect, useRef } from 'react';
 import { t, tr } from '../i18n';
-import { cr, carFits, hasLicence, playerCar, currentCar, CLASS_RANK, type Save } from '../career/save';
+import { cr, carFits, hasLicence, playerCar, currentCar, topClass, CLASS_RANK, type Save } from '../career/save';
 import { CARS, CAR_BY_ID } from '../game/content/cars';
-import { PARTS, partPrice, tuned, type PartKind } from '../game/content/parts';
+import { partsFor, partPrice, tuned, type PartKind } from '../game/content/parts';
 import { EVENTS, type EventDef } from '../game/content/events';
 import { LICENCES, type LicenceDef } from '../game/content/licences';
-import { WEAPONS, type WeaponDef } from '../game/content/weapons';
+import { WEAPONS, canCarry, type WeaponDef } from '../game/content/weapons';
 import { TRACK_BY_ID } from '../game/content/tracks';
 import { carSprite } from '../render/sprites';
 import type { CarDef } from '../game/types';
 import { fmt, recordKey, type Records } from '../records';
-import { Lamps, MineIcon, MissileIcon } from './Dash';
+import { Lamps, MineIcon, MissileIcon, OilIcon } from './Dash';
 
 /** The car, drawn big, as the sprite the race uses. */
 function CarPic({ car, size = 160 }: { car: CarDef; size?: number }) {
@@ -103,6 +103,7 @@ function Top({ save, title, onBack }: { save: Save; title: string; onBack?: () =
 export function Garage({ save, onEvents, onShop, onDealer, onLicences, onArmoury, onPick, onTitle }: { save: Save; onEvents: () => void; onShop: () => void; onDealer: () => void; onLicences: () => void; onArmoury: () => void; onPick: (i: number) => void; onTitle: () => void }) {
   const car = playerCar(save);
   const owned = currentCar(save);
+  const top = topClass(save);
   return (
     <div className="screen garage">
       <Top save={save} title={tr('Talli', 'Garage')} />
@@ -124,12 +125,26 @@ export function Garage({ save, onEvents, onShop, onDealer, onLicences, onArmoury
         </button>
         <button className="item" onClick={onShop}>
           {tr('Osakauppa', 'Parts shop')}
-          <small>{Object.values(owned.parts).reduce((a, b) => a + b, 0)}/12</small>
+          <small>
+            {Object.values(owned.parts).reduce((a, b) => a + b, 0)}/{partsFor(car.cls).length * 3}
+          </small>
         </button>
         <button className="item" onClick={onArmoury}>
           {tr('Asevarasto', 'Armoury')}
           <small>
-            <MissileIcon /> {save.missiles} <MineIcon /> {save.mines}
+            <OilIcon /> {save.oil}
+            {canCarry(top, 'mine') && (
+              <>
+                {' '}
+                <MineIcon /> {save.mines}
+              </>
+            )}
+            {canCarry(top, 'missile') && (
+              <>
+                {' '}
+                <MissileIcon /> {save.missiles}
+              </>
+            )}
           </small>
         </button>
         <button className="item" onClick={onDealer}>
@@ -138,7 +153,7 @@ export function Garage({ save, onEvents, onShop, onDealer, onLicences, onArmoury
         </button>
         <button className="item" onClick={onLicences}>
           {tr('Ajokortit', 'Licences')}
-          <small>{['C', ...save.licences].join(' ')}</small>
+          <small>{['JM', 'C', ...save.licences].join(' ')}</small>
         </button>
         <button className="item quiet" onClick={onTitle}>
           {tr('Alkuun', 'Title')}
@@ -196,7 +211,7 @@ export function Shop({ save, onBuy, onBack }: { save: Save; onBuy: (kind: PartKi
       <div className="carname small">{t(base.name)}</div>
       <CarStats car={car} />
       <div className="cards">
-        {PARTS.map((p) => {
+        {partsFor(base.cls).map((p) => {
           const lvl = owned.parts[p.kind];
           const price = partPrice(base, p.kind, owned.parts);
           const can = price !== null && price <= save.credits;
@@ -283,13 +298,14 @@ export function Licences({ save, onTake, onBack }: { save: Save; onTake: (l: Lic
 }
 
 export function Armoury({ save, onBuy, onBack }: { save: Save; onBuy: (w: WeaponDef) => void; onBack: () => void }) {
+  const top = topClass(save);
   return (
     <div className="screen list">
       <Top save={save} title={tr('Asevarasto', 'Armoury')} onBack={onBack} />
-      <p className="help">{tr('Ostetaan kappaleittain, ja mitä jää, se jää seuraavaan kisaan. Aseet laukeavat itsestään: ohjus kun auto on pysynyt tähtäimessä, miina kun auto on ihan takana. Konekivääri on osakaupan osa.', 'Bought by the shot; what is left stays for the next race. Weapons fire themselves: the missile once a car has sat in the sights, the mine when a car is right behind. The machine gun is a part in the shop.')}</p>
+      <p className="help">{tr('Ostetaan kappaleittain, ja mitä jää, se jää seuraavaan kisaan. Aseet laukeavat itsestään, kun auto on ihan takana tai tähtäimessä. Auto kantaa vain luokkansa aseet: öljyä jokkiksesta, miinoja C-luokasta, ohjuksia B-luokasta. Konekivääri on osakaupan osa.', 'Bought by the shot; what is left stays for the next race. Weapons fire themselves, when a car is right behind or in the sights. A car carries only its class\'s weapons: oil from JM, mines from C, missiles from B. The machine gun is a part in the shop.')}</p>
       <div className="cards">
-        {WEAPONS.map((w) => {
-          const have = w.id === 'missile' ? save.missiles : save.mines;
+        {WEAPONS.filter((w) => canCarry(top, w.id)).map((w) => {
+          const have = w.id === 'missile' ? save.missiles : w.id === 'mine' ? save.mines : save.oil;
           const full = have >= w.max;
           const can = !full && w.price <= save.credits;
           return (
@@ -301,7 +317,7 @@ export function Armoury({ save, onBuy, onBack }: { save: Save; onBuy: (w: Weapon
               <div className="body">
                 <div className="name">
                   <span>
-                    {w.id === 'missile' ? <MissileIcon /> : <MineIcon />} {t(w.name)}
+                    {w.id === 'missile' ? <MissileIcon /> : w.id === 'mine' ? <MineIcon /> : <OilIcon />} {t(w.name)}
                   </span>
                   {full ? <span className="stamp">{tr('Täynnä', 'Full')}</span> : <span className="lvl">{`${cr(w.price)} / ${tr('kpl', 'each')}`}</span>}
                 </div>

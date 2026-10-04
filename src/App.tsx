@@ -6,11 +6,11 @@ import { loadRecords, saveRace, recordKey, track, type Records } from './records
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { loadSave, store, playerCar, currentCar, CLASS_RANK, type Save } from './career/save';
 import { OPPONENTS } from './game/content/drivers';
-import { EVENT_BY_ID, type EventDef } from './game/content/events';
+import { EVENT_BY_ID, fieldAmmo, type EventDef } from './game/content/events';
 import { LICENCE_BY_CLASS, type LicenceDef } from './game/content/licences';
 import { CARS, CAR_BY_ID } from './game/content/cars';
 import { partPrice, tuned, STOCK, type PartKind } from './game/content/parts';
-import { REPAIR_SHARE, type WeaponDef } from './game/content/weapons';
+import { REPAIR_SHARE, canCarry, carried, type WeaponDef } from './game/content/weapons';
 import type { Entry } from './game/state';
 import type { CarClass, CarDef, CarShape } from './game/types';
 
@@ -52,11 +52,12 @@ function Screens() {
 
   const enter = (e: EventDef) => {
     const fieldCar = CARS.find((c) => c.cls === e.cls)!;
-    // the class car's numbers under the other bodies, so the pack is not four of a kind
-    const shapes: CarShape[] = ['coupe', 'rally', 'hatch'];
-    // the field shoots back from the second event of a class on, more as the cars get built
-    const built = Object.values(e.fieldParts).reduce((a, b) => a + b, 0);
-    const field: Entry[] = OPPONENTS.map((driver, i) => ({ driver, car: { ...tuned(fieldCar, e.fieldParts), shape: shapes[(i + CLASS_RANK[e.cls]) % 3] }, missiles: 1 + Math.round(built / 3), mines: 1 + Math.round(built / 4) }));
+    // the class car's numbers under the other bodies, so the pack is not four of a kind; a
+    // jokkis field is old saloons and a hatchback
+    const shapes: CarShape[] = e.cls === 'JM' ? ['saloon', 'hatch', 'saloon'] : ['coupe', 'rally', 'hatch'];
+    // the field carries what its class allows, more as the cars get built
+    const ammo = fieldAmmo(e);
+    const field: Entry[] = OPPONENTS.map((driver, i) => ({ driver, car: { ...tuned(fieldCar, e.fieldParts), shape: shapes[(i + CLASS_RANK[e.cls]) % 3] }, ...ammo }));
     setScreen({ kind: 'race', purpose: { kind: 'event', id: e.id }, trackId: e.trackId, car: playerCar(save), field, laps: e.laps });
   };
   const take = (l: LicenceDef) => {
@@ -126,11 +127,12 @@ function Screens() {
           save={save}
           onBuy={(w: WeaponDef) =>
             update((s) => {
-              const have = w.id === 'missile' ? s.missiles : s.mines;
+              const have = w.id === 'missile' ? s.missiles : w.id === 'mine' ? s.mines : s.oil;
               if (have >= w.max || w.price > s.credits) return;
               s.credits -= w.price;
               if (w.id === 'missile') s.missiles++;
-              else s.mines++;
+              else if (w.id === 'mine') s.mines++;
+              else s.oil++;
               track('buy_ammo', { weapon: w.id, price: w.price });
             })
           }
@@ -145,24 +147,29 @@ function Screens() {
           car={screen.car}
           field={screen.field}
           laps={screen.laps}
-          ammo={{ missiles: save.missiles, mines: save.mines }}
+          ammo={carried(screen.car.cls, { oil: save.oil, mines: save.mines, missiles: save.missiles })}
           onEnd={(r) => {
             const set = saveRace(records, recordKey(r.trackId, r.carId), r.laps);
             setRecords({ ...records });
             const purpose = screen.purpose;
             let prize = 0;
             let passed = false;
-            // the boot comes back as it was left, and the car gets fixed
+            // the boot comes back as it was left, for what the car carried, and the car gets fixed
             const repair = Math.round((CAR_BY_ID[r.carId].price * REPAIR_SHARE * (r.damage / 100)) / 10) * 10;
-            // what the race paid on the road: cash pickups, wreck bounties, rams
+            const cls = CAR_BY_ID[r.carId].cls;
+            const boot = (s: Save) => {
+              if (canCarry(cls, 'missile')) s.missiles = r.missiles;
+              if (canCarry(cls, 'mine')) s.mines = r.mines;
+              if (canCarry(cls, 'oil')) s.oil = r.oil;
+            };
+            // what the race paid on the road: cash pickups, wreck bounties, rams and oil spins
             const earned = r.cash + r.bounty + r.ramCash;
             if (purpose.kind === 'event') {
               const e = EVENT_BY_ID[purpose.id];
               prize = e.prizes[r.place - 1] ?? 0;
               update((s) => {
                 s.credits += prize + earned - repair;
-                s.missiles = r.missiles;
-                s.mines = r.mines;
+                boot(s);
                 s.races++;
                 s.wrecks = (s.wrecks ?? 0) + r.wrecks;
                 if (r.place === 1) s.wins++;
@@ -173,8 +180,7 @@ function Screens() {
               passed = r.time >= 0 && r.time <= l.target;
               update((s) => {
                 s.credits += earned - repair;
-                s.missiles = r.missiles;
-                s.mines = r.mines;
+                boot(s);
                 if (passed && !s.licences.includes(l.cls)) s.licences = [...s.licences, l.cls];
               });
             }

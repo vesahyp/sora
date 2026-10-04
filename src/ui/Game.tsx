@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { createState, placeOf, standings, type Entry, type SimState } from '../game/state';
+import { createState, placeOf, standings, type Ammo, type Entry, type SimState } from '../game/state';
+import { canCarry } from '../game/content/weapons';
 import type { Text } from '../i18n';
 import type { CarDef } from '../game/types';
 import { step, DT } from '../game/sim';
@@ -10,7 +11,7 @@ import { audio } from '../audio';
 import { botInput } from '../../tools/autoplayer';
 import { fmt, track } from '../records';
 import { t, tr } from '../i18n';
-import { Lamps, MineIcon, MissileIcon, PauseIcon, SoundIcon, WheelIcon } from './Dash';
+import { Lamps, MineIcon, MissileIcon, OilIcon, PauseIcon, SoundIcon, WheelIcon } from './Dash';
 
 export interface RaceResult {
   trackId: string;
@@ -23,7 +24,8 @@ export interface RaceResult {
   /** what is left in the boot */
   missiles: number;
   mines: number;
-  /** the race's tally; credits off the road, from wreck bounties and from rams that spun someone */
+  oil: number;
+  /** the race's tally; credits off the road, from wreck bounties and from rams and oil that spun someone */
   wrecks: number;
   wrecked: number;
   cash: number;
@@ -41,6 +43,7 @@ interface Hud {
   damage: number;
   missiles: number;
   mines: number;
+  oil: number;
   boost: number;
   boosting: boolean;
   heat: number;
@@ -62,7 +65,7 @@ interface Hud {
  * `field` is the rest of the grid, empty for a licence test. The sim
  * runs here; React only draws the HUD and the overlays.
  */
-export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { trackId: string; car: CarDef; field: Entry[]; laps: number; ammo: { missiles: number; mines: number }; onEnd: (r: RaceResult) => void; onQuit: () => void }) {
+export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { trackId: string; car: CarDef; field: Entry[]; laps: number; ammo: Ammo; onEnd: (r: RaceResult) => void; onQuit: () => void }) {
   const carId = car.id;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -130,6 +133,7 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
         damage: me.damage,
         missiles: me.missiles,
         mines: me.mines,
+        oil: me.oil,
         boost: me.boost,
         boosting: me.boosting > 0,
         heat: me.heat,
@@ -160,6 +164,7 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
         damage: me.damage,
         missiles: me.missiles,
         mines: me.mines,
+        oil: me.oil,
         wrecks: me.wrecks,
         wrecked: me.wrecked,
         cash: me.cash,
@@ -311,18 +316,28 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
               <span>{tr('Nitro', 'Nitro')}</span>
               <Lamps n={8} v={hud.boost} tone="bone" />
             </div>
-            <div className={`gauge${hud.overheated ? ' bad' : ''}`}>
-              <span>{tr('Kk', 'MG')}</span>
-              <Lamps n={8} v={hud.heat} tone={hud.overheated || hud.heat > 0.8 ? 'red' : 'amber'} />
-            </div>
+            {car.gun > 0 && (
+              <div className={`gauge${hud.overheated ? ' bad' : ''}`}>
+                <span>{tr('Kk', 'MG')}</span>
+                <Lamps n={8} v={hud.heat} tone={hud.overheated || hud.heat > 0.8 ? 'red' : 'amber'} />
+              </div>
+            )}
             <div className="ammo">
-              <span className={hud.missiles ? '' : 'out'}>
-                <MissileIcon />
-                <b>{hud.missiles}</b>
-              </span>
-              <span className={hud.mines ? '' : 'out'}>
-                <MineIcon />
-                <b>{hud.mines}</b>
+              {canCarry(car.cls, 'missile') && (
+                <span className={hud.missiles ? '' : 'out'}>
+                  <MissileIcon />
+                  <b>{hud.missiles}</b>
+                </span>
+              )}
+              {canCarry(car.cls, 'mine') && (
+                <span className={hud.mines ? '' : 'out'}>
+                  <MineIcon />
+                  <b>{hud.mines}</b>
+                </span>
+              )}
+              <span className={hud.oil ? '' : 'out'}>
+                <OilIcon />
+                <b>{hud.oil}</b>
               </span>
             </div>
           </div>

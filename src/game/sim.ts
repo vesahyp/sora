@@ -1,6 +1,6 @@
 import type { Car, SimState } from './state';
 import type { CarInput } from './types';
-import { BOOST, DAMAGE, GUN, MINE, MISSILE, RESPAWN_DAMAGE, WRECK_BOUNTY, WRECK_TIME } from './content/weapons';
+import { BOOST, DAMAGE, GUN, MINE, MISSILE, OIL, OIL_CREDIT, RESPAWN_DAMAGE, WRECK_BOUNTY, WRECK_TIME } from './content/weapons';
 import { PICKUPS, PICKUP_REACH, PICKUP_RESPAWN } from './content/pickups';
 import { CLASS_RANK } from './types';
 import { GRUDGE, hostility, leaderOf } from './content/drivers';
@@ -18,7 +18,8 @@ const LOCK_FADE = 50;
  * the contacts between cars and with the trees, height; physics-old.ts
  * at ?physics=old). Around it the race runs: the countdown, a tap of
  * nitro from a tank that drifting, ramming and wrecking fill, guns that
- * fire themselves, bullets, missiles, mines and pickups, and the laps.
+ * fire themselves, bullets, missiles, mines, oil slicks and pickups,
+ * and the laps.
  * At 100 damage a car is a wreck for a few seconds, then it is back on
  * the centreline.
  */
@@ -49,6 +50,7 @@ export function step(s: SimState, inputs: CarInput[], dt: number): void {
   flyBullets(s, dt);
   flyMissiles(s, dt);
   mines(s, dt);
+  oils(s, dt);
   pickups(s, dt);
   for (const c of s.cars) if (c.damage >= 100 && c.wreck <= 0) wreck(s, c);
   for (let i = s.fx.length - 1; i >= 0; i--) {
@@ -62,11 +64,12 @@ export function step(s: SimState, inputs: CarInput[], dt: number): void {
   s.shake = Math.max(0, s.shake - dt * 2.5);
 }
 
-/** Target, machine gun, missile lock, mine drop: all automatic. */
+/** Target, machine gun, missile lock, mine drop, oil leak: all automatic. */
 function guns(s: SimState, c: Car, i: number, dt: number): void {
   const g = c.def.gun;
   if (c.missileWait > 0) c.missileWait -= dt;
   if (c.mineWait > 0) c.mineWait -= dt;
+  if (c.oilWait > 0) c.oilWait -= dt;
   // the sights: the nearest living car in the cone ahead, a grudge or the lead making a car
   // look nearer than it is, so the guns go for whoever this car has it in for
   let target = -1;
@@ -93,12 +96,12 @@ function guns(s: SimState, c: Car, i: number, dt: number): void {
   c.target = target;
   const canFire = c.finishedAt < 0 && c.spin <= 0 && s.hold < -GUN.holdOff;
 
-  // the machine gun
-  const firing = canFire && target >= 0 && !c.overheated;
+  // the machine gun, if the car has one: the part's first level is the gun
+  const firing = canFire && g > 0 && target >= 0 && !c.overheated;
   if (firing) {
     c.heat += dt / GUN.heat;
     if (c.heat >= 1) c.overheated = true;
-    const rate = GUN.rate * (1 + 0.25 * g);
+    const rate = GUN.rate * (1 + 0.25 * (g - 1));
     c.gunWait -= dt;
     if (c.gunWait <= 0) {
       c.gunWait += 1 / rate;
@@ -124,8 +127,8 @@ function guns(s: SimState, c: Car, i: number, dt: number): void {
     s.sounds.push(i === 0 ? 'missile' : 'missile-far');
   }
 
-  // a mine for a car right behind, on this line
-  if (canFire && c.mines > 0 && c.mineWait <= 0 && Math.abs(c.speed) > 5) {
+  // a mine, or a can of oil, for a car right behind, on this line
+  const behind = (reach: number) => {
     for (let k = 0; k < s.cars.length; k++) {
       if (k === i) continue;
       const o = s.cars[k];
@@ -133,15 +136,22 @@ function guns(s: SimState, c: Car, i: number, dt: number): void {
       let gap = o.s - c.s;
       if (gap < -s.track.length / 2) gap += s.track.length;
       if (gap > s.track.length / 2) gap -= s.track.length;
-      if (gap < -3 && gap > -MINE.behind && Math.abs(o.d - c.d) < 2.6) {
-        c.mines--;
-        c.mineWait = MINE.every;
-        const tail = -c.def.length * 0.7;
-        s.mines.push({ x: c.x + Math.cos(c.heading) * tail, y: c.y + Math.sin(c.heading) * tail, age: 0, owner: i });
-        if (i === 0) s.sounds.push('mine');
-        break;
-      }
+      if (gap < -3 && gap > -reach && Math.abs(o.d - c.d) < 2.6) return true;
     }
+    return false;
+  };
+  const tail = -c.def.length * 0.7;
+  if (canFire && c.mines > 0 && c.mineWait <= 0 && Math.abs(c.speed) > 5 && behind(MINE.behind)) {
+    c.mines--;
+    c.mineWait = MINE.every;
+    s.mines.push({ x: c.x + Math.cos(c.heading) * tail, y: c.y + Math.sin(c.heading) * tail, age: 0, owner: i });
+    if (i === 0) s.sounds.push('mine');
+  }
+  if (canFire && c.oil > 0 && c.oilWait <= 0 && Math.abs(c.speed) > 5 && behind(OIL.behind)) {
+    c.oil--;
+    c.oilWait = OIL.every;
+    s.oils.push({ x: c.x + Math.cos(c.heading) * tail, y: c.y + Math.sin(c.heading) * tail, age: 0, owner: i });
+    if (i === 0) s.sounds.push('oil');
   }
 }
 
@@ -167,7 +177,7 @@ function flyBullets(s: SimState, dt: number): void {
       if (Math.hypot(c.x - b.x, c.y - b.y) < 1.7) {
         gone = true;
         const shooter = s.cars[b.owner];
-        hurt(s, c, DAMAGE.bullet * (1 + 0.3 * shooter.def.gun), b.owner);
+        hurt(s, c, DAMAGE.bullet * (1 + 0.3 * (shooter.def.gun - 1)), b.owner);
         anger(s, c, b.owner, GRUDGE.bullet);
         s.fx.push({ kind: 'spark', x: b.x, y: b.y, age: 0 });
         if (k === 0) s.shake = Math.max(s.shake, 0.15);
@@ -234,6 +244,54 @@ function mines(s: SimState, dt: number): void {
   }
 }
 
+/**
+ * Oil on the road: a car that crosses a slick keeps little grip for a
+ * moment (physics.ts reads `slick`). The slick stays; the one who laid it
+ * is spared it for a moment. A car that goes sideways on it has been spun,
+ * and the one who laid the oil is paid, as a ram that spins someone is.
+ */
+function oils(s: SimState, dt: number): void {
+  for (let i = s.oils.length - 1; i >= 0; i--) {
+    const o = s.oils[i];
+    o.age += dt;
+    if (o.age > OIL.life) {
+      s.oils.splice(i, 1);
+      continue;
+    }
+    for (let k = 0; k < s.cars.length; k++) {
+      const c = s.cars[k];
+      if (c.wreck > 0 || c.air || (k === o.owner && o.age < 1.5)) continue;
+      if (Math.hypot(c.x - o.x, c.y - o.y) < OIL.r + 0.6) {
+        if (c.slick <= 0) {
+          // the tail goes the way it was already leaning, or either way on a straight car
+          c.slickPaid = false;
+          const lean = Math.abs(c.slipAngle) > 0.02 ? Math.sign(c.slipAngle) : Math.sin(s.time * 13 + c.x) >= 0 ? 1 : -1;
+          c.yaw += lean * OIL.kick * Math.min(1, Math.abs(c.speed) / 15);
+          if (k === 0) {
+            s.sounds.push('slick');
+            s.shake = Math.max(s.shake, 0.2);
+          }
+        }
+        c.slick = OIL.slick;
+        if (k !== o.owner) c.slickBy = o.owner;
+      }
+    }
+  }
+  for (let k = 0; k < s.cars.length; k++) {
+    const c = s.cars[k];
+    if (c.slick <= 0 || c.slickPaid || c.slickBy < 0 || c.wreck > 0) continue;
+    if (Math.abs(c.slipAngle) > 0.45 && Math.abs(c.speed) > 5) {
+      c.slickPaid = true;
+      const by = s.cars[c.slickBy];
+      anger(s, c, c.slickBy, GRUDGE.spin);
+      const credit = OIL_CREDIT * (CLASS_RANK[c.def.cls] + 1);
+      by.ramCash += credit;
+      if (by === s.cars[0]) s.toasts.push({ text: { fi: `${c.driver.name.fi} liukastui! +${credit} cr`, en: `${c.driver.name.en} slid! +${credit} cr` }, colour: '#ffd870', age: 0 });
+      else if (c === s.cars[0]) s.toasts.push({ text: { fi: `${by.driver.name.fi} öljysi sinut`, en: `${by.driver.name.en} oiled you` }, colour: '#ff8a3a', age: 0 });
+    }
+  }
+}
+
 function pickups(s: SimState, dt: number): void {
   for (const p of s.pickups) {
     if (p.gone > 0) {
@@ -260,6 +318,9 @@ function pickups(s: SimState, dt: number): void {
           break;
         case 'mine':
           c.mines = Math.min(9, c.mines + 1);
+          break;
+        case 'oil':
+          c.oil = Math.min(9, c.oil + 1);
           break;
       }
       s.fx.push({ kind: p.kind === 'cash' ? 'cash' : 'flash', x: p.x, y: p.y, age: 0, colour: def.colour });
@@ -309,6 +370,7 @@ function burn(s: SimState, c: Car, dt: number): void {
   c.damage = RESPAWN_DAMAGE;
   c.d = 0;
   c.stall = 0;
+  c.slick = 0;
   s.fx.push({ kind: 'flash', x: c.x, y: c.y, age: 0, colour: '#fff' });
   if (c === s.cars[0]) s.sounds.push('respawn');
 }

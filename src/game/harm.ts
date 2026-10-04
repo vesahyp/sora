@@ -45,7 +45,7 @@ export function boom(s: SimState, x: number, y: number, shake: number): void {
  * Two cars met at `closing` m/s along the normal (nx, ny), pointing from
  * car i to car j. Below RAM.minClosing it is a touch; above it, the one
  * whose nose points along the contact rammed the other: damage both ways,
- * the heavier and better armoured doing more, a grudge, nitro for the
+ * the heavier doing more and a ram bar more still, a grudge, nitro for the
  * rammer, and past RAM.spinClosing the victim is thrown and the rammer
  * paid. `throwVictim` is how the car model throws a car: the old one
  * kicks the yaw; in the new one the impulse has turned it already, and
@@ -62,9 +62,10 @@ export function ram(s: SimState, i: number, j: number, closing: number, nx: numb
   const victim = rammer === a ? b : a;
   const ri = rammer === a ? i : j;
   const vi = rammer === a ? j : i;
+  // the ram bar: a shunt with it hurts the other car more and the rammer less
   const force = (closing - RAM.minClosing) * DAMAGE.ram;
-  hurt(s, victim, force * (rammer.def.mass / victim.def.mass) * (1 + 0.35 * rammer.def.armour), ri);
-  hurt(s, rammer, force * 0.35 * (victim.def.mass / rammer.def.mass), vi);
+  hurt(s, victim, force * (rammer.def.mass / victim.def.mass) * (1 + 0.35 * rammer.def.ram), ri);
+  hurt(s, rammer, force * 0.35 * (victim.def.mass / rammer.def.mass) * (1 - 0.25 * rammer.def.ram), vi);
   rammer.rams++;
   victim.rammed++;
   anger(s, victim, ri, GRUDGE.ram);

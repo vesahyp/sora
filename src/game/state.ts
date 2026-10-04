@@ -1,7 +1,7 @@
 import type { CarDef, Surface, TrackDef } from './types';
 import { Track } from './track';
 import type { Text } from '../i18n';
-import { PICKUP_OFFSET, PICKUP_OFFSET_CASH, PICKUP_ORDER, PICKUP_SPACING, type PickupKind } from './content/pickups';
+import { PICKUP_OFFSET, PICKUP_OFFSET_CASH, PICKUP_SPACING, pickupOrder, type PickupKind } from './content/pickups';
 
 export interface Driver {
   name: Text;
@@ -66,6 +66,12 @@ export interface Car {
   wreck: number;
   missiles: number;
   mines: number;
+  /** cans of oil in the boot */
+  oil: number;
+  /** seconds the tyres have little hold left, after an oil slick; who laid it, and whether the spin has paid */
+  slick: number;
+  slickBy: number;
+  slickPaid: boolean;
   /** nitro in the tank, 0..1 */
   boost: number;
   /** seconds of burst left */
@@ -80,6 +86,7 @@ export interface Car {
   gunWait: number;
   missileWait: number;
   mineWait: number;
+  oilWait: number;
   /** seconds left of being a passenger after a hit */
   spin: number;
   /** seconds the car has been near standstill with the throttle down; the bot reverses on it */
@@ -131,6 +138,14 @@ export interface Mine {
   owner: number;
 }
 
+/** A slick of oil on the road: a car that crosses it loses its grip for a moment. */
+export interface Oil {
+  x: number;
+  y: number;
+  age: number;
+  owner: number;
+}
+
 export interface Pickup {
   kind: PickupKind;
   x: number;
@@ -172,6 +187,7 @@ export interface SimState {
   bullets: Bullet[];
   missiles: Missile[];
   mines: Mine[];
+  oils: Oil[];
   pickups: Pickup[];
   fx: Fx[];
   toasts: Toast[];
@@ -191,14 +207,24 @@ export interface Entry {
   car: CarDef;
   missiles?: number;
   mines?: number;
+  oil?: number;
 }
 
-export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: number, opponents: Entry[] = [], ammo: { missiles: number; mines: number } = { missiles: 0, mines: 0 }, physics: Physics = 'new'): SimState {
+/** What a car takes into the race. */
+export interface Ammo {
+  missiles: number;
+  mines: number;
+  oil: number;
+}
+
+export const NO_AMMO: Ammo = { missiles: 0, mines: 0, oil: 0 };
+
+export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: number, opponents: Entry[] = [], ammo: Partial<Ammo> = NO_AMMO, physics: Physics = 'new'): SimState {
   const track = new Track(trackDef);
-  const entries: Entry[] = [{ driver: PLAYER, car: playerCar, ...ammo }, ...opponents];
+  const entries: Entry[] = [{ driver: PLAYER, car: playerCar, ...NO_AMMO, ...ammo }, ...opponents];
   // the grid: two abreast behind the line, the player in the last slot. Death Rally starts
   // you last: the race is the climb through the field, and the field is where the fight is.
-  const cars = entries.map(({ driver, car, missiles = 0, mines = 0 }, i) => {
+  const cars = entries.map(({ driver, car, missiles = 0, mines = 0, oil = 0 }, i) => {
     const slot = i === 0 ? entries.length - 1 : i - 1;
     const row = Math.floor(slot / 2);
     const side = slot % 2 ? 1 : -1;
@@ -240,6 +266,10 @@ export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: nu
       wreck: 0,
       missiles,
       mines,
+      oil,
+      slick: 0,
+      slickBy: -1,
+      slickPaid: false,
       boost: 0.3,
       boosting: 0,
       heat: 0,
@@ -249,6 +279,7 @@ export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: nu
       gunWait: 0,
       missileWait: 0,
       mineWait: 0,
+      oilWait: 0,
       spin: 0,
       stall: 0,
       wrecks: 0,
@@ -263,17 +294,19 @@ export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: nu
       lastHitBy: -1,
     };
   });
-  // pickups along the lap, off the line, alternating sides, the kinds in rotation
+  // pickups along the lap, off the line, alternating sides, the kinds in rotation: the
+  // race's class is the player's car's, and the road grows what that class carries
   const pickups: Pickup[] = [];
+  const order = pickupOrder(playerCar.cls);
   const n = Math.floor(track.length / PICKUP_SPACING);
   for (let i = 0; i < n; i++) {
     const s = ((i + 0.5) * track.length) / n;
     const p = track.at(s);
-    const kind = PICKUP_ORDER[i % PICKUP_ORDER.length];
+    const kind = order[i % order.length];
     const d = (i % 2 ? 1 : -1) * (trackDef.width / 2) * (kind === 'cash' ? PICKUP_OFFSET_CASH : PICKUP_OFFSET);
     pickups.push({ kind, x: p.x - p.ty * d, y: p.y + p.tx * d, gone: 0 });
   }
-  return { time: 0, physics, track, cars, totalLaps, finished: false, hold: 2.5, bullets: [], missiles: [], mines: [], pickups, fx: [], toasts: [], shake: 0, sounds: [], view: { w: 40, h: 70 } };
+  return { time: 0, physics, track, cars, totalLaps, finished: false, hold: 2.5, bullets: [], missiles: [], mines: [], oils: [], pickups, fx: [], toasts: [], shake: 0, sounds: [], view: { w: 40, h: 70 } };
 }
 
 /** The running order: finishers by flag time, then everyone by distance covered. */

@@ -12,6 +12,8 @@ import { botInput } from './autoplayer';
 import { OPPONENTS } from '../src/game/content/drivers';
 import { PICKUPS } from '../src/game/content/pickups';
 import { standings } from '../src/game/state';
+import { STOCK, tuned } from '../src/game/content/parts';
+import { canCarry, carried } from '../src/game/content/weapons';
 
 /**
  * A phone's view of the world in metres, portrait: the renderer shows ten
@@ -63,9 +65,13 @@ for (const track of TRACKS) {
       assert(offRoad / steps < 0.08, `${track.id}/${car.id}: the bot stays on the road (off ${((offRoad / steps) * 100).toFixed(1)}%)`);
       assert(hits < 30, `${track.id}/${car.id}: the bot rarely meets a tree (${hits} steps)`);
     }
-    // then the race: four bots, armed, so the race is tested with the guns in. One race is
+    // then the race: four bots, armed with what the class carries (oil in JM, mines and the
+    // gun from C, missiles from B), so the race is tested with its weapons in. One race is
     // chaos (a wreck early moves everything after it), so it is run in every grid order of the
     // three opponents, everyone must finish each, and the view is the average.
+    const guns = canCarry(car.cls, 'mine');
+    const armed = guns ? tuned(car, { ...STOCK, gun: 1 }) : car;
+    const boot = carried(car.cls, { oil: 2, mines: 2, missiles: 2 });
     let racing = 0;
     let onScreen = 0;
     let inSights = 0;
@@ -76,14 +82,16 @@ for (const track of TRACKS) {
     const orders = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
     for (const grid of orders) {
       const field = grid.map((k) => OPPONENTS[k]);
-      const race = createState(track, car, 3, field.map((driver) => ({ driver, car, missiles: 2, mines: 2 })), { missiles: 2, mines: 2 });
+      const race = createState(track, armed, 3, field.map((driver) => ({ driver, car: armed, ...boot })), boot);
       let drifting = 0;
       let boosts = 0;
+      let slicks = 0;
       while (race.cars.some((c) => c.finishedAt < 0) && race.time < 900) {
         step(race, race.cars.map((c) => botInput(race, c)), DT);
         for (const c of race.cars) {
           if (c.sliding && c.wreck <= 0) drifting++;
           if (c.boosting > 0) boosts++;
+          if (c.slick > 0 && c.wreck <= 0) slicks++;
         }
         // is the race on the player's screen: a living car inside the view around the player,
         // and a car in the player's sights, counted from the lights to the player's flag
@@ -101,8 +109,11 @@ for (const track of TRACKS) {
       const shots = race.cars.reduce((a, c) => a + c.shots, 0);
       const wrecks = race.cars.reduce((a, c) => a + c.wrecked, 0);
       const cash = race.cars.reduce((a, c) => a + c.cash, 0);
-      console.log(`  guns:  ${shots} rounds, ${wrecks} wrecks, ${(drifting / 60).toFixed(0)} s sliding, ${(boosts / 60).toFixed(0)} s of nitro, ${cash} cr off the road, damage ${race.cars.map((c) => Math.round(c.damage)).join('/')}`);
-      assert(shots > 0, `${track.id}/${car.id}: the guns fire (${shots} rounds)`);
+      const oils = race.cars.reduce((a, c) => a + (boot.oil - c.oil), 0);
+      console.log(`  guns:  ${shots} rounds, ${oils} cans of oil, ${(slicks / 60).toFixed(0)} s on oil, ${wrecks} wrecks, ${(drifting / 60).toFixed(0)} s sliding, ${(boosts / 60).toFixed(0)} s of nitro, ${cash} cr off the road, damage ${race.cars.map((c) => Math.round(c.damage)).join('/')}`);
+      if (guns) assert(shots > 0, `${track.id}/${car.id}: the guns fire (${shots} rounds)`);
+      else assert(shots === 0, `${track.id}/${car.id}: no guns in this class (${shots} rounds)`);
+      assert(slicks > 0, `${track.id}/${car.id}: oil is laid and somebody crosses it (${(slicks / 60).toFixed(1)} s on oil)`);
       assert(drifting > 60, `${track.id}/${car.id}: the cars slide (${(drifting / 60).toFixed(1)} s)`);
       const order = standings(race);
       console.log(`  race:  ${order.map((c) => `${c.driver.name.en} ${c.finishedAt >= 0 ? c.finishedAt.toFixed(1) : 'DNF'}`).join('  ')}`);
@@ -119,10 +130,15 @@ for (const track of TRACKS) {
     const road = roadCredits / orders.length;
     const allCash = createState(track, car, 3).pickups.filter((p) => p.kind === 'cash').length * PICKUPS.cash.amount * 3;
     console.log(`  fight: per race the player rams or is rammed ${(playerRams / orders.length).toFixed(1)} times, wrecks ${(playerWrecks / orders.length).toFixed(1)}, earns ${Math.round(fight)} cr from aggression and ${Math.round(road)} cr off the road (every cash: ${allCash})`);
-    assert(fight > road, `${track.id}/${car.id}: aggression pays more than the road (${Math.round(fight)} > ${Math.round(road)} cr)`);
-    assert(fight > allCash, `${track.id}/${car.id}: aggression pays more than taking every cash (${Math.round(fight)} > ${allCash} cr)`);
+    // in JM the only weapon is oil and a ram rarely wrecks: the prize is the money there, and the
+    // bot player, starting last, lays little oil. It only has to pay at all. With guns the fight
+    // has to beat the road, and every cash on every lap
+    if (guns) {
+      assert(fight > road, `${track.id}/${car.id}: aggression pays more than the road (${Math.round(fight)} > ${Math.round(road)} cr)`);
+      assert(fight > allCash, `${track.id}/${car.id}: aggression pays more than taking every cash (${Math.round(fight)} > ${allCash} cr)`);
+    } else assert(fight > 0, `${track.id}/${car.id}: oil and rams pay something (${Math.round(fight)} cr a race)`);
     assert(seen > ON_SCREEN_MIN, `${track.id}/${car.id}: the race happens on screen (${(seen * 100).toFixed(0)}% > ${ON_SCREEN_MIN * 100}%)`);
-    assert(aimed > IN_SIGHTS_MIN, `${track.id}/${car.id}: the player has someone to shoot at (${(aimed * 100).toFixed(0)}% > ${IN_SIGHTS_MIN * 100}%)`);
+    assert(aimed > IN_SIGHTS_MIN, `${track.id}/${car.id}: the player has someone ahead to go for (${(aimed * 100).toFixed(0)}% > ${IN_SIGHTS_MIN * 100}%)`);
     // unarmed the cars still lean on each other, so the order is not skill's alone; everyone must still get home
     const clean = createState(track, car, 3, OPPONENTS.map((driver) => ({ driver, car })));
     while (clean.cars.some((c) => c.finishedAt < 0) && clean.time < 900) step(clean, clean.cars.map((c) => botInput(clean, c)), DT);

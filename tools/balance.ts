@@ -8,7 +8,7 @@ import { step, DT } from '../src/game/sim';
 import { TRACKS } from '../src/game/content/tracks';
 import { CARS } from '../src/game/content/cars';
 import { botInput } from './autoplayer';
-import { tuned, FULL } from '../src/game/content/parts';
+import { tuned, fullFor } from '../src/game/content/parts';
 import { Track } from '../src/game/track';
 
 declare const process: { argv: string[]; exitCode?: number };
@@ -20,7 +20,7 @@ for (const track of TRACKS) {
   if (only && track.id !== only) continue;
   console.log(`${track.id}  ${Math.round(new Track(track).length)} m`);
   for (const car of CARS) {
-    for (const [label, def] of [['stock', car], ['full', tuned(car, FULL)]] as const) {
+    for (const [label, def] of [['stock', car], ['full', tuned(car, fullFor(car.cls))]] as const) {
       const s = createState(track, def, laps);
       while (!s.finished && s.time < 1200) step(s, [botInput(s)], DT);
       const me = s.cars[0];

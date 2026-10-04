@@ -2,13 +2,33 @@ import { L } from '../../i18n';
 import type { CarDef } from '../types';
 
 /**
- * The cars, one per class. Numbers are the balance knobs; the bot in
- * tools/ reports what they do to a lap. The classes should be a clear
- * step apart with stock parts, and a fully built car of one class should
- * be close to a stock car of the next, so the choice at the dealer is
- * a real one.
+ * The cars, one per class, slowest first. Numbers are the balance knobs;
+ * the bot in tools/ reports what they do to a lap. The classes should be
+ * a clear step apart with stock parts, and a fully built car of one class
+ * should be close to a stock car of the next, so the choice at the dealer
+ * is a real one. The career starts in the Tauno (docs/progression.md).
  */
 export const CARS: CarDef[] = [
+  {
+    id: 'tauno',
+    name: L('Tauno 2.0'),
+    cls: 'JM',
+    shape: 'saloon',
+    price: 1200,
+    blurb: L('Jokkisauto: takaveto, pehmeä ja painava. Vuotaa öljyä, ja se on ainoa aseesi.', 'A folk-racing saloon: rear drive, soft and heavy. It leaks oil, and that is your only weapon.'),
+    accel: 10.5,
+    topSpeed: 31,
+    brake: 13,
+    turnRate: 2.6,
+    grip: 17,
+    mass: 1.25,
+    armour: 0,
+    ram: 0,
+    gun: 0,
+    length: 4.4,
+    width: 1.7,
+    colour: '#c8352a',
+  },
   {
     id: 'kortteli',
     name: L('Kortteli 1.3'),
@@ -23,6 +43,7 @@ export const CARS: CarDef[] = [
     grip: 20,
     mass: 1,
     armour: 0,
+    ram: 0,
     gun: 0,
     length: 3.9,
     width: 1.7,
@@ -42,6 +63,7 @@ export const CARS: CarDef[] = [
     grip: 23,
     mass: 0.95,
     armour: 0,
+    ram: 0,
     gun: 0,
     length: 4.0,
     width: 1.7,
@@ -62,6 +84,7 @@ export const CARS: CarDef[] = [
     frontDrive: 0.3,
     mass: 1.25,
     armour: 0,
+    ram: 0,
     gun: 0,
     length: 4.2,
     width: 1.8,

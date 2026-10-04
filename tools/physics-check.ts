@@ -10,7 +10,7 @@
 import { createState, type Car, type SimState } from '../src/game/state';
 import { step, DT } from '../src/game/sim';
 import { overlap } from '../src/game/physics';
-import { CARS } from '../src/game/content/cars';
+import { CARS, CAR_BY_ID } from '../src/game/content/cars';
 import type { CarInput, TrackDef } from '../src/game/types';
 
 declare const process: { exitCode?: number };
@@ -32,7 +32,7 @@ function oval(width: number, extra: Partial<TrackDef> = {}): TrackDef {
   return { id: 'test', name: { fi: 'testi', en: 'test' }, width, surface: 'gravel', points: pts, ...extra };
 }
 
-const kortteli = CARS[0];
+const kortteli = CAR_BY_ID.kortteli;
 
 /** a state with the player only, lights already out, the car at s on the lap at speed, angled `off` from the road */
 function setup(track: TrackDef, at: { s: number; v: number; d?: number; off?: number }, car = kortteli, rivals = 0): SimState {
@@ -160,7 +160,7 @@ for (const p of pieces) {
   const me = s.cars[0];
   const it = s.cars[1];
   place(s, it, { s: 20 + p.it.ahead, v: p.it.v, d: p.it.d, off: p.it.off });
-  it.missiles = it.mines = 0;
+  it.missiles = it.mines = it.oil = 0;
   const mom0 = [me.vx * me.def.mass + it.vx * it.def.mass, me.vy * me.def.mass + it.vy * it.def.mass];
   let contact = -1;
   let worst = 0;

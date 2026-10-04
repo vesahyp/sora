@@ -76,10 +76,10 @@ function geometry(def: CarDef): Geo {
   const W = def.width * SPRITE_PPM;
   const shape = def.shape;
   const wh = wheelLayout(def);
-  const inset = W * (shape === 'rally' ? 0.075 : shape === 'coupe' ? 0.03 : 0.04);
+  const inset = W * (shape === 'rally' ? 0.075 : shape === 'coupe' ? 0.03 : shape === 'saloon' ? 0.02 : 0.04);
   const fl = 2.5;
-  const nose = shape === 'coupe' ? [L * 0.05, W * 0.2] : shape === 'rally' ? [L * 0.03, W * 0.1] : [L * 0.025, W * 0.09];
-  const tail = shape === 'coupe' ? [L * 0.04, W * 0.14] : [L * 0.025, W * 0.08];
+  const nose = shape === 'coupe' ? [L * 0.05, W * 0.2] : shape === 'rally' ? [L * 0.03, W * 0.1] : shape === 'saloon' ? [L * 0.015, W * 0.06] : [L * 0.025, W * 0.09];
+  const tail = shape === 'coupe' ? [L * 0.04, W * 0.14] : shape === 'saloon' ? [L * 0.015, W * 0.06] : [L * 0.025, W * 0.08];
   const ra0 = wh.rearX - 2;
   const ra1 = wh.rearX + wh.wl + 2;
   const fa0 = wh.frontX - 2;
@@ -103,13 +103,16 @@ function geometry(def: CarDef): Geo {
   for (let i = top.length - 1; i >= 0; i--) body.lineTo(top[i][0], W - top[i][1]);
   body.closePath();
 
-  // the greenhouse in fractions of the length: bonnet seam, screen, roof, rear window
+  // the greenhouse in fractions of the length: bonnet seam, screen, roof, rear window. The
+  // saloon is three boxes: a long bonnet, an upright cabin in the middle, a boot behind it
   const f =
     shape === 'coupe'
       ? { bonnet: 0.62, screen: 0.48, roofB: 0.36, rear: 0.12, wF: 0.15, wR: 0.22 }
       : shape === 'rally'
         ? { bonnet: 0.68, screen: 0.55, roofB: 0.27, rear: 0.17, wF: 0.12, wR: 0.17 }
-        : { bonnet: 0.76, screen: 0.63, roofB: 0.15, rear: 0.06, wF: 0.12, wR: 0.13 };
+        : shape === 'saloon'
+          ? { bonnet: 0.7, screen: 0.6, roofB: 0.34, rear: 0.24, wF: 0.11, wR: 0.13 }
+          : { bonnet: 0.76, screen: 0.63, roofB: 0.15, rear: 0.06, wF: 0.12, wR: 0.13 };
   const g0 = inset + W * 0.06;
   const roof: [number, number, number, number] = [L * f.roofB, inset + W * 0.13, L * (f.screen - f.roofB), W - 2 * (inset + W * 0.13)];
   const screen: [number, number][] = [
@@ -195,7 +198,7 @@ function livery(colour: string, k: number): { kind: 'twin' | 'band' | 'split'; t
 
 export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
   const bin = lightBin(look.heading ?? -0.3);
-  const key = `car:${def.shape}:${def.length}:${def.width}:${def.colour}:${look.number ?? 0}:${look.faded ? 1 : 0}:${look.livery ?? 0}:${bin}`;
+  const key = `car:${def.shape}:${def.length}:${def.width}:${def.colour}:${def.ram}:${look.number ?? 0}:${look.faded ? 1 : 0}:${look.livery ?? 0}:${bin}`;
   const hit = cache.get(key);
   if (hit) return hit;
   const geo = geometry(def);
@@ -333,6 +336,20 @@ export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
     g.fillStyle = '#1c1915';
     g.fillRect(geo.roof[0] + geo.roof[2] * 0.15, geo.roof[1] - 1, 1.6, geo.roof[3] + 2);
     g.fillRect(geo.roof[0] + geo.roof[2] * 0.8, geo.roof[1] - 1, 1.6, geo.roof[3] + 2);
+  } else if (shape === 'saloon') {
+    // a jokkis saloon: the boot lid's seam, a vinyl roof gone matt, a dent in the rear quarter
+    g.fillStyle = 'rgba(12,8,6,0.22)';
+    g.fillRect(geo.roof[0], geo.roof[1], geo.roof[2], geo.roof[3]);
+    g.strokeStyle = 'rgba(12,8,6,0.4)';
+    g.lineWidth = 0.6;
+    g.beginPath();
+    g.moveTo(geo.bootX * 0.35, W * 0.16);
+    g.lineTo(geo.bootX * 0.35, W * 0.84);
+    g.stroke();
+    g.fillStyle = 'rgba(30,24,18,0.3)';
+    g.beginPath();
+    g.ellipse(geo.bootX + 2, W * 0.86, 3, 1.4, 0.3, 0, Math.PI * 2);
+    g.fill();
   } else if (shape === 'rally') {
     // the roof scoop
     g.fillStyle = '#1a1712';
@@ -387,6 +404,26 @@ export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
   g.fillStyle = '#8a1e14';
   g.fillRect(0, W * 0.1, 1.8, W * 0.16);
   g.fillRect(0, W * 0.74, 1.8, W * 0.16);
+  // the ram bar on the nose: a pipe, then a bar with spikes, then a plough
+  if (def.ram > 0) {
+    g.fillStyle = '#2a2622';
+    const bw = def.ram >= 3 ? 3.2 : 1.8;
+    g.fillRect(L - 0.6, W * 0.06, bw, W * 0.88);
+    g.fillStyle = 'rgba(255,236,204,0.3)';
+    g.fillRect(L - 0.6, W * 0.06, bw, 0.6);
+    if (def.ram === 2) {
+      g.fillStyle = '#6a655c';
+      for (let i = 0; i < 4; i++) {
+        const y = W * (0.16 + i * 0.22);
+        poly(g, [[L + 1.2, y - 0.6], [L + 2.6, y], [L + 1.2, y + 0.6]]);
+        g.fill();
+      }
+    } else if (def.ram >= 3) {
+      g.fillStyle = '#3a352f';
+      poly(g, [[L + 2.6, W * 0.04], [L + 4.2, W * 0.5], [L + 2.6, W * 0.96]]);
+      g.fill();
+    }
+  }
   cache.set(key, c);
   return c;
 }
@@ -535,8 +572,8 @@ export function wheelLayout(def: CarDef): { wl: number; ww: number; out: number;
   const wl = L * (def.shape === 'coupe' ? 0.16 : 0.17);
   const ww = W * (def.shape === 'rally' ? 0.2 : 0.16);
   const out = def.shape === 'rally' ? ww * 0.3 : ww * 0.15;
-  const frontX = L * (def.shape === 'coupe' ? 0.72 : def.shape === 'hatch' ? 0.74 : 0.7);
-  const rearX = L * (def.shape === 'hatch' ? 0.1 : 0.12);
+  const frontX = L * (def.shape === 'coupe' ? 0.72 : def.shape === 'hatch' ? 0.74 : def.shape === 'saloon' ? 0.73 : 0.7);
+  const rearX = L * (def.shape === 'hatch' ? 0.1 : def.shape === 'saloon' ? 0.15 : 0.12);
   return { wl, ww, out, frontX, rearX };
 }
 
@@ -924,6 +961,11 @@ function pickupShape(kind: string): Path2D {
     p.arc(0.47, 0, 0.2, 0, Math.PI * 2);
     p.moveTo(-0.3, 0);
     p.arc(-0.47, 0, 0.18, 0, Math.PI * 2);
+  } else if (kind === 'oil') {
+    // an oil can lying on its side: a drum with a spout off one end
+    p.rect(-0.4, -0.28, 0.72, 0.56);
+    p.rect(0.32, -0.08, 0.26, 0.16);
+    p.rect(-0.1, -0.4, 0.18, 0.12);
   } else if (kind === 'missile') {
     // a tube with an ogive nose and four fins seen from above as two
     p.moveTo(-0.55, -0.1);
@@ -1058,6 +1100,22 @@ export function pickupSprite(kind: string): HTMLCanvasElement {
     g.fillRect(-0.32, -0.08, 0.64, 0.04);
     g.fillStyle = 'rgba(110,60,30,0.45)';
     g.fillRect(0.05, -0.085, 0.12, 0.17);
+  } else if (kind === 'oil') {
+    g.fillStyle = '#4a4238';
+    g.fill(shape);
+    // the drum's ribs, a faded label, and the oil it has leaked onto itself
+    g.strokeStyle = 'rgba(15,12,8,0.5)';
+    g.lineWidth = 0.025;
+    g.beginPath();
+    for (const x of [-0.3, 0.2]) {
+      g.moveTo(x, -0.28);
+      g.lineTo(x, 0.28);
+    }
+    g.stroke();
+    g.fillStyle = faded('#c8a030', 0.4);
+    g.fillRect(-0.22, -0.16, 0.34, 0.32);
+    g.fillStyle = 'rgba(10,8,6,0.55)';
+    g.fillRect(0.4, -0.04, 0.18, 0.08);
   } else if (kind === 'missile') {
     g.fillStyle = '#6a6a58';
     g.fill(shape);

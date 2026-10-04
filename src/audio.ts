@@ -116,6 +116,17 @@ class Audio {
       case 'mine':
         beep(260, 0, 0.12, 'square', 0.12);
         break;
+      case 'oil':
+        // a can glugging out of the back
+        beep(220, 0, 0.09, 'triangle', 0.16);
+        beep(170, 0.08, 0.1, 'triangle', 0.16);
+        beep(140, 0.17, 0.14, 'triangle', 0.14);
+        break;
+      case 'slick':
+        // the tyres finding nothing: a thin squeal that falls away
+        beep(900, 0, 0.08, 'sawtooth', 0.05);
+        beep(700, 0.06, 0.12, 'sawtooth', 0.04);
+        break;
       case 'boom':
       case 'wreck': {
         const len = name === 'wreck' ? 0.9 : 0.5;
