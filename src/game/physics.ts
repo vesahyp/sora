@@ -4,7 +4,7 @@ import { BOOST, DAMAGE, DAMAGE_PACE, OIL, SPIN_TIME, nitroFill, nitroTank } from
 import { enginePace } from './content/drivers';
 import { SURFACES, type SurfaceDef } from './content/surfaces';
 import { clamp, hurt, ram } from './harm';
-import { steeringLock, wheelbase } from './sim';
+import { steeringLock, wheelbase, yawMax } from './sim';
 import { LANE_VERGE } from './track';
 
 /**
@@ -39,7 +39,14 @@ const REVERSE_TOP = 5;
 /** the rear tyres against the front: a touch under 1 so the car rotates at the limit instead of plowing */
 const REAR_GRIP = 0.92;
 /** how quickly the drive fades as the rear slides past its peak, per peak */
-const TRACTION = 0.8;
+const TRACTION = 1.0;
+/**
+ * The safety net under every hand: past COUNTER_FROM peaks of rear slip the wheel is turned into
+ * the slide by COUNTER of the excess. A pedal slide held at an angle sits under two peaks and is
+ * left alone; a tail going past that toward a spin is caught, for the thumb as for the bot.
+ */
+const COUNTER_FROM = 2;
+const COUNTER = 0.8;
 /** how far a free wheel follows the front axle's direction of travel */
 const CASTER = 0.8;
 /** slip, in peaks, past which a sliding tyre bites again */
@@ -76,6 +83,13 @@ const LAND_BOUNCE = 2.5;
 const LAND_REBOUND = 0.25;
 const LAND_REBOUND_MAX = 1.5;
 const LAND_HURT = 7;
+
+/** the air and the rolling tyres: a pull on the forward speed, per second */
+let DRAG = 0.12;
+/** for the sweeps in tools/dbg */
+export function setDrag(d: number): void {
+  DRAG = d;
+}
 
 const bitten = new Map<string, SurfaceDef>();
 
@@ -279,10 +293,16 @@ function integrate(s: SimState, c: Car, a: Ask, h: number, last: boolean): void 
     const lock = steeringLock(def, vx);
     const free = (1 - Math.abs(c.steer)) * CASTER;
     const swing = steeringLock(def, 0);
-    const delta = c.steer * lock + free * clamp(Math.atan2(vyF, vxs), -swing, swing) * Math.sign(vx || 1);
     const vyR = vy - w * cc;
-    const alphaF = Math.atan2(vyF, vxs) - delta * Math.sign(vx || 1);
     const alphaR = Math.atan2(vyR, vxs);
+    // the hand asks for yaw; the wheel turns as far as the tyres can use at this speed (yawMax).
+    // A tail well past its peak is caught for the hand (COUNTER): the same car answers every hand
+    // the same way
+    const asked = Math.atan((c.steer * yawMax(def, vx) * L) / vxs);
+    const past = Math.abs(alphaR) - sr.peak * COUNTER_FROM;
+    const tailOut = past > 0 && Math.abs(vx) > 6 ? Math.sign(alphaR) * past * COUNTER : 0;
+    const delta = clamp(asked + tailOut, -lock, lock) + free * clamp(Math.atan2(vyF, vxs), -swing, swing) * Math.sign(vx || 1);
+    const alphaF = Math.atan2(vyF, vxs) - delta * Math.sign(vx || 1);
     // the thumb has no throttle to lift, so the car lifts for it: past the rear's peak the drive
     // fades, the way a driver feathers a slide instead of powering it into a spin
     if (drive > 0) drive *= clamp(1 - (Math.abs(alphaR) / sr.peak - 1) * TRACTION, 0.25, 1);
@@ -300,7 +320,7 @@ function integrate(s: SimState, c: Car, a: Ask, h: number, last: boolean): void 
     const sd = Math.sin(delta);
     const carFx = fxF * cd - fyF * sd;
     const carFy = fxF * sd + fyF * cd;
-    ax = carFx + fxR - vx * 0.12;
+    ax = carFx + fxR - vx * DRAG;
     ay = carFy + fyR;
     if (vx > top) ax -= (vx - top) * 2;
     wdot = (carFy * b - fyR * cc) / k2;

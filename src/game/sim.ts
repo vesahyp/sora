@@ -15,6 +15,8 @@ export const DT = 1 / 60;
  * cars got a fifth faster (2026-10-04), raised with them so a car still turns at its new speeds */
 const LOCK = 0.17;
 const LOCK_FADE = 60;
+/** how much more yaw than the grip can hold a hand may ask for at speed: room to provoke a slide */
+const YAW_ROOM = 1.35;
 /**
  * One fixed step. The car model moves the cars (physics.ts: the tyres,
  * the contacts between cars and with the trees, height; physics-old.ts
@@ -457,9 +459,14 @@ function settle(s: SimState, c: Car, player: boolean): void {
   if (c.stuck > TOW_AFTER && c.wreck <= 0) tow(s, c);
 }
 
-/** seconds off the road without getting TOW_ALONG metres along the lap before the marshals tow a car back on */
+/**
+ * seconds off the road without getting TOW_ALONG metres along the lap before the marshals tow a
+ * car back on. Eight metres: a car crawling along the tree line at a metre a second made the
+ * old three and sat there for seven seconds without a tow (2026-10-04); a car driving a shortcut
+ * lane or the grass makes eight in well under four seconds
+ */
 export const TOW_AFTER = 4;
-const TOW_ALONG = 3;
+const TOW_ALONG = 8;
 /** stalled this long, seconds, with the nose in the trees, a car reverses on its own for BACK_OUT seconds */
 const BACK_AFTER = 1.5;
 const BACK_OUT = 1.1;
@@ -533,6 +540,23 @@ export function wheelbase(def: Car['def']): number {
 }
 
 /** Radians of wheel angle at full lock, at this speed: the lock shrinks as the car goes faster. */
+/** The rack's lock at this speed: full at rest, fading with speed, as on a real wheel. */
 export function steeringLock(def: Car['def'], v: number): number {
   return (def.turnRate * LOCK) / (1 + Math.abs(v) / LOCK_FADE);
+}
+
+/**
+ * The most yaw a car can ask for at this speed, rad/s. The input's steer is a share of this,
+ * not of the rack: a hand asks the car to turn, and the car turns the wheel as far as the
+ * tyres can use. At rest the rack is the limit; at speed the grip is, with YAW_ROOM over
+ * it so a slide can still be provoked. Before this, at 100 km/h the rack offered four times
+ * the angle the front could turn into force: a thumb at full stretch saturated the front,
+ * then the rear, and the car slid like ice, while the bot, which already asked for yaw
+ * rates, stayed on rails (tools/dbg/slip.ts, 2026-10-04). Every car, every hand.
+ */
+export function yawMax(def: Car['def'], v: number): number {
+  const vv = Math.max(Math.abs(v), 3);
+  const rack = (vv * Math.tan(steeringLock(def, v))) / wheelbase(def);
+  const grip = (YAW_ROOM * def.grip) / vv;
+  return Math.min(rack, grip);
 }

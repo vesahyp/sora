@@ -74,7 +74,9 @@ const run = (s: SimState, seconds: number, inputs: (t: number) => CarInput[], ea
   assert(maxYaw < 0.005 && Math.abs(c.heading - h0) < 0.005 && Math.abs(drift) < 0.05, `hands off at 90 km/h the car holds a straight line (yaw ${f(maxYaw, 4)} rad/s, heading ${f(c.heading - h0, 4)} rad, drift ${f(drift, 3)} m over ${f(Math.hypot(c.x - x0, c.y - y0), 0)} m)`);
 }
 
-// 2. full lock at speed: the car slides, and let go it recovers
+// 2. full lock at speed: a held turn, not a spin, and let go it recovers. The hand asks for yaw and
+// the car turns the wheel as far as the tyres can use (sim.ts, yawMax), so a thumb at full stretch at
+// 90 km/h is a corner, with a little slide in the cars whose grip the yaw room exceeds
 for (const car of CARS) {
   const s = setup(oval(160), { s: 20, v: 25, d: -15 }, car);
   const c = s.cars[0];
@@ -87,7 +89,7 @@ for (const car of CARS) {
   run(s, 3, () => [go(0)], (t) => {
     if (settled < 0 && Math.abs(c.yaw) < 0.1 && Math.abs(c.slipAngle) < 0.05) settled = t;
   });
-  assert(maxSlip > 0.1, `${car.id}: a second of full lock at 90 km/h slides the car (body slip up to ${f(maxSlip, 2)} rad, turned ${f(turned, 2)} rad)`);
+  assert(turned > 0.3 && maxSlip < 0.6, `${car.id}: a second of full lock at 90 km/h turns the car, not a spin (turned ${f(turned, 2)} rad, body slip up to ${f(maxSlip, 2)} rad)`);
   assert(settled >= 0 && settled < 2, `${car.id}: let go, the slide recovers by itself (straight in ${f(settled, 2)} s, at ${f(speed(c) * 3.6, 0)} km/h)`);
   assert(Math.abs(c.heading - h0) < Math.PI / 2, `${car.id}: and it does not spin (${f(c.heading - h0, 2)} rad after letting go)`);
 }
@@ -106,7 +108,9 @@ for (const car of CARS) {
   });
   const turned = c.heading - h0;
   assert(maxSlip > 0.3, `the pedal at half lock throws the tail out (body slip up to ${f(maxSlip, 2)} rad)`);
-  assert(turned > 0.5 && turned < 2.4, `and turns the car a corner's worth, not a spin (${f(turned, 2)} rad)`);
+  // let go, the car catches the tail itself (COUNTER in physics.ts): a stab turns a kink's worth and
+  // comes back; the hairpin's worth is the thumb held through the slide, 3b below
+  assert(turned > 0.3 && turned < 2.4, `and turns the car, not a spin (${f(turned, 2)} rad)`);
   assert(settled >= 0 && settled < 2.5 && speed(c) > 8, `and let go it straightens itself (in ${f(settled, 2)} s, at ${f(speed(c) * 3.6, 0)} km/h)`);
 }
 

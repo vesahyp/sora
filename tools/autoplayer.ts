@@ -1,6 +1,6 @@
 import type { Car, SimState } from '../src/game/state';
 import type { CarInput } from '../src/game/types';
-import { steeringLock, wheelbase } from '../src/game/sim';
+import { wheelbase, yawMax } from '../src/game/sim';
 import { GRUDGE, PACING, catchUp, enginePace, hostility, leaderOf, paceToPlayer } from '../src/game/content/drivers';
 import { SURFACES } from '../src/game/content/surfaces';
 import { MINE, OIL } from '../src/game/content/weapons';
@@ -59,10 +59,6 @@ export const DEFAULT_BOT: BotTuning = { look: 6, lookPerSpeed: 0.4, gain: 7, mar
  */
 const WOBBLE = { steer: 0.25, w1: 1.1, w2: 2.7 };
 const LATE = { chance: 0.6, over: 0.7, bend: 40 };
-
-/** seconds a stuck bot reverses before it tries forward again; when each car's reversing ends */
-const BACK_OUT = 1.2;
-const backing = new WeakMap<Car, number>();
 
 /** a hash as a fraction, 0 to 1 */
 const frac = (n: number) => hash32(n) / 4294967296;
@@ -180,17 +176,19 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
   while (err < -Math.PI) err += 2 * Math.PI;
   // the yaw rate that closes the heading error, turned into a wheel angle through the
   // wheelbase, so the bot asks the tyres for what they can give instead of full lock
-  const yawWant = Math.max(-2.2, Math.min(2.2, err * tune.gain));
-  let deltaWant = Math.atan((yawWant * wheelbase(c.def)) / Math.max(speed, 3));
-  // the tail is out past the tyres' peak: steer into the slide, the way a hand does
+  // the input is a share of the yaw the car can give at this speed (sim.ts, yawMax): the bot asks
+  // for the yaw rate that closes the heading error, and the car turns the wheel; the car also
+  // counter-steers a tail that is out, for the bot as for the thumb
+  let yawWant = Math.max(-2.2, Math.min(2.2, err * tune.gain));
+  // the tail is out past the tyres' peak: steer into the slide, the way a hand does, as yaw
   const alphaR = Math.atan2(c.slip - c.yaw * wheelbase(c.def) * 0.5, Math.max(Math.abs(c.speed), 3));
   const tailOut = Math.abs(alphaR) > 0.1 && speed > 6;
-  if (tailOut) deltaWant += alphaR * 1.1;
+  if (tailOut) yawWant += (Math.tan(alphaR * 1.1) * Math.max(speed, 3)) / wheelbase(c.def);
   // the hands wander: a poor driver weaves down a straight and saws at the wheel in a bend
   const sloppy = 1 - skill;
   const who = s.cars.indexOf(c);
   const wobble = sloppy > 0 ? sloppy * WOBBLE.steer * (Math.sin(s.time * WOBBLE.w1 + who * 2.1) * 0.7 + Math.sin(s.time * WOBBLE.w2 + who * 4.3) * 0.3) : 0;
-  let steer = Math.max(-1, Math.min(1, deltaWant / steeringLock(c.def, speed) + ramSteer + wobble));
+  let steer = Math.max(-1, Math.min(1, yawWant / yawMax(c.def, speed) + ramSteer + wobble));
 
   // how sharp is the road coming: the worst turn over the braking distance, at what the tyres can brake
   const stop = Math.min(c.def.brake, c.def.grip) * 0.7;
@@ -239,30 +237,10 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
   // a poor driver is never flat out: it short-shifts and lifts, its foot the same share as its top speed
   const foot = 0.45 + 0.55 * skill;
   const allowed = (rubbing ? 0.9 : 1) * Math.min(Math.sqrt(c.def.grip * gripHere * margin * radius) * (lane?.inside ? 1 : onRoadFactor(c)) * late, c.def.topSpeed * foot * enginePace(s, c)) * wait;
-  // nose in the trees: slow at the forest's edge and pointing away from the road. The tree
-  // wall bounces the car, so the stall clock never runs long enough; back out on this instead
-  const edge = t.width / 2 + t.verge - 1;
-  const normal = Math.sign(c.d);
-  const here0 = t.at(c.s);
-  const noseOut = (Math.cos(c.heading) * -here0.ty + Math.sin(c.heading) * here0.tx) * normal;
-  // in a lane the same, against the lane's trees: slow, at its wall, nose pointing off the lane
-  let inTrees = !lane && Math.abs(c.d) > edge && noseOut > 0.3 && speed < 4;
-  // backing out of a lane's wall, the wheel is turned so the nose swings back to the lane's middle
-  let backSteer = 0;
-  if (lane?.inside) {
-    const l = lane.lane.locate(c.x, c.y);
-    const dir = lane.lane.at(l.u);
-    const off = Math.abs(Math.atan2(Math.cos(c.heading) * dir.ty - Math.sin(c.heading) * dir.tx, Math.cos(c.heading) * dir.tx + Math.sin(c.heading) * dir.ty));
-    inTrees = l.dist > lane.lane.width / 2 + LANE_VERGE - 1.2 && off > 0.5 && speed < 4;
-    // reversing swings the nose against the wheel: to bring it round to the lane's direction, the
-    // wheel goes the other way from where that direction lies
-    const ang = Math.atan2(Math.cos(c.heading) * dir.ty - Math.sin(c.heading) * dir.tx, Math.cos(c.heading) * dir.tx + Math.sin(c.heading) * dir.ty);
-    backSteer = ang > 0 ? -1 : 1;
-  }
-  // once stuck it backs out for a while: backing a metre resets the stall clock, and a bot that
-  // went forward again at once rocked against the same tree for twenty seconds
-  if ((c.stall > 0.8 && c.stall < 2.0) || inTrees) backing.set(c, s.time + BACK_OUT);
-  const stuck = (backing.get(c) ?? -9) > s.time;
+  // a car wedged nose first in the trees is backed out by the sim itself (sim.ts, rescue), for
+  // the bot as for the thumb. The bot kept its own back-out timer here until 2026-10-04: it was
+  // still running when the marshals towed the car onto the road, so the bot reversed from the
+  // tow point, off the road again, and was towed every eight seconds for a lap (tools/dbg/towloop.ts)
   // brake to the limit, lift just under it, and lift when the front is washing out
   let brake = speed > allowed ? 1 : 0;
   let throttle = brake ? 0 : speed > allowed * 0.95 ? 0.2 : foot;
@@ -275,15 +253,9 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
     throttle = 0;
   }
   // with the tail out, braking would unload the rear further: hold a little throttle instead
-  if (tailOut && !stuck) {
+  if (tailOut) {
     brake = 0;
     throttle = Math.min(throttle, 0.35);
-  }
-  // stuck against something: back out for a moment, wheel the other way, then try again
-  if (stuck) {
-    brake = 1;
-    throttle = 0;
-    steer = backSteer || -steer;
   }
   // nitro on a straight with a full enough tank; a bot behind the player lights it sooner,
   // one well ahead keeps it
