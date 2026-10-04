@@ -155,7 +155,8 @@ for (const track of TRACKS) {
         step(race, race.cars.map((c) => botInput(race, c)), DT);
         race.cars.forEach((c, k) => {
           const st = stalledFrom[k];
-          const along = Math.abs(((c.s - st.s + race.track.length * 1.5) % race.track.length) - race.track.length / 2);
+          // forward from the mark only, as the sim counts it: rocking back over the mark is not progress
+          const along = ((c.s - st.s + race.track.length * 1.5) % race.track.length) - race.track.length / 2;
           if (race.hold > 0 || c.finishedAt >= 0 || c.wreck > 0 || Math.abs(c.d) <= race.track.width / 2 || along >= 3 || st.t < 0) {
             st.t = Math.abs(c.d) > race.track.width / 2 && c.wreck <= 0 && c.finishedAt < 0 && race.hold <= 0 ? race.time : -1;
             st.s = c.s;
@@ -198,7 +199,8 @@ for (const track of TRACKS) {
     const aimed = inSights / Math.max(1, racing);
     // the owner's stuck spot, 2026-10-04: nobody sits off the road going nowhere; the back-out
     // frees a car nose first in the trees and the marshals tow whatever it cannot
-    assert(stalled <= TOW_AFTER + 0.1, `${track.id}/${car.id}: no car is stalled off the road more than ${TOW_AFTER} s in any race (longest ${stalled.toFixed(1)} s)`);
+    // a few steps of slack: this clock can start a step before the sim's, and the tow lands a step after it fires
+    assert(stalled <= TOW_AFTER + 0.25, `${track.id}/${car.id}: no car is stalled off the road more than ${TOW_AFTER} s in any race (longest ${stalled.toFixed(1)} s)`);
     console.log(`  view:  another car on screen ${(seen * 100).toFixed(0)}% of the race, a target in the sights ${(aimed * 100).toFixed(0)}%, the player wrecked ${playerWrecks} in ${orders.length} races`);
     // aggression against the road, the player's own, per race: wrecking and ramming must pay more
     // than driving over cash, or the race teaches the player to drive round the fight. The bot

@@ -428,8 +428,11 @@ function settle(s: SimState, c: Car, player: boolean): void {
   const lapS = c.lap === 1 && !c.half && c.s > L * 0.8 ? c.s - L : c.s;
   c.progress = c.finishedAt >= 0 ? s.totalLaps * L + 1e6 - c.finishedAt : (c.lap - 1) * L + lapS;
   // going nowhere: a metre from the last place it was counts as moving, so a car rubbing a wall at
-  // a crawl, or rocking against it, is as stalled as one standing still
-  if (s.hold <= 0 && c.finishedAt < 0 && Math.hypot(c.x - c.stallX, c.y - c.stallY) < 1.2) c.stall += DT;
+  // a crawl, or rocking against it, is as stalled as one standing still; so is any car under
+  // walking pace, because a car bouncing off the wall with the throttle on can travel more
+  // than a metre without going anywhere
+  const slow = Math.hypot(c.vx, c.vy) < 1.5;
+  if (s.hold <= 0 && c.finishedAt < 0 && (slow || Math.hypot(c.x - c.stallX, c.y - c.stallY) < 1.2)) c.stall += DT;
   else {
     c.stall = 0;
     c.stallX = c.x;
@@ -439,14 +442,14 @@ function settle(s: SimState, c: Car, player: boolean): void {
   // back-out could not free, one rocking against the trees. The marshals tow it back, as a folk
   // race's tractor would, before the player has time to wonder what to do
   if (s.hold <= 0 && c.finishedAt < 0 && Math.abs(c.d) > t.width / 2) {
+    // forward from the mark, never back: a car rocking to and fro over the mark is going nowhere
     let along = c.s - c.stuckS;
     if (along < -L / 2) along += L;
     if (along > L / 2) along -= L;
-    if (Math.abs(along) < TOW_ALONG) c.stuck += DT;
-    else {
+    if (along >= TOW_ALONG && !slow) {
       c.stuck = 0;
       c.stuckS = c.s;
-    }
+    } else c.stuck += DT;
   } else {
     c.stuck = 0;
     c.stuckS = c.s;

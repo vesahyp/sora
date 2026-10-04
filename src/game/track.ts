@@ -365,10 +365,50 @@ export class Track {
 
   /** Deterministic forest outside the verge; the renderer culls by view. */
   private plantTrees(): void {
-    // dense enough that the forest reads as forest, not a park
+    const edge = this.width / 2 + this.verge;
+    // The wall first: the physics stops a car at `edge` from the road and at a lane's verge
+    // (physics.ts, treeContacts), so a tree stands on every metre of that line. Without this
+    // row the first trees began a metre further out with gaps between them, and a car sat
+    // "stuck on open grass" against a wall nothing showed.
+    const row = (x: number, y: number, r: number, seed: number) => {
+      if (this.inRiver(x, y)) return;
+      this.trees.push({ x, y, r, kind: seed & 3 });
+    };
+    const WALL_STEP = 2.6;
+    for (let s = 0; s < this.length; s += WALL_STEP) {
+      const p = this.at(s);
+      const h = hash32(Math.round(s * 7919) ^ 0x5bd1);
+      const r = 1.7 + ((h >>> 8) & 0xff) / 255 * 0.6;
+      for (const side of [-1, 1]) {
+        const d = side * (edge + r * 0.55);
+        const x = p.x - p.ty * d;
+        const y = p.y + p.tx * d;
+        // not across a lane's mouth, and not where the road doubles back on itself
+        const lane = this.laneAt(x, y);
+        if (lane && lane.dist < lane.lane.width / 2 + LANE_VERGE + r) continue;
+        if (Math.abs(this.locate(x, y).d) < edge) continue;
+        row(x, y, r, h >>> 4);
+      }
+    }
+    for (const lane of this.lanes) {
+      for (let u = 0; u < lane.length; u += WALL_STEP) {
+        const p = lane.at(u);
+        const h = hash32(Math.round(u * 6007) ^ 0x1f3d);
+        const r = 1.6 + ((h >>> 8) & 0xff) / 255 * 0.5;
+        for (const side of [-1, 1]) {
+          const d = side * (lane.width / 2 + LANE_VERGE + r * 0.55);
+          const x = p.x - p.ty * d;
+          const y = p.y + p.tx * d;
+          if (Math.abs(this.locate(x, y).d) < edge + r) continue;
+          const other = this.laneAt(x, y);
+          if (other && other.dist < other.lane.width / 2 + LANE_VERGE) continue;
+          row(x, y, r, h >>> 4);
+        }
+      }
+    }
+    // then the forest behind it, dense enough that it reads as forest, not a park
     const step = 4.5;
     const { minX, minY, maxX, maxY } = this.bounds;
-    const edge = this.width / 2 + this.verge;
     for (let gx = Math.floor(minX / step); gx * step < maxX; gx++) {
       for (let gy = Math.floor(minY / step); gy * step < maxY; gy++) {
         const h = hash32((gx * 73856093) ^ (gy * 19349663) ^ 7);
