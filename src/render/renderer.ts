@@ -393,9 +393,12 @@ export class Renderer {
       g.fill();
     }
 
-    // the auto-fire cone: two thin dashed edges and a ticked arc, under the cars
+    // the auto-fire cone: two thin dashed edges and a ticked arc, under the cars. Only with a
+    // weapon that aims: a gun or a missile. Oil and mines drop behind, and a car with nothing
+    // to aim showed sights at cars it could not hurt, which looked silly
     const me = s.cars[0];
-    if (me.wreck <= 0 && s.hold <= 0) {
+    const aims = me.def.gun > 0 || me.missiles > 0;
+    if (aims && me.wreck <= 0 && s.hold <= 0) {
       const r = GUN.range * 0.6;
       const a0 = me.heading - GUN.cone;
       const a1 = me.heading + GUN.cone;
@@ -645,8 +648,8 @@ export class Renderer {
     g.drawImage(this.air!, 0, 0);
     g.restore();
 
-    // the sights on top of the air, so they stay sharp
-    if (me.target >= 0 && me.wreck <= 0) {
+    // the sights on top of the air, so they stay sharp; only with a weapon that aims
+    if (aims && me.target >= 0 && me.wreck <= 0) {
       g.save();
       g.translate(this.w / 2, this.h / 2);
       g.scale(this.ppm, this.ppm);
