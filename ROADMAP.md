@@ -5,26 +5,29 @@ The design is in `docs/design.md`.
 
 ## Next
 
-- **Playtest the jokkis start on the phone** (2026-10-04): is the Tauno
-  fun to slide, does the oil read on screen and pay, is the first race
-  won in a few tries and does the Kortteli feel earned. Knobs: the
-  Tauno in `cars.ts`, `OIL` in `weapons.ts`, the prizes in
-  `events.ts`, `START_CREDITS` in `save.ts`. Then the shortcut by
-  hand: is a second a lap the right gain for a lane that narrow, and
-  should Marko take it too (`laneFor` in `autoplayer.ts`).
-- **Playtest the faster pace and the river** (2026-10-04): the cars are
-  a third quicker off the line and a fifth faster flat out, and the
-  kickers are gone for a river jumped from its bank and a crest. The
-  questions: does the pace feel right or now too twitchy on a phone,
-  does a thumb clear Kiviaho's river and land on the road, does falling
-  in read as a mistake and not a trap, does the crest lift the field
-  in a way that is fun, and does the player still ever sit stuck at
-  the hairpin, or does the back-out and the tow (`PERUUTA`, `HINAUS`)
-  get them going before they wonder what to do. Knobs: `accel` and
-  `topSpeed` in `cars.ts`, `LOCK_FADE` in `sim.ts`, the rivers and
-  crests in `tracks.ts`, `RIVER` in `track.ts`, `LAND_*` in
-  `physics.ts`, `BACK_AFTER`, `BACK_OUT` and `TOW_AFTER` in `sim.ts`,
-  `DEFAULT_BOT` in `autoplayer.ts`.
+- **Vesa's own phone playtest of the first hour.** The scripted thumb
+  (`make playthrough`, 2026-10-04) has answered what a script can: the
+  Tauno holds the road by thumb (5 to 15% of a race off it), a thumb
+  laps Kiviaho in 34 to 38 s stock and under 30 with the ram bar and
+  tyres, the first race is close, the next three are won clearly and
+  the final is lost or won by tenths to Marko, the river is cleared and
+  landed on the road, nobody sits stuck. What only a hand can answer:
+  is the Tauno fun to slide or merely safe now that the wheel asks for
+  yaw, does a nudge feel like a correction, is the oil read on screen
+  before it is driven over, is the co-driver's arrow looked at, does
+  the pace feel quick or twitchy, does the crest lift the field in a
+  way that is fun, the frame rate on the device. Knobs: `YAW_ROOM` in
+  `sim.ts`, `COUNTER` in `physics.ts`, the response curve in
+  `input.ts`, the grips in `cars.ts`, `fieldSkill` in `events.ts`,
+  `OIL` in `weapons.ts`, `CARS_ACROSS` and `LEAD_*` in `renderer.ts`.
+  Then the shortcut by hand: is a second a lap the right gain for a
+  lane that narrow, and should Marko take it too (`laneFor` in
+  `autoplayer.ts`).
+- **The thumb driver is a model, and a floor.** `scripts/playthrough.mjs`
+  steers by heading error with a reaction delay and never brakes to
+  rotate the car; a real thumb uses the pedal to swing the tail into
+  the hairpin and would lap quicker. Teach it the pedal stab, then the
+  shortcut, then read the hour again.
 - **Delete the old car model in the next release.** Vesa played the
   new one (2026-10-03) and it is better, so `?physics=old` has done its
   job. Remove `src/game/physics-old.ts`, `SimState.physics` and the
@@ -35,16 +38,6 @@ The design is in `docs/design.md`.
   `tools/physics-check.ts`, `PHYSICS=` in the Makefile and
   `scripts/drive-log.mjs`, and the `?physics=old` lines in `README.md`
   and `CLAUDE.md`. ADR 0003 already says so.
-- **Playtest the new start on the phone** (2026-10-04): the camera at
-  24 m across with the lead down the road, the co-driver's arrow, the
-  tiny JM cars and a crap JM field. The questions: can the road be read
-  now, does the arrow get looked at or ignored, is the first race won
-  by a margin that feels earned rather than handed over, does damage
-  read in the race, and the frame rate on a device with more ground on
-  screen. Knobs: `CARS_ACROSS` and `LEAD_*` in `renderer.ts`, `WARN`
-  and `GRADE_R` in `notes.ts`, the skills in `rivals.ts`, `WOBBLE` and
-  `LATE` in `autoplayer.ts`, `FUMBLE` and `GUN.spray` in `weapons.ts`,
-  `DAMAGE_AT` in `sprites.ts`.
 - **C is a coin toss for the bot player.** Over 48 C races (the six
   grids with a hair of skill changed, `tools/dbg/grid2.ts`) the default
   bot finishes top two 62% of the time with the wild cast, 52% with the
@@ -119,7 +112,7 @@ the track features below need. All of it is data in `tracks.ts`:
 - **Stuck:** any car not a metre along in 1.5 s with its nose at the
   trees reverses on its own for a second, the wheel turned to bring the
   nose round to the road (`sim.ts`, `rescue`); a car off the road and
-  not 3 m along the lap in 4 s is towed back on facing forward.
+  not 8 m along the lap in 4 s is towed back on facing forward.
 - **Checked:** `tools/physics-check.ts` flies a crest fast and only
   lifts a slow car over it, holds that full lock does nothing in the
   air, that a crooked landing costs more than a straight one, that the

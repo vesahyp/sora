@@ -42,7 +42,12 @@ const built: Parts = { ...STOCK, tyres: 2, weight: 2, engine: 2, brakes: 1, armo
 const purse = (win: number): [number, number, number, number] => [win, Math.round((win * 0.55) / 10) * 10, Math.round((win * 0.28) / 10) * 10, Math.round((win * 0.13) / 10) * 10];
 
 export const EVENTS: EventDef[] = [
-  { id: 'jm-kiviaho', name: L('Kiviahon jokkis', 'Kiviaho Folk Race'), cls: 'JM', trackId: 'kiviaho', laps: 3, prizes: purse(300), fieldParts: stock, fieldSkill: 0.7 },
+  // 0.45 since 2026-10-04: at 0.7 the thumb playthrough (scripts/playthrough.mjs) lost the first
+  // race by three tenths five times in six, the rivals lapping Kiviaho in 40 s against a hand's
+  // 38 to 41 on its first day. A tenth of the scale is a second a lap for a folk rival
+  // (tools/dbg/calib.ts): at 0.45 they lap about 42, and the first race of a career is won in one
+  // or two. Hirvisuo flows and suits a thumb, so its field stays at 0.8
+  { id: 'jm-kiviaho', name: L('Kiviahon jokkis', 'Kiviaho Folk Race'), cls: 'JM', trackId: 'kiviaho', laps: 3, prizes: purse(300), fieldParts: stock, fieldSkill: 0.45 },
   { id: 'jm-hirvisuo', name: L('Hirvisuon jokkis', 'Hirvisuo Folk Race'), cls: 'JM', trackId: 'hirvisuo', laps: 3, prizes: purse(450), fieldParts: stock, fieldSkill: 0.8 },
   { id: 'jm-kiviaho-4', name: L('Kiviahon kahlaus', 'Kiviaho Wade'), cls: 'JM', trackId: 'kiviaho', laps: 4, prizes: purse(600), fieldParts: stock, fieldSkill: 0.9 },
   { id: 'jm-hirvisuo-4', name: L('Hirvisuon pitkä jokkis', 'Hirvisuo Long Folk Race'), cls: 'JM', trackId: 'hirvisuo', laps: 4, prizes: purse(800), fieldParts: stock, fieldSkill: 1 },
