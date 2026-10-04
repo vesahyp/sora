@@ -677,6 +677,67 @@ export class Ground {
       const p = t.at(s);
       return { x: p.x - p.ty * d, y: p.y + p.tx * d };
     };
+    // a shortcut: a worn two-track through the gap in the trees, bare earth frayed into the
+    // straw with a darker middle and two pale ruts; it stops at the road's edge, where the
+    // gravel stays gravel
+    for (const lane of t.lanes) {
+      if (!lane.pts.some((p) => inChunk(p.x, p.y, lane.width + 2))) continue;
+      const path = (d: number) => {
+        const p = new Path2D();
+        let pen = false;
+        for (const q of lane.pts) {
+          if (Math.abs(t.locate(q.x, q.y).d) <= half + 0.6) {
+            pen = false;
+            continue;
+          }
+          const x = q.x - q.ty * d;
+          const y = q.y + q.tx * d;
+          if (pen) p.lineTo(x, y);
+          else p.moveTo(x, y);
+          pen = true;
+        }
+        return p;
+      };
+      const mid = path(0);
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
+      g.shadowColor = PAL.earth;
+      g.shadowBlur = 0.9 * this.res;
+      g.strokeStyle = PAL.earth;
+      g.lineWidth = lane.width * 0.9;
+      g.globalAlpha = 0.9;
+      g.stroke(mid);
+      g.shadowBlur = 0;
+      g.shadowColor = 'transparent';
+      g.strokeStyle = PAL.earthDark;
+      g.lineWidth = lane.width * 0.45;
+      g.globalAlpha = 0.3;
+      g.stroke(mid);
+      g.strokeStyle = PAL.gravelPale;
+      g.lineWidth = 0.32;
+      g.globalAlpha = 0.3;
+      for (const d of [-0.8, 0.8]) g.stroke(path(d));
+      // tufts of straw left between the ruts
+      g.strokeStyle = PAL.strawPale;
+      g.lineWidth = 0.06;
+      g.globalAlpha = 0.5;
+      const blades = new Path2D();
+      for (let i = 0; i < lane.pts.length; i += 2) {
+        const q = lane.pts[i];
+        for (let b = 0; b < 4; b++) {
+          const h = hash32(i * 977 + b * 7919 + 4242);
+          const d = (((h & 0xff) / 255) - 0.5) * 0.9;
+          const a = (((h >>> 8) & 0xff) / 255) * Math.PI * 2;
+          const l = 0.15 + (((h >>> 16) & 0xff) / 255) * 0.2;
+          const x = q.x - q.ty * d;
+          const y = q.y + q.tx * d;
+          blades.moveTo(x, y);
+          blades.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l);
+        }
+      }
+      g.stroke(blades);
+      g.globalAlpha = 1;
+    }
     for (const patch of t.def.patches ?? []) {
       if (patch.surface !== 'water' || patch.d) continue;
       const reach = half + t.verge + RIVER_REACH;

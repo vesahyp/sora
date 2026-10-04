@@ -85,6 +85,7 @@ export class Renderer {
   /** dust puffs a second, smoothed: how thick the haze hangs */
   private activity = 0;
   private roadPath: Path2D | null = null;
+  private lanePaths: Path2D[] = [];
   private roadFor: Track | null = null;
   private scenery: Scenery | null = null;
   private ground: Ground | null = null;
@@ -148,6 +149,11 @@ export class Renderer {
     t.pts.forEach((p, i) => (i ? path.lineTo(p.x, p.y) : path.moveTo(p.x, p.y)));
     path.closePath();
     this.roadPath = path;
+    this.lanePaths = t.lanes.map((lane) => {
+      const lp = new Path2D();
+      lane.pts.forEach((p, i) => (i ? lp.lineTo(p.x, p.y) : lp.moveTo(p.x, p.y)));
+      return lp;
+    });
     this.scenery = buildScenery(t);
     this.ground = new Ground(t, this.scenery);
     this.ground.marks = { c: m, ppm: MARK_PPM, x: b.minX, y: b.minY };
@@ -899,6 +905,13 @@ export class Renderer {
       mg.strokeStyle = PAL.hud;
       mg.lineWidth = 1.5 / k;
       mg.stroke(this.roadPath!);
+      // the shortcuts, thin and dashed: a lane through the trees, not a road
+      mg.setLineDash([3 / k, 2 / k]);
+      mg.lineWidth = 1 / k;
+      mg.globalAlpha = 0.8;
+      for (const lp of this.lanePaths) mg.stroke(lp);
+      mg.setLineDash([]);
+      mg.globalAlpha = 1;
       // the start line, a short bar across
       const sp = t.at(0);
       mg.lineWidth = 2 / k;

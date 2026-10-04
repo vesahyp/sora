@@ -370,6 +370,8 @@ function burn(s: SimState, c: Car, dt: number): void {
   c.damage = RESPAWN_DAMAGE;
   c.d = 0;
   c.stall = 0;
+  c.stallX = c.x;
+  c.stallY = c.y;
   c.slick = 0;
   s.fx.push({ kind: 'flash', x: c.x, y: c.y, age: 0, colour: '#fff' });
   if (c === s.cars[0]) s.sounds.push('respawn');
@@ -407,8 +409,14 @@ function settle(s: SimState, c: Car, player: boolean): void {
   }
   const lapS = c.lap === 1 && !c.half && c.s > L * 0.8 ? c.s - L : c.s;
   c.progress = c.finishedAt >= 0 ? s.totalLaps * L + 1e6 - c.finishedAt : (c.lap - 1) * L + lapS;
-  if (s.hold <= 0 && c.finishedAt < 0 && Math.abs(c.speed) < 0.8) c.stall += DT;
-  else c.stall = 0;
+  // going nowhere: a metre from the last place it was counts as moving, so a car rubbing a wall at
+  // a crawl, or rocking against it, is as stalled as one standing still
+  if (s.hold <= 0 && c.finishedAt < 0 && Math.hypot(c.x - c.stallX, c.y - c.stallY) < 1.2) c.stall += DT;
+  else {
+    c.stall = 0;
+    c.stallX = c.x;
+    c.stallY = c.y;
+  }
 }
 
 export function wheelbase(def: Car['def']): number {

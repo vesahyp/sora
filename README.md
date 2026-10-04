@@ -57,10 +57,14 @@ nousee, auto oikaisee itsensä. Poljin mutkassa heittää perän ympäri
 hiusneulaa varten. Puurivi ei pysäytä: viistossa osumassa auto liukuu
 puiden vartta ja jatkaa. Autot tönivät toisiaan oikeasti: osuma toisen
 takakulmaan pyöräyttää sen, ja painavampi auto siirtää kevyempää.
-Kiviahon lähtösuoralla on **hyppyri**: ilmassa auto ei ohjaa, joten
-linja valitaan ennen reunaa, ja vinossa alastulo maksaa vauhtia.
-Pitkässä mutkassa tie ylittää **kahlaamon**: vesi jarruttaa, roiskuu ja
-liukastaa, joten sen ylittää suoraan ja lyhyesti.
+Kummankin radan lähtösuoralla on **hyppyri**, Kiviaholla toinen
+hiusneulaan laskevalla suoralla: ilmassa auto ei ohjaa, joten linja
+valitaan ennen reunaa, ja vinossa alastulo maksaa vauhtia. Heti
+ensimmäisen kaarteen jälkeen tie ylittää **kahlaamon**: vesi jarruttaa,
+roiskuu ja liukastaa, joten sen ylittää suoraan ja lyhyesti. Kiviahon
+hiusneulan sisäkautta menee **oikotie**, metsään hakattu ura nurmella:
+lyhyempi, hitaampi ja puiden reunustama, ja Jorma löytää sen, kun jää
+jälkeen.
 Vanhan ajomallin voi vielä yhden version ajan kokeilla osoitteessa
 https://vesahyp.github.io/sora/?physics=old.
 
@@ -79,7 +83,7 @@ https://vesahyp.github.io/sora/?physics=old.
 - Nurmi on liukas, metsä pysäyttää. Maalissa korjaus maksaa osan
   palkinnosta.
 
-Kaksi rataa: **Kiviaho**, reilu puoli kilometriä ja alle puoli minuuttia
+Kaksi rataa: **Kiviaho**, vajaa 700 metriä ja noin puoli minuuttia
 kierros, ja **Hirvisuo**, kilometrin lenkki.
 
 ## Ura

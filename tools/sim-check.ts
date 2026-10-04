@@ -8,7 +8,7 @@ import { createState } from '../src/game/state';
 import { step, DT } from '../src/game/sim';
 import { TRACKS } from '../src/game/content/tracks';
 import { CARS } from '../src/game/content/cars';
-import { botInput } from './autoplayer';
+import { botInput, DEFAULT_BOT } from './autoplayer';
 import { OPPONENTS } from '../src/game/content/drivers';
 import { PICKUPS } from '../src/game/content/pickups';
 import { standings } from '../src/game/state';
@@ -23,10 +23,13 @@ import { canCarry, carried } from '../src/game/content/weapons';
  * order). On the rigid-body car model (ADR 0003) with the catch-up in
  * PACING the race sat at 42 to 65% on screen and 35 to 41% in the
  * sights across the tracks and cars; the old model gave 27 to 50% and
- * 15 to 37%. The floors stay where they were set; the target is a half.
+ * 15 to 37%. With the longer Kiviaho and Jorma on its shortcut
+ * (2026-10-04) the armed classes sit at 29 to 44% and JM at 66 to 75%,
+ * so the floor is a quarter; the target is still a half, and PACING is
+ * the knob.
  */
 const VIEW = { w: 17, h: 37 };
-const ON_SCREEN_MIN = 0.3;
+const ON_SCREEN_MIN = 0.25;
 const IN_SIGHTS_MIN = 0.1;
 
 declare const process: { argv: string[]; exitCode?: number };
@@ -39,12 +42,17 @@ const assert = (ok: boolean, what: string) => {
 
 for (const track of TRACKS) {
   for (const car of CARS) {
-    // alone first: the clean lap
+    // alone first: the clean lap, and the track's features on the way round: every jump flown
+    // and landed on the road, the ford crossed
     const solo = createState(track, car, 3);
     let offRoad = 0;
     let hits = 0;
     let topSpeed = 0;
     let steps = 0;
+    let water = 0;
+    let flight: { s0: number; v0: number; t0: number } | null = null;
+    const flights: { jump: number; v0: number; air: number; d: number; v1: number }[] = [];
+    let prevAir = false;
     while (!solo.finished && solo.time < 600) {
       step(solo, [botInput(solo)], DT);
       steps++;
@@ -52,7 +60,24 @@ for (const track of TRACKS) {
         const c = solo.cars[0];
         if (!c.onRoad) offRoad++;
         if (c.hit) hits++;
+        if (c.surface === 'water') water++;
         topSpeed = Math.max(topSpeed, c.speed);
+        if (!prevAir && c.air) flight = { s0: c.s, v0: c.speed, t0: solo.time };
+        if (prevAir && !c.air && flight) {
+          const jumps = track.jumps ?? [];
+          let jump = -1;
+          let near = Infinity;
+          for (let j = 0; j < jumps.length; j++) {
+            const gap = Math.abs(((flight.s0 - jumps[j].s + solo.track.length / 2) % solo.track.length) - solo.track.length / 2);
+            if (gap < near) {
+              near = gap;
+              jump = j;
+            }
+          }
+          flights.push({ jump, v0: flight.v0, air: solo.time - flight.t0, d: Math.abs(c.d), v1: c.speed });
+          flight = null;
+        }
+        prevAir = c.air;
       }
     }
     const me = solo.cars[0];
@@ -64,6 +89,39 @@ for (const track of TRACKS) {
       assert(best > 15 && best < 90, `${track.id}/${car.id}: a lap is between 15 s and 90 s (${best.toFixed(1)})`);
       assert(offRoad / steps < 0.08, `${track.id}/${car.id}: the bot stays on the road (off ${((offRoad / steps) * 100).toFixed(1)}%)`);
       assert(hits < 30, `${track.id}/${car.id}: the bot rarely meets a tree (${hits} steps)`);
+    }
+    // the jumps: each one flown on every lap, at racing speed, landing on the road
+    (track.jumps ?? []).forEach((j, k) => {
+      const f = flights.filter((x) => x.jump === k);
+      const line = f.map((x) => `${(x.v0 * 3.6).toFixed(0)} km/h ${x.air.toFixed(2)} s d ${x.d.toFixed(1)}`).join(', ');
+      console.log(`  jump ${k + 1} at ${j.s} m: ${line || 'never flown'}`);
+      assert(f.length >= 3, `${track.id}/${car.id}: the kicker at ${j.s} m throws the car every lap (${f.length} flights)`);
+      // racing speed: the bot did not slow for it, so the lip is taken at least as fast as the lap's average
+      const pace = solo.track.length / Math.min(...me.laps);
+      assert(f.every((x) => x.v0 > pace * 0.85), `${track.id}/${car.id}: the kicker at ${j.s} m is taken at racing speed (${f.map((x) => (x.v0 * 3.6).toFixed(0)).join('/')} km/h, over ${(pace * 0.85 * 3.6).toFixed(0)})`);
+      assert(f.every((x) => x.air > 0.3), `${track.id}/${car.id}: the kicker at ${j.s} m is a real flight (${f.map((x) => x.air.toFixed(2)).join('/')} s)`);
+      assert(f.every((x) => x.d < track.width / 2), `${track.id}/${car.id}: the kicker at ${j.s} m lands on the road (${f.map((x) => x.d.toFixed(1)).join('/')} m off the centreline)`);
+    });
+    if (track.patches?.some((p) => p.surface === 'water')) assert(water > 10, `${track.id}/${car.id}: the ford is crossed (${(water / 60).toFixed(1)} s in the water)`);
+    // the shortcut: the bot told to take it drives it without meeting the trees and gains on the
+    // lap, but not a free lap: under three seconds, the rest is the driver's
+    if (track.shortcuts?.length && me.laps.length) {
+      const lane = createState(track, car, 3);
+      let inLane = 0;
+      let laneHits = 0;
+      const tune = { ...DEFAULT_BOT, shortcuts: true };
+      while (!lane.finished && lane.time < 600) {
+        step(lane, [botInput(lane, lane.cars[0], tune)], DT);
+        if (lane.hold > 0) continue;
+        if (lane.track.inLane(lane.cars[0].x, lane.cars[0].y)) inLane++;
+        if (lane.cars[0].hit) laneHits++;
+      }
+      const you = lane.cars[0];
+      const saved = Math.min(...me.laps) - (you.laps.length ? Math.min(...you.laps) : Infinity);
+      console.log(`  shortcut: ${you.laps.map((l) => l.toFixed(2)).join('  ')}   ${(inLane / 60).toFixed(1)} s in the lane, ${laneHits} tree hits, saves ${saved.toFixed(2)} s a lap`);
+      assert(lane.finished && laneHits < 30, `${track.id}/${car.id}: the bot drives the shortcut home (${laneHits} tree hits)`);
+      assert(inLane > 60 * 3, `${track.id}/${car.id}: the bot takes the shortcut every lap (${(inLane / 60).toFixed(1)} s in it)`);
+      assert(saved > 0.3 && saved < 3, `${track.id}/${car.id}: the shortcut is worth taking and not a free lap (saves ${saved.toFixed(2)} s)`);
     }
     // then the race: four bots, armed with what the class carries (oil in JM, mines and the
     // gun from C, missiles from B), so the race is tested with its weapons in. One race is

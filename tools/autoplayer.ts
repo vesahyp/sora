@@ -2,6 +2,8 @@ import type { Car, SimState } from '../src/game/state';
 import type { CarInput } from '../src/game/types';
 import { steeringLock, wheelbase } from '../src/game/sim';
 import { GRUDGE, PACING, enginePace, hostility, leaderOf, paceToPlayer } from '../src/game/content/drivers';
+import { SURFACES } from '../src/game/content/surfaces';
+import { LANE_VERGE, type Lane } from '../src/game/track';
 
 /**
  * The bot driver. It aims at a point on the centreline a little ahead,
@@ -16,7 +18,9 @@ import { GRUDGE, PACING, enginePace, hostility, leaderOf, paceToPlayer } from '.
  * themselves, so it has nothing to decide there. It holds grudges (`GRUDGE`): a car that
  * hurt it, or the leader, gets leaned on harder, punted from behind instead of passed,
  * and blocked when it comes up behind, and a bot with it in for the player waits for
- * them; a driver's `aggression` scales it all.
+ * them; a driver's `aggression` scales it all. It knows the shortcuts: told to
+ * (`shortcuts`), or as the best driver when it is well behind the player, it aims down
+ * the lane from its mouth; and any bot that finds itself in a lane drives it to its end.
  */
 export interface BotTuning {
   look: number;
@@ -28,11 +32,31 @@ export interface BotTuning {
   inside: number;
   /** past this share of the road width off the centreline and still drifting out, the bot brakes */
   wide: number;
+  /** take every shortcut */
+  shortcuts?: boolean;
 }
 
 // Tuned on the 6 m road: a short look and a firm hand keep it on a road three cars wide;
 // the long look of a wide road cut the corners into the grass.
 export const DEFAULT_BOT: BotTuning = { look: 6, lookPerSpeed: 0.4, gain: 5, margin: 0.7, inside: 0.15, wide: 0.25 };
+
+/** The lane this car is driving, or about to turn into, and how far along it the car is (negative before the mouth). */
+function laneFor(s: SimState, c: Car, tune: BotTuning): { lane: Lane; u: number; inside: boolean } | null {
+  const t = s.track;
+  if (!t.lanes.length) return null;
+  const wants = tune.shortcuts || (c !== s.cars[0] && c.driver.skill >= 0.95 && paceToPlayer(s, c) > 0.3);
+  for (const lane of t.lanes) {
+    const loc = lane.locate(c.x, c.y);
+    if (loc.dist < lane.width / 2 + LANE_VERGE && loc.u < lane.length - 3 && loc.u > 3 && Math.abs(c.d) > t.width / 2 + 0.5) return { lane, u: loc.u, inside: true };
+    if (!wants) continue;
+    let toEntry = lane.entryS - c.s;
+    if (toEntry < -t.length / 2) toEntry += t.length;
+    if (toEntry > t.length / 2) toEntry -= t.length;
+    // from 30 m before the mouth until the car is well into the lane, so a fast car is not let go of at the mouth
+    if (toEntry > -14 && toEntry < 45 && Math.abs(c.d) < t.width) return { lane, u: -toEntry, inside: false };
+  }
+  return null;
+}
 
 /** on grass the tyres have less than half; the bot slows for it */
 function onRoadFactor(c: Car): number {
@@ -44,8 +68,9 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
   const skill = c.driver.skill;
   const speed = Math.max(0, c.speed);
   const look = tune.look + tune.lookPerSpeed * speed;
-  const target = t.at(c.s + look);
-  const turn = t.curvatureAhead(c.s, look + 20);
+  const lane = laneFor(s, c, tune);
+  const target = lane ? lane.lane.at(lane.u + look) : t.at(c.s + look);
+  const turn = lane ? 0 : t.curvatureAhead(c.s, look + 20);
   let inside = Math.max(-1, Math.min(1, turn * 1.5)) * (t.width * tune.inside);
   let ramSteer = 0;
   const aggression = c.driver.aggression;
@@ -84,6 +109,8 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
     const w = Math.min(0.8, GRUDGE.block * blockKeen);
     inside += (blockD - inside) * w;
   }
+  // down a lane the line is the lane's middle: a car and a half between the trees
+  if (lane) inside = 0;
   const tx = target.x + -target.ty * inside;
   const ty = target.y + target.tx * inside;
   const want = Math.atan2(ty - c.y, tx - c.x);
@@ -104,12 +131,29 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
   const stop = Math.min(c.def.brake, c.def.grip) * 0.7;
   const brakeDist = 8 + (speed * speed) / (2 * stop);
   let sharpest = 0;
-  for (let a = 5; a <= brakeDist + 30; a += 5) {
-    const k = Math.abs(t.curvatureAhead(c.s + a, 30));
-    if (k > sharpest) sharpest = k;
+  let span = 30;
+  if (lane) {
+    // the lane's bends, over a shorter span: it is narrow, and its mouth is a turn off the road
+    span = 16;
+    for (let a = 0; a <= brakeDist + 16; a += 4) {
+      const k = Math.abs(lane.lane.curvatureAhead(lane.u + a, span));
+      if (k > sharpest) sharpest = k;
+    }
+    if (!lane.inside) {
+      // the turn off the road into the mouth, as a bend over the distance left to it
+      const road = t.at(lane.lane.entryS);
+      const m = lane.lane.at(0);
+      const turnIn = Math.abs(Math.atan2(road.tx * m.ty - road.ty * m.tx, road.tx * m.tx + road.ty * m.ty));
+      sharpest = Math.max(sharpest, (turnIn * span) / Math.max(10, -lane.u));
+    }
+  } else {
+    for (let a = 5; a <= brakeDist + 30; a += 5) {
+      const k = Math.abs(t.curvatureAhead(c.s + a, 30));
+      if (k > sharpest) sharpest = k;
+    }
   }
   // the speed the bend allows: v² / r at the tyres' limit, with a margin the driver's skill shrinks
-  const radius = sharpest < 0.05 ? Infinity : 30 / sharpest;
+  const radius = sharpest < 0.05 ? Infinity : span / sharpest;
   // paced to the player: the bot dares more or less in a bend, and its top speed is the one
   // the sim gives its paced engine
   const pace = paceToPlayer(s, c);
@@ -120,14 +164,30 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
   const lead = c.progress - me.progress;
   const owed = c === me ? 0 : c.grudge[0] * aggression;
   const wait = owed > 0 && lead > 0 && lead < GRUDGE.waitRange ? 1 - Math.min(GRUDGE.waitMax, GRUDGE.wait * owed) : 1;
-  const allowed = Math.min(Math.sqrt(c.def.grip * margin * radius) * (onRoadFactor(c)), c.def.topSpeed * (0.7 + 0.3 * skill) * enginePace(s, c)) * wait;
+  // in a lane, and turning into one, the surface is the lane's: grass is the road there, not a
+  // mistake to slow for, but it holds less, so the mouth is taken at the grass's pace
+  const gripHere = lane ? SURFACES[lane.lane.surface].grip : 1;
+  const allowed = Math.min(Math.sqrt(c.def.grip * gripHere * margin * radius) * (lane?.inside ? 1 : onRoadFactor(c)), c.def.topSpeed * (0.7 + 0.3 * skill) * enginePace(s, c)) * wait;
   // nose in the trees: slow at the forest's edge and pointing away from the road. The tree
   // wall bounces the car, so the stall clock never runs long enough; back out on this instead
   const edge = t.width / 2 + t.verge - 1;
   const normal = Math.sign(c.d);
   const here0 = t.at(c.s);
   const noseOut = (Math.cos(c.heading) * -here0.ty + Math.sin(c.heading) * here0.tx) * normal;
-  const inTrees = Math.abs(c.d) > edge && noseOut > 0.3 && speed < 4;
+  // in a lane the same, against the lane's trees: slow, at its wall, nose pointing off the lane
+  let inTrees = !lane && Math.abs(c.d) > edge && noseOut > 0.3 && speed < 4;
+  // backing out of a lane's wall, the wheel is turned so the nose swings back to the lane's middle
+  let backSteer = 0;
+  if (lane?.inside) {
+    const l = lane.lane.locate(c.x, c.y);
+    const dir = lane.lane.at(l.u);
+    const off = Math.abs(Math.atan2(Math.cos(c.heading) * dir.ty - Math.sin(c.heading) * dir.tx, Math.cos(c.heading) * dir.tx + Math.sin(c.heading) * dir.ty));
+    inTrees = l.dist > lane.lane.width / 2 + LANE_VERGE - 1.2 && off > 0.5 && speed < 4;
+    // reversing swings the nose against the wheel: to bring it round to the lane's direction, the
+    // wheel goes the other way from where that direction lies
+    const ang = Math.atan2(Math.cos(c.heading) * dir.ty - Math.sin(c.heading) * dir.tx, Math.cos(c.heading) * dir.tx + Math.sin(c.heading) * dir.ty);
+    backSteer = ang > 0 ? -1 : 1;
+  }
   const stuck = (c.stall > 0.8 && c.stall < 2.0) || inTrees;
   // brake to the limit, lift just under it, and lift when the front is washing out
   let brake = speed > allowed ? 1 : 0;
@@ -136,7 +196,7 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
   // running wide: the car is past a third of the road and still moving outward, so brake
   const here = t.at(c.s);
   const outward = (c.vx * -here.ty + c.vy * here.tx) * Math.sign(c.d);
-  if (Math.abs(c.d) > t.width * tune.wide && outward > 1.5 && speed > 8) {
+  if (!lane && Math.abs(c.d) > t.width * tune.wide && outward > 1.5 && speed > 8) {
     brake = 1;
     throttle = 0;
   }
@@ -149,11 +209,11 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
   if (stuck) {
     brake = 1;
     throttle = 0;
-    steer = -steer;
+    steer = backSteer || -steer;
   }
   // nitro on a straight with a full enough tank; a bot behind the player lights it sooner,
   // one well ahead keeps it
-  const straight = Math.abs(t.curvatureAhead(c.s, 60)) < 0.25;
+  const straight = !lane && Math.abs(t.curvatureAhead(c.s, 60)) < 0.25;
   const tank = pace > 0.3 ? 0.2 : 0.35;
   const boost = s.hold <= 0 && straight && pace > -0.5 && c.boost > tank && c.boosting <= 0 && c.spin <= 0 && speed > 8;
   return { steer, throttle, brake, boost };

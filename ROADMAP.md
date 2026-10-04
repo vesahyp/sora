@@ -5,6 +5,13 @@ The design is in `docs/design.md`.
 
 ## Next
 
+- **Playtest the jokkis start on the phone** (2026-10-04): is the Tauno
+  fun to slide, does the oil read on screen and pay, is the first race
+  won in a few tries and does the Kortteli feel earned. Knobs: the
+  Tauno in `cars.ts`, `OIL` in `weapons.ts`, the prizes in
+  `events.ts`, `START_CREDITS` in `save.ts`. Then the shortcut by
+  hand: is a second a lap the right gain for a lane that narrow, and
+  should Marko take it too (`laneFor` in `autoplayer.ts`).
 - **Delete the old car model in the next release.** Vesa played the
   new one (2026-10-03) and it is better, so `?physics=old` has done its
   job. Remove `src/game/physics-old.ts`, `SimState.physics` and the
@@ -46,16 +53,30 @@ the track features below need. All of it is data in `tracks.ts`:
   it lands with a bounce that scrubs the sideways speed. Cars more than
   0.9 m apart in height pass over each other. The renderer lifts a car
   in the air and leaves its shadow on the ground.
+- **Shortcuts** (`TrackDef.shortcuts`): a lane through the forest along
+  an open polyline, with a width and a surface. `Track.lanes` drives
+  it: the walls are the union of the road's verge and the lanes'
+  (`physics.ts`, `treeContacts`), the surface under an axle is the
+  lane's inside it, the trees are not planted in it, the ground bakes
+  it as a worn two-track, the minimap dashes it. The bot drives a lane
+  (`autoplayer.ts`, `laneFor`): told to, or as the best driver when it
+  is well behind the player; any bot that finds itself in one drives
+  it to the end.
 - **Drawn** (`src/render/ground.ts`, `bakeFeatures`): a water patch
   across the whole road as a river that runs on under the trees,
   shallow over the road, and each kicker as planks, a lit lip and the
   drop's shadow. `splash` fx and the `splash` and `land` sounds exist.
-- **On a track:** Kiviaho has a 0.6 m kicker with its lip at 45 m on
-  the start straight and a 9 m ford at 340 m on the sweeper.
+- **On the tracks:** Kiviaho has a 0.9 m kicker on the start straight,
+  a 0.7 m one on the diagonal, a ford after the first sweeper and the
+  grass shortcut across the hairpin; Hirvisuo a 0.8 m kicker on the
+  straight and a ford in the esses.
 - **Checked:** `tools/physics-check.ts` flies a 1.2 m kicker, holds
   that full lock does nothing in the air, that a crooked landing costs
   more than a straight one, that water drags and splashes, and that ice
-  slides where gravel grips.
+  slides where gravel grips. `sim-check` flies every kicker with every
+  car at racing speed and lands it on the road, crosses every ford,
+  and drives every shortcut: it must save time and not a free lap.
+  `make drive-log` takes the first kicker by touch on a phone.
 
 ## Heights and surfaces: what is left
 
@@ -66,48 +87,38 @@ the track features below need. All of it is data in `tracks.ts`:
   sheer drop. Crests, dips, a landing ramp and a bridge deck over water
   need a height profile along `s`, and a bridge needs the car's height
   to decide whether it is on the deck or in the river.
-- **Walls that are not the tree line.** The only wall is the forest at
-  `width / 2 + verge`. Gates, bridge rails, log piles and the inside of
-  a shortcut need obstacles in the sim: boxes or circles that
-  `treeContacts` (an impulse at the corner that went in) can push
-  against, and a renderer for them.
+- **Walls that are not the tree line.** The only walls are the forest
+  at `width / 2 + verge` and a lane's trees. Gates, bridge rails, log
+  piles need obstacles in the sim: boxes or circles that `treeContacts`
+  (an impulse at the corner that went in) can push against, and a
+  renderer for them.
 - **The river is a wall at the tree line.** Cars cannot drive down the
   river past the forest edge, though it is drawn running on under the
   trees. Fine for a ford; a river to drive along would need its own
   corridor.
-- **The bot does not know features.** It slows for bends only, so it
-  crosses the ford flat out and takes the kicker at whatever speed it
-  has. It still laps Kiviaho clean (0.2 s slower than without the
-  ford), but a shortcut or a bridge will need the bot to see it.
-- **The minimap** shows neither the kicker nor the ford.
+- **The bot does not know fords or kickers.** It slows for bends only,
+  so it crosses the ford flat out and takes the kicker at whatever
+  speed it has, which the checks show is fine on these tracks.
+- **The minimap** shows the shortcuts but neither the kickers nor the
+  fords.
 
 ## Track features
 
 What to put on the roads next, each one built on the heights and
-surfaces above. Jumps and fords are data today; the rest needs what is
-listed as left:
+surfaces above:
 
-- **Jumps** on every track (Kiviaho's start straight has the first).
-  A kicker across the road (`TrackDef.jumps`): take it
-  straight and fast and you fly far and land clean, take it crooked
-  and the landing scrubs your speed; no steering in the air, so the
-  line is chosen before the lip.
-- **Fords** on every track (Kiviaho's sweeper has the first). A
-  stretch of shallow water (`patches`, `water`): heavy
-  drag and a splash, less grip, so the fast line crosses it short and
-  straight and a car that drifts into it loses the race there.
 - **Bridges.** A narrow deck over the river, a car and a half wide,
   with rails that are walls: the dry line is quick but one car at a
   time, the ford beside it is slow but wide, and the pack splits.
 - **Narrow gates.** Two posts or a barn's doorway on the road, a car
   and a half apart: a place to block, to be punted into the post, and
   to get through first.
-- **Shortcuts.** A gap in the forest across the inside of a hairpin,
-  on mud or grass: shorter, slower underfoot, and a gamble when the
-  field is on your bumper.
+- **A mud hole in a shortcut**, so the lane is a gamble underfoot too:
+  a patch along a lane needs `SurfacePatch` to speak lane arc length.
 - **Hazards.** Ice on a shaded bend, a mud hole on the line, a log
   pile at the edge that is a wall: each a surface or an obstacle that
   punishes the lazy line and rewards the driver who saw it.
+- **A shortcut on Hirvisuo**, once Kiviaho's has been driven by hand.
 
 ## Later
 

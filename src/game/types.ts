@@ -48,6 +48,19 @@ export type CarClass = 'JM' | 'C' | 'B' | 'A';
 export const CLASSES: CarClass[] = ['JM', 'C', 'B', 'A'];
 export const CLASS_RANK: Record<CarClass, number> = { JM: 0, C: 1, B: 2, A: 3 };
 
+/**
+ * A shortcut: a gap in the forest, a lane `width` metres wide on `surface`
+ * along an open polyline in world metres from a point on the road to a
+ * point on the road further along the lap. The trees are its walls; the
+ * sim's walls and surfaces follow it, the bot can drive it, the renderer
+ * draws it as a worn two-track.
+ */
+export interface ShortcutDef {
+  points: [number, number][];
+  width: number;
+  surface: Surface;
+}
+
 export interface TrackDef {
   id: string;
   name: Text;
@@ -58,6 +71,7 @@ export interface TrackDef {
   /** stretches of another surface, in arc length: fords, mud, ice */
   patches?: SurfacePatch[];
   jumps?: JumpDef[];
+  shortcuts?: ShortcutDef[];
   /** the centreline, metres, closed: the last point joins the first. Driven in index order. */
   points: [number, number][];
 }

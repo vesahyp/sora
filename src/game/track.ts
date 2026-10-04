@@ -1,4 +1,4 @@
-import type { Surface, SurfacePatch, TrackDef } from './types';
+import type { ShortcutDef, Surface, SurfacePatch, TrackDef } from './types';
 import { hash32 } from './rng';
 
 /**
@@ -34,6 +34,112 @@ export interface Tree {
   kind: number;
 }
 
+/**
+ * A shortcut lane as the sim drives it: the open polyline smoothed and
+ * sampled like the road, with its own arc length `u` from the entry. It
+ * answers where a point is along and off it (`locate`), where the lane is
+ * at `u` (`at`), and how it bends ahead, the way the Track does for the
+ * road; and it knows where it joins the lap (`entryS`, `exitS`).
+ */
+export class Lane {
+  readonly pts: TrackPoint[] = [];
+  readonly length: number;
+  readonly width: number;
+  readonly surface: Surface;
+  /** arc length on the lap where the lane leaves the road and where it comes back */
+  entryS = 0;
+  exitS = 0;
+
+  constructor(readonly def: ShortcutDef) {
+    this.width = def.width;
+    this.surface = def.surface;
+    const P = def.points;
+    const n = P.length;
+    const per = 8;
+    let s = 0;
+    let prev: [number, number] | null = null;
+    const at = (i: number) => P[Math.max(0, Math.min(n - 1, i))];
+    for (let i = 0; i < n - 1; i++) {
+      const [p0, p1, p2, p3] = [at(i - 1), at(i), at(i + 1), at(i + 2)];
+      for (let k = 0; k < per; k++) {
+        const t = k / per;
+        const x = catmull(p0[0], p1[0], p2[0], p3[0], t);
+        const y = catmull(p0[1], p1[1], p2[1], p3[1], t);
+        if (prev) s += Math.hypot(x - prev[0], y - prev[1]);
+        this.pts.push({ x, y, s, tx: 0, ty: 0 });
+        prev = [x, y];
+      }
+    }
+    const last = P[n - 1];
+    s += Math.hypot(last[0] - prev![0], last[1] - prev![1]);
+    this.pts.push({ x: last[0], y: last[1], s, tx: 0, ty: 0 });
+    this.length = s;
+    const m = this.pts.length;
+    for (let i = 0; i < m; i++) {
+      const a = this.pts[Math.max(0, i - 1)];
+      const b = this.pts[Math.min(m - 1, i + 1)];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const l = Math.hypot(dx, dy) || 1;
+      this.pts[i].tx = dx / l;
+      this.pts[i].ty = dy / l;
+    }
+  }
+
+  /** The nearest point of the lane to (x, y): arc length `u` along it, the distance off it, and the point itself. */
+  locate(x: number, y: number): { u: number; dist: number; px: number; py: number } {
+    let best = 0;
+    let bestD = Infinity;
+    const pts = this.pts;
+    for (let i = 0; i < pts.length; i++) {
+      const d = (pts[i].x - x) ** 2 + (pts[i].y - y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+    // project onto the better of the two segments at the nearest sample
+    let out = { u: pts[best].s, dist: Math.sqrt(bestD), px: pts[best].x, py: pts[best].y };
+    for (const j of [best - 1, best + 1]) {
+      if (j < 0 || j >= pts.length) continue;
+      const a = pts[Math.min(best, j)];
+      const b = pts[Math.max(best, j)];
+      const ex = b.x - a.x;
+      const ey = b.y - a.y;
+      const el = ex * ex + ey * ey || 1;
+      const t = Math.max(0, Math.min(1, ((x - a.x) * ex + (y - a.y) * ey) / el));
+      const px = a.x + ex * t;
+      const py = a.y + ey * t;
+      const dist = Math.hypot(x - px, y - py);
+      if (dist < out.dist) out = { u: a.s + (b.s - a.s) * t, dist, px, py };
+    }
+    return out;
+  }
+
+  /** The lane's point and tangent at arc length u, held at the ends. */
+  at(u: number): TrackPoint {
+    const pts = this.pts;
+    u = Math.max(0, Math.min(this.length, u));
+    let i = Math.min(pts.length - 2, Math.floor((u / this.length) * (pts.length - 1)));
+    while (i > 0 && pts[i].s > u) i--;
+    while (i < pts.length - 2 && pts[i + 1].s <= u) i++;
+    const a = pts[i];
+    const b = pts[i + 1];
+    const t = b.s > a.s ? (u - a.s) / (b.s - a.s) : 0;
+    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, s: u, tx: a.tx + (b.tx - a.tx) * t, ty: a.ty + (b.ty - a.ty) * t };
+  }
+
+  /** How much the lane turns over the next `ahead` metres, radians, signed (positive is right). */
+  curvatureAhead(u: number, ahead: number): number {
+    const a = this.at(u);
+    const b = this.at(u + ahead);
+    return Math.atan2(a.tx * b.ty - a.ty * b.tx, a.tx * b.tx + a.ty * b.ty);
+  }
+}
+
+/** grass between a shortcut lane's edge and its trees, metres: the lane's own verge */
+export const LANE_VERGE = 2;
+
 export class Track {
   readonly pts: TrackPoint[] = [];
   readonly length: number;
@@ -41,6 +147,8 @@ export class Track {
   /** grass between the road edge and the trees, metres */
   readonly verge = 7;
   readonly trees: Tree[] = [];
+  /** the shortcuts, as lanes the sim can drive */
+  readonly lanes: Lane[] = [];
   readonly bounds: { minX: number; minY: number; maxX: number; maxY: number };
   private cell = 20;
   private grid = new Map<number, number[]>();
@@ -99,7 +207,29 @@ export class Track {
       const last = this.tiles[Math.floor((((p.to - 0.01) % this.length) + this.length) % this.length / TILE)];
       if (!last.includes(p)) last.push(p);
     }
+    for (const sc of def.shortcuts ?? []) {
+      const lane = new Lane(sc);
+      lane.entryS = this.locate(sc.points[0][0], sc.points[0][1]).s;
+      lane.exitS = this.locate(sc.points[sc.points.length - 1][0], sc.points[sc.points.length - 1][1]).s;
+      this.lanes.push(lane);
+    }
     this.plantTrees();
+  }
+
+  /** The nearest lane to a point and where the point is against it, or null without shortcuts. */
+  laneAt(x: number, y: number): { lane: Lane; u: number; dist: number; px: number; py: number } | null {
+    let best: { lane: Lane; u: number; dist: number; px: number; py: number } | null = null;
+    for (const lane of this.lanes) {
+      const l = lane.locate(x, y);
+      if (!best || l.dist < best.dist) best = { lane, ...l };
+    }
+    return best;
+  }
+
+  /** Inside a shortcut lane, its verge included: on its surface, walled by its trees. */
+  inLane(x: number, y: number): Lane | null {
+    const l = this.laneAt(x, y);
+    return l && l.dist <= l.lane.width / 2 + LANE_VERGE ? l.lane : null;
   }
 
   /** In a river that crosses the road, between the tree lines: nothing grows or stands there. */
@@ -109,8 +239,16 @@ export class Track {
     return Math.abs(loc.d) < this.width / 2 + this.verge && this.surfaceAt(loc.s, loc.d) === 'water';
   }
 
-  /** The surface at (s, d): a patch if one covers the spot, else the road's surface on it and grass off it. */
-  surfaceAt(s: number, d: number): Surface {
+  /**
+   * The surface at (s, d): a patch if one covers the spot, else the road's
+   * surface on it and grass off it. With the world point too, a shortcut
+   * lane's surface where the point is inside one.
+   */
+  surfaceAt(s: number, d: number, x?: number, y?: number): Surface {
+    if (x !== undefined && y !== undefined && this.lanes.length) {
+      const lane = this.inLane(x, y);
+      if (lane) return lane.surface;
+    }
     s = ((s % this.length) + this.length) % this.length;
     for (const p of this.tiles[Math.floor(s / TILE)] ?? []) {
       if (!inSpan(s, p.s, p.to, this.length)) continue;
@@ -228,6 +366,9 @@ export class Track {
         const y = gy * step + ((h >>> 16) & 0xff) / 255 * step;
         const near = this.locate(x, y);
         if (Math.abs(near.d) < edge + 1) continue;
+        // the gap in the forest a shortcut runs through
+        const lane = this.laneAt(x, y);
+        if (lane && lane.dist < lane.lane.width / 2 + LANE_VERGE + 1) continue;
         this.trees.push({ x, y, r: 1.8 + ((h >>> 24) & 0xff) / 255 * 1.6, kind: (h >>> 4) & 3 });
       }
     }

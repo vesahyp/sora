@@ -89,8 +89,10 @@ export interface Car {
   oilWait: number;
   /** seconds left of being a passenger after a hit */
   spin: number;
-  /** seconds the car has been near standstill with the throttle down; the bot reverses on it */
+  /** seconds the car has gone nowhere since the lights: not a metre from where it was; the bot reverses on it */
   stall: number;
+  stallX: number;
+  stallY: number;
   /** the race's tally: wrecks dealt and taken, rams dealt and taken above RAM.minClosing */
   wrecks: number;
   wrecked: number;
@@ -282,6 +284,8 @@ export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: nu
       oilWait: 0,
       spin: 0,
       stall: 0,
+      stallX: 0,
+      stallY: 0,
       wrecks: 0,
       wrecked: 0,
       rams: 0,

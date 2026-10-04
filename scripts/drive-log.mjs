@@ -73,6 +73,8 @@ const SAMPLER = () => {
         x: c.x,
         y: c.y,
         h: c.heading,
+        z: c.z,
+        air: c.air,
         v: Math.hypot(c.vx, c.vy),
         fwd: c.speed,
         yaw: c.yaw,
@@ -163,7 +165,8 @@ try {
   await page.evaluate(SAMPLER);
   const st = await straight();
   console.log(`physics=${physics}; the longest straight starts at s=${st.s.toFixed(0)} m, ${st.len.toFixed(0)} m long`);
-  const S = st.s + 5;
+  // past the ford that crosses the straight's start on Kiviaho
+  const S = st.s + 20;
 
   // 1. hands off: does a straight line hold
   await place({ name: 'hands off at 25 m/s', s: S, v: 25 });
@@ -217,6 +220,14 @@ try {
   await page.waitForTimeout(1500);
   pieces.push('T-bone at 20 m/s');
 
+  // 9. the first kicker at racing speed, hands off: the flight and the landing
+  const jump = await page.evaluate(() => window.__sim.track.def.jumps?.[0]?.s ?? -1);
+  if (jump >= 0) {
+    await place({ name: 'the kicker at 22 m/s', s: jump - 40, v: 22 });
+    await page.waitForTimeout(3000);
+    pieces.push('the kicker at 22 m/s');
+  }
+
   const log = await page.evaluate(() => window.__log);
   mkdirSync('shots', { recursive: true });
   writeFileSync(`shots/drive-log-${physics}.json`, JSON.stringify(log));
@@ -244,6 +255,12 @@ try {
     for (let i = 1; i < rows.length; i++) if (Math.sign(rows[i].yaw) !== Math.sign(rows[i - 1].yaw) && Math.abs(rows[i].yaw) > 0.3 && Math.abs(rows[i - 1].yaw) > 0.3) flips++;
     console.log(`  speed ${f(v0)} -> min ${f(vMin)} -> end ${f(vEnd)} m/s; contact frames ${contacts}${firstHit >= 0 ? ` from t+${(rows[firstHit].t - rows[0].t).toFixed(2)} s` : ''}`);
     console.log(`  max yaw ${maxYaw.toFixed(2)} rad/s, max body slip ${maxBeta.toFixed(2)} rad, yaw sign flips at > 0.3 rad/s: ${flips}, position jumps: ${jumps}, worst body overlap ${maxOverlap.toFixed(2)} m`);
+    const airRows = rows.filter((r) => r.air);
+    if (airRows.length) {
+      const lipRow = rows[rows.indexOf(airRows[0]) - 1] ?? airRows[0];
+      const landRow = rows[rows.indexOf(airRows[airRows.length - 1]) + 1] ?? airRows[airRows.length - 1];
+      console.log(`  flight: off the lip at ${(lipRow.v * 3.6).toFixed(0)} km/h, ${(landRow.t - lipRow.t).toFixed(2)} s in the air, ${Math.max(...airRows.map((r) => r.z)).toFixed(2)} m up, landed ${Math.abs(landRow.d).toFixed(1)} m off the centreline (${landRow.onRoad ? 'on the road' : 'OFF THE ROAD'}) at ${(landRow.v * 3.6).toFixed(0)} km/h`);
+    }
     if (firstHit >= 0) {
       const a = Math.max(0, firstHit - 3);
       for (const r of rows.slice(a, firstHit + 12)) console.log(`   t ${r.t.toFixed(3)}  v ${f(r.v)}  fwd ${f(r.fwd)}  yaw ${f(r.yaw, 2)}  beta ${f(r.beta, 2)}  d ${f(r.d, 2)}  hit ${r.hit}${r.near ? `  other v ${f(r.near.v)} gap ${r.near.dist.toFixed(2)} overlap ${r.near.overlap.toFixed(2)}` : ''}`);

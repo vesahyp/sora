@@ -3,10 +3,12 @@
 Guidance for AI agents working in this repo. `README.md` is the player page:
 what the game is and how to play it. Code, architecture and process notes
 live here. `ROADMAP.md` is forward-looking only. `docs/design.md` is the
-design: what the game is meant to become. `docs/research/` holds what
-was read before building: the mechanics people love in combat racers,
-and the car physics model and how it is tuned. Read them before
-changing the race or the car.
+design: what the game is meant to become; `docs/progression.md` the
+career's shape: the classes, the weapons by class, the shop, the money
+curve, the first five races. `docs/research/` holds what was read
+before building: the mechanics people love in combat racers, and the
+car physics model and how it is tuned. Read them before changing the
+race, the car or the career.
 
 ## What this is
 
@@ -14,11 +16,14 @@ changing the race or the car.
 Super Cars II, with a career in the shape of Gran Turismo, for the
 browser, phones first. One thumb steers, a tap is nitro, the pedal
 brakes and swings the tail; the guns fire themselves. Cars slide, ram,
-wreck each other and come back. Finnish gravel roads, nineties cars. Two tracks, three cars in three classes, a field of
-four with the bot driving the other three, missiles and oil slicks with
-damage that costs a repair, and a career: credits from results, a parts
-shop, an armoury, a dealer, and licence tests that gate the classes.
-Sora is Finnish for gravel.
+wreck each other and come back. Finnish gravel roads, nineties cars.
+Two tracks with kickers, fords and a shortcut through the forest, four
+cars in four classes, a field of four with the bot driving the other
+three, and a career that starts in jokamiesluokka (folk racing) in a
+tired old saloon whose only weapon is the oil it leaks: credits from
+results, a parts shop, an armoury, a dealer, and licence tests that
+gate the upper classes; weapons and parts arrive by class (ADR 0004,
+`docs/progression.md`). Sora is Finnish for gravel.
 
 ## Stack
 
@@ -44,27 +49,28 @@ src/
   game/               the simulation, no DOM anywhere in here
     types.ts          CarInput, TrackDef, CarDef
     state.ts          SimState, Car (with its grudges and the race's credits), Driver, createState (the grid), standings
-    sim.ts            step(): the automatic guns, bullets, missiles, mines, pickups,
+    sim.ts            step(): the automatic guns, bullets, missiles, mines, oil slicks, pickups,
                         wrecks and respawns, lap counting; hands the cars to the car model
     physics.ts        the car model: the tyres, the aids, height and landing, box-against-box
                         and tree contacts by impulse, in SUB substeps a frame
     physics-old.ts    the model before 2026-10-03, at ?physics=old for one release. Delete after
     harm.ts           what a hit costs, for both models: damage, grudge, a blast's spin, a ram
     track.ts          Track: smoothing, locate(x, y) -> (s, d), at(s), the forest,
-                        surfaceAt(s, d) from the patches, groundAt(s, d) from the jumps
+                        surfaceAt(s, d) from the patches, groundAt(s, d) from the jumps;
+                        Lane: a shortcut as the sim drives it, its own arc length u
     rng.ts            seeded RNG and hashes
     content/
-      cars.ts         the cars, one per class: the balance knobs, a price
-      parts.ts        the shop: four parts, three levels, tuned(car, parts)
-      events.ts       the calendar: class, track, laps, prizes, how built the field is
+      cars.ts         the cars, one per class, the Tauno first: the balance knobs, a price
+      parts.ts        the shop: seven parts, three levels, each from a class; tuned(car, parts)
+      events.ts       the calendar: class, track, laps, prizes, how built the field is, what it carries
       licences.ts     the tests: one lap under a target, read off make balance
-      weapons.ts      combat: the armoury's prices, damage, gun, missile, mine, boost and ram numbers,
-                        the wreck bounty and the ram credit
+      weapons.ts      combat: the armoury's prices and the class each weapon arrives in, damage, gun,
+                        missile, mine, oil, boost and ram numbers, the wreck bounty, the ram and oil credits
       pickups.ts      what lies on the road, how far apart, how fast it grows back
       drivers.ts      the opponents: a name, a colour, a skill and an aggression for the bot; PACING, Death Rally's catch-up:
                         sim.ts scales an opponent's engine by its gap to the player, the bot its corners;
                         GRUDGE, Burnout's hostility: what a ram, shot or wreck costs and how the bot uses it
-      tracks.ts       the tracks: a centreline in metres, a width, a surface, patches, jumps
+      tracks.ts       the tracks: a centreline in metres, a width, a surface, patches, jumps, shortcuts
       surfaces.ts     what each surface does to a tyre and a car: grip, peak, slide, drag, top
   career/save.ts      the save: credits, cars owned with parts, licences; one object in localStorage
   render/
@@ -117,9 +123,11 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
    real time and calls `step` a whole number of times. Never pass a frame
    delta into `step`. The car model cuts each step into `SUB` substeps of
    its own; that is inside `physics.ts` and nothing outside sees it.
-3. **Content is data.** A new track is a list of points in `tracks.ts`. A
-   new car is a `CarDef`, a new race an `EventDef`. Balance changes are
-   number changes in `content/`. A part's effect is one line in `tuned()`.
+3. **Content is data.** A new track is a list of points in `tracks.ts`,
+   its kickers, fords and shortcuts beside it. A new car is a `CarDef`,
+   a new race an `EventDef`. Balance changes are number changes in
+   `content/`. A part's effect is one line in `tuned()`; what a class
+   can buy and carry is a `from` on the part or the weapon.
 4. **The bot is the opponent.** `tools/autoplayer.ts` drives the checks,
    the screenshots and the other cars, guns included. A change to it
    changes the race, so keep it readable. `sim-check` races it armed and
@@ -149,6 +157,11 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
   grid orders), `spin.ts` (the ground a blast costs). Build one like
   the tools: `npx vite build --ssr tools/dbg/matrix.ts --outDir .sim-check && node .sim-check/matrix.js`.
 - `?physics=old` plays the old car model, for one release, to compare.
+- **A track feature is checked before it is driven.** `sim-check` flies
+  every kicker with every car, crosses every ford and drives every
+  shortcut with the bot told to take it (`BotTuning.shortcuts`), and
+  asserts the flight, the landing on the road and the time the lane
+  saves. `make drive-log` adds the first kicker by touch.
 - **Balance with `make balance`.** It prints the bot's laps per car, stock
   and fully built, per track. The bot is a floor, not a player: a human
   who looks through the corner beats it. A change that moves the bot's

@@ -17,7 +17,7 @@ export interface LicenceDef {
 }
 
 export const LICENCES: LicenceDef[] = [
-  { cls: 'B', name: L('B-ajokortti', 'B licence'), trackId: 'kiviaho', target: 33.5, desc: L('Yksi kierros Kiviahoa alle 33,5 sekunnin.', 'One lap of Kiviaho under 33.5 seconds.') },
+  { cls: 'B', name: L('B-ajokortti', 'B licence'), trackId: 'kiviaho', target: 31.7, desc: L('Yksi kierros Kiviahoa alle 31,7 sekunnin.', 'One lap of Kiviaho under 31.7 seconds.') },
   { cls: 'A', name: L('A-ajokortti', 'A licence'), trackId: 'hirvisuo', target: 42.5, desc: L('Yksi kierros Hirvisuota alle 42,5 sekunnin.', 'One lap of Hirvisuo under 42.5 seconds.') },
 ];
 

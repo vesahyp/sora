@@ -5,6 +5,7 @@ import { enginePace } from './content/drivers';
 import { SURFACES, type SurfaceDef } from './content/surfaces';
 import { clamp, hurt, ram } from './harm';
 import { steeringLock, wheelbase } from './sim';
+import { LANE_VERGE } from './track';
 
 /**
  * The car model. docs/adr/0003-rigid-body-cars.md has the why.
@@ -180,9 +181,9 @@ function integrate(s: SimState, c: Car, a: Ask, h: number, last: boolean): void 
   // the surface under each axle: the road's frame tells how far along and across each one sits
   const along = fx * road.tx + fy * road.ty;
   const across = fx * -road.ty + fy * road.tx;
-  const sf = SURFACES[t.surfaceAt(loc.s + b * along, loc.d + b * across)];
-  const sr = SURFACES[t.surfaceAt(loc.s - cc * along, loc.d - cc * across)];
-  const here = t.surfaceAt(loc.s, loc.d);
+  const sf = SURFACES[t.surfaceAt(loc.s + b * along, loc.d + b * across, c.x + fx * b, c.y + fy * b)];
+  const sr = SURFACES[t.surfaceAt(loc.s - cc * along, loc.d - cc * across, c.x - fx * cc, c.y - fy * cc)];
+  const here = t.surfaceAt(loc.s, loc.d, c.x, c.y);
   const sc = SURFACES[here];
 
   // height: on the ground the car follows it; when the ground falls away faster than gravity can pull, it flies
@@ -515,7 +516,12 @@ function carContacts(s: SimState, report: boolean): void {
   }
 }
 
-/** A car that has put a corner into the trees is pushed back out with an impulse at that corner. */
+/**
+ * A car that has put a corner into the trees is pushed back out with an
+ * impulse at that corner. The trees are everything outside the road and
+ * its verge, and outside every shortcut lane: a corner is in them when it
+ * is beyond both, and is pushed back toward whichever it is nearer.
+ */
 function treeContacts(s: SimState, c: Car): void {
   const t = s.track;
   const loc = t.locate(c.x, c.y);
@@ -527,21 +533,32 @@ function treeContacts(s: SimState, c: Car): void {
   let deepest = 0;
   let cx = 0;
   let cy = 0;
-  let side = 0;
+  let nx = 0;
+  let ny = 0;
   for (const p of corners(c)) {
     const d = loc.d + (p[0] - c.x) * rx + (p[1] - c.y) * ry;
-    const pen = Math.abs(d) - limit;
+    let pen = Math.abs(d) - limit;
+    // the normal points back to the road
+    let px = -rx * Math.sign(d);
+    let py = -ry * Math.sign(d);
+    if (pen > 0 && t.lanes.length) {
+      const l = t.laneAt(p[0], p[1]);
+      if (l && l.dist - (l.lane.width / 2 + LANE_VERGE) < pen) {
+        pen = l.dist - (l.lane.width / 2 + LANE_VERGE);
+        const len = l.dist || 1;
+        px = (l.px - p[0]) / len;
+        py = (l.py - p[1]) / len;
+      }
+    }
     if (pen > deepest) {
       deepest = pen;
       cx = p[0];
       cy = p[1];
-      side = Math.sign(d);
+      nx = px;
+      ny = py;
     }
   }
   if (deepest <= 0) return;
-  // the normal points back to the road
-  const nx = -rx * side;
-  const ny = -ry * side;
   c.x += nx * deepest;
   c.y += ny * deepest;
   // the world is b: n must point from the car into the world
