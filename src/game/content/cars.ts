@@ -18,6 +18,12 @@ import type { CarDef } from '../types';
  * Niva and a Valmet tractor in C, a monster truck in B, a hearse in A.
  * Each handles like what it is, so the choice is a character, not a
  * faster number.
+ *
+ * The pace (2026-10-04, the phone playthrough, scripts/playthrough.mjs): the lap is grip-limited,
+ * so every car's grip went up 12% together and the Tauno got a tenth more pull, after a thumb
+ * lapped Kiviaho in 37 s against the bot's 32 and the owner asked for laps around 30. The bot now
+ * laps Kiviaho in 30.4 in the Tauno, 27.6 in the Kortteli, 25.7 in the Sorsa, 23.7 in the Kiila
+ * (tools/dbg/gripsweep.ts); the drag was not the lever, a third of it moved the lap half a second.
  */
 export const CARS: CarDef[] = [
   {
@@ -27,11 +33,11 @@ export const CARS: CarDef[] = [
     shape: 'saloon',
     price: 1200,
     blurb: L('Pieni kulmikas jokkisauto: takaveto, pehmeä ja väsynyt. Vuotaa öljyä, ja se on ainoa aseesi.', 'A tiny boxy folk-racing saloon: rear drive, soft and tired. It leaks oil, and that is your only weapon.'),
-    accel: 13.5,
-    topSpeed: 37,
+    accel: 15,
+    topSpeed: 39,
     brake: 13,
     turnRate: 2.6,
-    grip: 17,
+    grip: 19,
     mass: 1.25,
     armour: 0,
     ram: 0,
@@ -54,7 +60,7 @@ export const CARS: CarDef[] = [
     topSpeed: 50.5,
     brake: 16,
     turnRate: 2.8,
-    grip: 20,
+    grip: 22.5,
     mass: 1,
     armour: 0,
     ram: 0,
@@ -77,7 +83,7 @@ export const CARS: CarDef[] = [
     topSpeed: 60,
     brake: 19,
     turnRate: 3.0,
-    grip: 23,
+    grip: 26,
     mass: 0.95,
     armour: 0,
     ram: 0,
@@ -100,7 +106,7 @@ export const CARS: CarDef[] = [
     topSpeed: 69.5,
     brake: 22,
     turnRate: 3.1,
-    grip: 26,
+    grip: 29,
     frontDrive: 0.3,
     mass: 1.25,
     armour: 0,
@@ -124,7 +130,7 @@ export const CARS: CarDef[] = [
     topSpeed: 47,
     brake: 15,
     turnRate: 2.9,
-    grip: 19,
+    grip: 21.5,
     frontDrive: 0.5,
     offroad: 0.65,
     mass: 1.15,
@@ -149,7 +155,7 @@ export const CARS: CarDef[] = [
     topSpeed: 30.5,
     brake: 17,
     turnRate: 3.7,
-    grip: 21,
+    grip: 23.5,
     offroad: 0.85,
     mass: 2.6,
     armour: 0,
@@ -173,7 +179,7 @@ export const CARS: CarDef[] = [
     topSpeed: 56.5,
     brake: 16,
     turnRate: 2.8,
-    grip: 21,
+    grip: 23.5,
     frontDrive: 0.4,
     offroad: 0.6,
     spinOnShunt: true,
@@ -199,7 +205,7 @@ export const CARS: CarDef[] = [
     topSpeed: 73,
     brake: 21,
     turnRate: 2.9,
-    grip: 25,
+    grip: 28,
     mass: 1.4,
     armour: 0,
     ram: 0,

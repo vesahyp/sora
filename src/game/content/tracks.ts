@@ -25,7 +25,10 @@ export const TRACKS: TrackDef[] = [
     // the hairpin, where a gap in the forest cuts across the inside on
     // grass, a car and a half wide between the trees; then esses home up
     // the left. Nothing throws a car into the hairpin: a car lands where
-    // it can still steer for it.
+    // it can still steer for it. The road runs straight for 45 m past
+    // the river's lip (2026-10-04): a flight is straight, and the A car
+    // flies 40 m at 155 km/h; before, the diagonal bent under it and it
+    // came down on the verge (tools/dbg/exits.ts).
     crests: [{ s: 26, len: 24, h: 0.9 }],
     rivers: [{ s: 214, gap: 12, bank: 0.45 }],
     shortcuts: [{ points: [[4, 168], [-10, 182], [-28, 190], [-46, 192], [-60, 184], [-65, 174], [-66, 164]], width: 4, surface: 'grass' }],
@@ -36,8 +39,8 @@ export const TRACKS: TrackDef[] = [
       [120, 40],
       [104, 72],
       [76, 86],
-      [52, 104],
-      [28, 130],
+      [50, 103],
+      [22, 126],
       [8, 160],
       [-4, 194],
       [-12, 222],
@@ -59,7 +62,9 @@ export const TRACKS: TrackDef[] = [
     width: 6,
     surface: 'gravel',
     // About a kilometre: a long start straight over a crest, a hairpin, an
-    // esses section with a river at its foot, a fast sweeper home.
+    // esses section with a river at its foot, a fast sweeper home. The
+    // bottom straight is straight for 45 m past the river's lip, for the
+    // same reason as on Kiviaho.
     crests: [{ s: 50, len: 24, h: 0.9 }],
     rivers: [{ s: 560, gap: 12, bank: 0.45 }],
     points: [
@@ -77,7 +82,7 @@ export const TRACKS: TrackDef[] = [
       [186, 192],
       [174, 236],
       [124, 248],
-      [74, 242],
+      [74, 252],
       [37, 254],
       [-12, 242],
       [-43, 205],
