@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Game, type RaceResult } from './ui/Game';
 import { Title, Result } from './ui/Screens';
-import { Garage, Events, Shop, Dealer, Licences, Armoury } from './ui/Garage';
+import { Garage, Events, Shop, Paint, Dealer, Licences, Armoury } from './ui/Garage';
 import { loadRecords, saveRace, recordKey, track, type Records } from './records';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { loadSave, store, playerCar, currentCar, type Save } from './career/save';
@@ -10,9 +10,10 @@ import { EVENT_BY_ID, fieldAmmo, type EventDef } from './game/content/events';
 import { LICENCE_BY_CLASS, type LicenceDef } from './game/content/licences';
 import { CAR_BY_ID } from './game/content/cars';
 import { partPrice, STOCK, type PartKind } from './game/content/parts';
+import { colourPrice, liveryPrice } from './game/content/paint';
 import { REPAIR_SHARE, canCarry, carried, type WeaponDef } from './game/content/weapons';
 import type { Entry } from './game/state';
-import type { CarClass, CarDef } from './game/types';
+import type { CarClass, CarDef, Livery } from './game/types';
 
 /** What the race was for: an event with prize money, or a licence test. */
 export type Purpose = { kind: 'event'; id: string } | { kind: 'licence'; cls: CarClass };
@@ -22,6 +23,7 @@ type Screen =
   | { kind: 'garage' }
   | { kind: 'events' }
   | { kind: 'shop' }
+  | { kind: 'paint' }
   | { kind: 'dealer' }
   | { kind: 'licences' }
   | { kind: 'armoury' }
@@ -74,6 +76,7 @@ function Screens() {
           save={save}
           onEvents={() => setScreen({ kind: 'events' })}
           onShop={() => setScreen({ kind: 'shop' })}
+          onPaint={() => setScreen({ kind: 'paint' })}
           onDealer={() => setScreen({ kind: 'dealer' })}
           onLicences={() => setScreen({ kind: 'licences' })}
           onArmoury={() => setScreen({ kind: 'armoury' })}
@@ -95,6 +98,37 @@ function Screens() {
               s.credits -= price;
               s.cars = s.cars.map((c, i) => (i === s.current ? { ...c, parts: { ...c.parts, [kind]: c.parts[kind] + 1 } } : c));
               track('buy_part', { car: o.carId, part: kind, level: o.parts[kind] + 1, price });
+            })
+          }
+          onBack={() => setScreen({ kind: 'garage' })}
+        />
+      );
+    case 'paint':
+      return (
+        <Paint
+          save={save}
+          onColour={(id: string) =>
+            update((s) => {
+              const o = currentCar(s);
+              const base = CAR_BY_ID[o.carId];
+              const have = id === 'red' || (o.paints ?? []).includes(id);
+              const price = have ? 0 : colourPrice(base);
+              if (price > s.credits) return;
+              s.credits -= price;
+              s.cars = s.cars.map((c, i) => (i === s.current ? { ...c, paint: id, paints: have ? c.paints : [...(c.paints ?? []), id] } : c));
+              if (price) track('buy_paint', { car: o.carId, colour: id, price });
+            })
+          }
+          onLivery={(kind: Livery) =>
+            update((s) => {
+              const o = currentCar(s);
+              const base = CAR_BY_ID[o.carId];
+              const have = kind === base.livery || (o.liveries ?? []).includes(kind);
+              const price = have ? 0 : liveryPrice(base);
+              if (price > s.credits) return;
+              s.credits -= price;
+              s.cars = s.cars.map((c, i) => (i === s.current ? { ...c, livery: kind, liveries: have ? c.liveries : [...(c.liveries ?? []), kind] } : c));
+              if (price) track('buy_livery', { car: o.carId, livery: kind, price });
             })
           }
           onBack={() => setScreen({ kind: 'garage' })}

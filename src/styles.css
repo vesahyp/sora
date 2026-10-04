@@ -270,6 +270,8 @@ table.laps .total td { border-bottom: 0; color: var(--straw); font-weight: 800; 
 .card .ic { width: 44px; height: 44px; flex: none; display: flex; align-items: center; justify-content: center; border: 2px solid var(--straw); color: var(--straw); font: 900 28px var(--f-stencil); font-variant-numeric: tabular-nums; }
 .card .ic small { font-size: 14px; margin-left: 1px; color: var(--straw-dark); }
 .card .pic { flex: none; }
+.swatch { display: inline-block; width: 14px; height: 14px; border: 1px solid var(--hair-strong); vertical-align: -2px; }
+.cards + .cards { margin-top: 14px; }
 .card .body { flex: 1; min-width: 0; }
 .card .name { display: flex; justify-content: space-between; gap: 8px; align-items: center; font: 700 19px var(--f-plate); letter-spacing: 0.03em; text-transform: uppercase; }
 .card .name > span:first-child { display: flex; align-items: center; gap: 6px; }

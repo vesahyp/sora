@@ -1,6 +1,6 @@
 import type { Car, SimState } from './state';
 import type { CarInput } from './types';
-import { BOOST, DAMAGE, FUMBLE, GUN, MINE, MISSILE, OIL, OIL_CREDIT, RESPAWN_DAMAGE, WRECK_BOUNTY, WRECK_TIME } from './content/weapons';
+import { BOOST, nitroFill, DAMAGE, FUMBLE, GUN, MINE, MISSILE, OIL, OIL_CREDIT, RESPAWN_DAMAGE, WRECK_BOUNTY, WRECK_TIME } from './content/weapons';
 import { PICKUPS, PICKUP_REACH, PICKUP_RESPAWN } from './content/pickups';
 import { CLASS_RANK } from './types';
 import { GRUDGE, hostility, leaderOf } from './content/drivers';
@@ -356,7 +356,7 @@ function wreck(s: SimState, c: Car): void {
   if (by) {
     anger(s, c, c.lastHitBy, GRUDGE.wreck);
     by.wrecks++;
-    by.boost = Math.min(1, by.boost + BOOST.perWreck);
+    by.boost = Math.min(1, by.boost + BOOST.perWreck * nitroFill(by.def));
     const bounty = WRECK_BOUNTY * (CLASS_RANK[c.def.cls] + 1);
     by.bounty += bounty;
     if (by === s.cars[0]) s.toasts.push({ text: { fi: `${c.driver.name.fi} romuna! +${bounty} cr`, en: `${c.driver.name.en} wrecked! +${bounty} cr` }, colour: '#ff8a3a', age: 0 });

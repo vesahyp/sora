@@ -3,7 +3,9 @@
 // then the dealer's wild buys) and the rivals' vehicles beside them, each
 // in a column as wide as it is long, so the bus takes the room it takes, so each row reads a size up from the one above;
 // then the player's cars fully built, then the Tauno at five levels of
-// damage so the stages sit side by side. `make lineup` writes shots/lineup.png.
+// damage so the stages sit side by side, then the Tauno with each part at
+// stock and levels 1, 2, 3 (a row a part: each level must read apart from
+// the last), with what the armoury loads on it, and in every paint. `make lineup` writes shots/lineup.png.
 // If two vehicles in it could be confused at a glance, the look is not
 // done. Starts its own dev server on port 5198 and draws with the race's
 // own sprites, so what it shows is what the race shows.
@@ -27,13 +29,24 @@ try {
     const { CARS } = await import('/src/game/content/cars.ts');
     const { RIVAL_CARS, vehicleDef } = await import('/src/game/content/rivals.ts');
     const { OPPONENTS } = await import('/src/game/content/drivers.ts');
-    const { tuned, fullFor } = await import('/src/game/content/parts.ts');
+    const { tuned, fullFor, PARTS, STOCK } = await import('/src/game/content/parts.ts');
+    const { PAINTS, LIVERIES, painted } = await import('/src/game/content/paint.ts');
     const { CLASSES } = await import('/src/game/types.ts');
     const PPM = 44;
     // a column per vehicle: its length and room for the plough's blade, the wing and the names
     const colOf = (def) => Math.max(5.6, def.length + 1.8) * PPM;
     const ROW = 4.3 * PPM;
-    const stock = { ram: 0, armour: 0, engine: 0, tyres: 0, weight: 0, brakes: 0, gun: 0 };
+    const stock = { ...STOCK };
+    const tauno = CARS[0];
+    const loads = [
+      ['tyhjä', { missiles: 0, mines: 0, oil: 0 }],
+      ['1 ohjus', { missiles: 1, mines: 0, oil: 0 }],
+      ['3 ohjusta', { missiles: 3, mines: 0, oil: 0 }],
+      ['3 miinaa', { missiles: 0, mines: 3, oil: 0 }],
+      ['öljyä', { missiles: 0, mines: 0, oil: 3 }],
+      ['3 + 3 + öljy', { missiles: 3, mines: 3, oil: 3 }],
+      ['täysi: teline', { missiles: 9, mines: 9, oil: 9 }],
+    ];
     const rows = [
       ...CLASSES.map((cls) => {
         const mine = CARS.filter((c) => c.cls === cls);
@@ -43,6 +56,9 @@ try {
         };
       }),
       { title: 'Sinun autosi, täysin rakennettuina', cars: CARS.map((c) => ({ def: tuned(c, fullFor(c.cls)), who: `${c.cls}, kaikki osat`, faded: false })) },
+      ...PARTS.map((p) => ({ title: `Osa: ${p.name.fi}, tasot 0-3`, cars: [0, 1, 2, 3].map((l) => ({ def: tuned(tauno, { ...stock, [p.kind]: l }), who: l ? `${p.name.fi} ${l}: ${p.levels[l - 1].fi}` : 'vakio', faded: false })) })),
+      { title: 'Asevarasto: ohjukset, miinat, öljy', cars: loads.map(([who, load]) => ({ def: tauno, who, faded: false, load })) },
+      { title: 'Maalaamo: värit ja kuviot', cars: PAINTS.map((p, i) => { const lv = i ? LIVERIES[(i - 1) % LIVERIES.length] : null; return { def: painted(tauno, p.id, lv?.kind), who: `${p.name.fi}${lv ? `, ${lv.name.fi}` : ''}`, faded: false }; }) },
       { title: 'Vauriot: Tauno 0, 20, 45, 70, 95', cars: [0, 20, 45, 70, 95].map((d) => ({ def: CARS[0], who: `vauriot ${d} · vaihe ${damageStage(d)}`, faded: false, damage: d })) },
     ];
     const W = Math.round(Math.max(...rows.map((r) => r.cars.reduce((a, v) => a + colOf(v.def), 0))) + 80);
@@ -79,7 +95,7 @@ try {
         g.globalAlpha = 0.55;
         g.drawImage(sh.img, cx + sh.x * PPM, cy + sh.y * PPM, sh.w * PPM, sh.h * PPM);
         g.globalAlpha = 1;
-        const spr = carPicture(v.def, { faded: v.faded, heading: 0 });
+        const spr = carPicture(v.def, { faded: v.faded, heading: 0, load: v.load });
         const w = (spr.width / SPRITE_PX) * PPM;
         const h = (spr.height / SPRITE_PX) * PPM;
         g.drawImage(spr, cx - w / 2, cy - h / 2, w, h);

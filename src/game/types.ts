@@ -173,6 +173,12 @@ export interface CarDef {
   tyres?: number;
   /** engine level 0..3, stamped by tuned() for the sprite */
   engine?: number;
+  /** nitro level 0..3: a bigger boost tank that fills faster (nitroTank, nitroFill). 0 when absent */
+  nitro?: number;
+  /** brakes level 0..3, stamped by tuned() for the sprite */
+  brakes?: number;
+  /** weight level 0..3, stamped by tuned() for the sprite: the shell stripped bare */
+  weight?: number;
   /** metres, nose to tail */
   length: number;
   width: number;

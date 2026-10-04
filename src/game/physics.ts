@@ -1,6 +1,6 @@
 import type { Car, SimState } from './state';
 import type { CarInput, Surface } from './types';
-import { BOOST, DAMAGE, DAMAGE_PACE, OIL, SPIN_TIME } from './content/weapons';
+import { BOOST, DAMAGE, DAMAGE_PACE, OIL, SPIN_TIME, nitroFill, nitroTank } from './content/weapons';
 import { enginePace } from './content/drivers';
 import { SURFACES, type SurfaceDef } from './content/surfaces';
 import { clamp, hurt, ram } from './harm';
@@ -119,7 +119,7 @@ export function advance(s: SimState, inputs: CarInput[], dt: number): void {
     if (c.wreck > 0) continue;
     // drifting fills the tank
     const fwd = c.vx * Math.cos(c.heading) + c.vy * Math.sin(c.heading);
-    if (Math.abs(c.slipAngle) > 0.2 && Math.abs(fwd) > 9 && c.spin <= 0 && !c.air) c.boost = Math.min(1, c.boost + BOOST.perDriftSecond * dt);
+    if (Math.abs(c.slipAngle) > 0.2 && Math.abs(fwd) > 9 && c.spin <= 0 && !c.air) c.boost = Math.min(1, c.boost + BOOST.perDriftSecond * nitroFill(c.def) * dt);
   }
 }
 
@@ -138,13 +138,14 @@ function ask(s: SimState, c: Car, input: CarInput, dt: number): Ask {
   if (c.slick > 0) c.slick -= dt;
   const spinning = c.spin > 0;
   if (input.boost && !done && !spinning && c.boost > 0.05 && c.boosting <= 0) {
-    c.boosting = Math.min(BOOST.seconds * BOOST.burst, c.boost * BOOST.seconds);
+    const tank = nitroTank(def);
+    c.boosting = Math.min(tank * BOOST.burst, c.boost * tank);
     if (c === s.cars[0]) s.sounds.push('nitro');
   }
   const boosting = c.boosting > 0;
   if (boosting) {
     c.boosting -= dt;
-    c.boost = Math.max(0, c.boost - dt / BOOST.seconds);
+    c.boost = Math.max(0, c.boost - dt / nitroTank(def));
   }
   return {
     throttle: done || spinning ? 0 : clamp(input.throttle, 0, 1),

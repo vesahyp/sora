@@ -1,6 +1,7 @@
 import { CARS, CAR_BY_ID } from '../game/content/cars';
 import { STOCK, tuned, type Parts } from '../game/content/parts';
-import { CLASS_RANK, type CarClass, type CarDef } from '../game/types';
+import { painted } from '../game/content/paint';
+import { CLASS_RANK, type CarClass, type CarDef, type Livery } from '../game/types';
 export { CLASS_RANK };
 
 /**
@@ -13,6 +14,11 @@ export { CLASS_RANK };
 export interface OwnedCar {
   carId: string;
   parts: Parts;
+  /** the paint shop: the colour (content/paint.ts id) and livery worn, and what was bought; stock when absent */
+  paint?: string;
+  livery?: Livery;
+  paints?: string[];
+  liveries?: Livery[];
 }
 
 export interface Save {
@@ -73,10 +79,14 @@ export function currentCar(s: Save): OwnedCar {
   return s.cars[s.current];
 }
 
-/** The car the player drives, parts fitted. */
+/** An owned car as it drives and looks: parts fitted, in its paint. */
+export function ownedCar(o: OwnedCar): CarDef {
+  return painted(tuned(CAR_BY_ID[o.carId], o.parts), o.paint, o.livery);
+}
+
+/** The car the player drives, parts fitted, in its paint. */
 export function playerCar(s: Save): CarDef {
-  const o = currentCar(s);
-  return tuned(CAR_BY_ID[o.carId], o.parts);
+  return ownedCar(currentCar(s));
 }
 
 export function hasLicence(s: Save, cls: CarClass): boolean {

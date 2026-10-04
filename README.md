@@ -67,9 +67,31 @@ kaikista, ja Niva ja traktori ajavat pientareella kuin tiellä.
 menopelinsä, omat värinsä ja oma numeronsa: Jorma ajaa kuplaa, sedania,
 ralliautoa ja ruumisautoa, Marko pikkupakua, traktoria, monsteriautoa ja
 aura-Sisua, Tapsa mopoautoa, Nivaa, linja-autoa ja coupéta. Painava kone
-voittaa törmäyksen ja kevyt lentää. Omasi on aina punainen, ja siitä
-näkee, mitä olet siihen ostanut: puskurin, panssarilevyt, konekiväärin
-konepellillä, nappularenkaat ja ilmanottimen.
+voittaa törmäyksen ja kevyt lentää. Omasi on punainen, kunnes maalaat
+sen, ja siitä näkee kaiken, mitä olet siihen ostanut, taso tasolta:
+
+- **Puskuri:** putkipuskuri, sitten pukinsarvet, sitten autoa leveämpi
+  aura, jonka reunassa on piikit.
+- **Panssari:** pellit oviin, sitten levyt katolle, sitten verkko
+  ikkunoihin, isot niitit ja levy konepellille.
+- **Moottori:** ilmanotin konepellillä, sitten isompi otin ja
+  kromiputki kylkeen, sitten ahdin ja putket molemmille kyljille.
+- **Renkaat:** leveämmät renkaat valkoisin kirjaimin, sitten
+  nappularenkaat, sitten valtavat mutarenkaat, jotka sylkevät mutaa
+  sivuluisussa.
+- **Typpi:** pullo takakontissa, sitten kaksi, sitten iso tankki ja
+  putket moottorille.
+- **Kevennys:** takaikkuna lexania ja raita, sitten ovet paljaaksi
+  metalliksi ja turvakaari näkyviin, sitten koko kori pohjamaalilaikkuina
+  ja yksi penkki.
+- **Jarrut:** punaiset satulat vanteissa, sitten porratut levyt, sitten
+  jäähdytysaukot konepeltiin punaisin reunoin.
+- **Konekivääri:** piippu konepellillä, sitten kaksi, sitten järeät
+  piiput ammuslaatikon päällä.
+
+Myös aseet näkyvät: ohjusputki katolla jokaista ohjusta kohti, neljästä
+ylöspäin kuuden putken teline, miinalaatikko perässä ja öljytynnyri
+takaikkunan takana.
 
 **Kenttä kantaa kaunaa.** Kun töytäiset, ammut tai romutat jonkun, hän
 muistaa sen: nojaa sinuun kovemmin, työntää perästä, ampuu sinua ensin
@@ -136,10 +158,18 @@ takavetoinen jokkisauto, kolme kanisteria öljyä ja 150 krediittiä, eli juuri
 puskurin hinta. Kisat tuovat rahaa sijoituksen mukaan, ja raha menee
 kolmeen paikkaan:
 
-- **Osakauppa**: puskuri, panssari, moottori ja renkaat, kolme tasoa
-  kukin. Puskuri tekee töytäisystä kipeän heille eikä sinulle. C-luokan
+- **Osakauppa**: puskuri, panssari, moottori, renkaat ja typpi, kolme
+  tasoa kukin. Puskuri tekee töytäisystä kipeän heille eikä sinulle.
+  Typpi kasvattaa nitrotankkia neljänneksen tasolta ja täyttää sitä
+  nopeammin. C-luokan
   autoon sopii lisäksi kevennys, jarrut ja konekivääri, jonka
   ensimmäinen taso on itse ase.
+- **Maalaamo**: kahdeksan väriä yhdeksänkymmentäluvun pihoilta
+  (punainen, polaarinvalkoinen, musta, metsänvihreä, taivaansininen,
+  sinappi, viininpunainen ja ladanbeige) ja kuviot: tuplaraidat,
+  kylkiraita, kaksivärinen, kattoväritys, ruutukatto ja tehdasväritys.
+  Kukin ostetaan kerran per auto, ja ostettuun pääsee takaisin
+  ilmaiseksi. Punainen ja auton oma kuvio ovat ilmaisia.
 - **Autokauppa**: neljä luokan autoa, JM, C, B ja A, ja niiden rinnalla
   hullut ostokset: Niva ja Valmet-traktori C-luokassa, monsteriauto
   B-luokassa ja ruumisauto A-luokassa. Punainen traktori numerolla 7 on

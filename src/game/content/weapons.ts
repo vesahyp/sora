@@ -87,5 +87,15 @@ export const RAM_CREDIT = 25;
 export const REPAIR_SHARE = 0.1;
 /** boost: full meter seconds of nitro, the pull and top speed it adds, what fills it */
 export const BOOST = { seconds: 2.4, accel: 1.8, top: 1.3, perDriftSecond: 0.27, perWreck: 1, perRam: 0.1, burst: 0.34 };
+/** the nitro part: the tank holds this much more a level, and the meter fills this much faster */
+export const NITRO = { tank: 0.25, fill: 0.15 };
+/** seconds of nitro in a full tank for this car */
+export function nitroTank(def: { nitro?: number }): number {
+  return BOOST.seconds * (1 + NITRO.tank * (def.nitro ?? 0));
+}
+/** what the meter's refills (a drift, a wreck, a ram) are multiplied by for this car */
+export function nitroFill(def: { nitro?: number }): number {
+  return 1 + NITRO.fill * (def.nitro ?? 0);
+}
 /** ramming: closing speed above this hurts; a shove past this throws the victim into a spin */
 export const RAM = { minClosing: 4, spinClosing: 11 };

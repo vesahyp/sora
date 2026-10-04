@@ -721,15 +721,29 @@ export class Renderer {
     const k = 1 / SPRITE_PPM;
     const fx = wh.frontX * k + (wh.fwl * k) / 2 - L / 2;
     const ang = car.steer * 0.55;
-    for (const y of [-wh.fout * k + (wh.fww * k) / 2 - W / 2, (W - wh.fww + wh.fout) * k + (wh.fww * k) / 2 - W / 2]) {
+    for (const [y, side] of [[-wh.fout * k + (wh.fww * k) / 2 - W / 2, -1], [(W - wh.fww + wh.fout) * k + (wh.fww * k) / 2 - W / 2, 1]] as const) {
       g.save();
       g.translate(fx, y);
       g.rotate(ang);
       g.scale(k, k);
-      tyre(g, -wh.fwl / 2, -wh.fww / 2, wh.fwl, wh.fww, tyreLevel(car.def));
+      tyre(g, -wh.fwl / 2, -wh.fww / 2, wh.fwl, wh.fww, tyreLevel(car.def), car.def.brakes ?? 0, side);
       g.restore();
     }
-    const spr = carSprite(car.def, { faded: i > 0, heading: car.heading });
+    if ((car.def.tyres ?? 0) >= 3 && (car.sliding || car.handbrake) && Math.abs(car.speed) > 4 && car.z < 0.1) {
+      // the mud tyres throw a spray of muck back off the rear wheels while the car slides
+      const rx = (wh.rearX * k) - L / 2;
+      g.fillStyle = 'rgba(84,62,36,0.75)';
+      for (const y of [-W / 2 - 0.1, W / 2 + 0.1]) {
+        for (let j = 0; j < 6; j++) {
+          const d = 0.3 + Math.random() * 1.6;
+          const r = 0.06 + Math.random() * 0.12;
+          g.beginPath();
+          g.arc(rx - d, y + (Math.random() - 0.5) * d * 0.9, r, 0, Math.PI * 2);
+          g.fill();
+        }
+      }
+    }
+    const spr = carSprite(car.def, { faded: i > 0, heading: car.heading, load: car });
     const sw = spr.width / SPRITE_PX;
     const sh = spr.height / SPRITE_PX;
     g.drawImage(spr, -sw / 2, -sh / 2, sw, sh);

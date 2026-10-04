@@ -2,18 +2,19 @@ import { L, type Text } from '../../i18n';
 import { CLASS_RANK, type CarClass, type CarDef } from '../types';
 
 /**
- * The parts shop. Seven kinds, three levels each; a level is a price and
- * what it does to the car. A part arrives with a class (`from`): a JM car
- * fits a ram bar, armour, an engine and tyres, the Death Rally start; a
+ * The parts shop. Eight kinds, three levels each; a level is a price and
+ * what it does to the car, and every level shows on the car (sprites.ts).
+ * A part arrives with a class (`from`): a JM car fits a ram bar, armour,
+ * an engine, tyres and nitro, the Death Rally start; a
  * class C car adds weight, brakes and the machine gun, whose first level
  * is the gun itself. Prices are a fraction of the car's price, so the
  * same shop fits every class. The order of value is the Gran Turismo
  * one: tyres and the ram bar first.
  */
-export type PartKind = 'ram' | 'armour' | 'engine' | 'tyres' | 'weight' | 'brakes' | 'gun';
-export const PART_KINDS: PartKind[] = ['ram', 'armour', 'engine', 'tyres', 'weight', 'brakes', 'gun'];
+export type PartKind = 'ram' | 'armour' | 'engine' | 'tyres' | 'nitro' | 'weight' | 'brakes' | 'gun';
+export const PART_KINDS: PartKind[] = ['ram', 'armour', 'engine', 'tyres', 'nitro', 'weight', 'brakes', 'gun'];
 export type Parts = Record<PartKind, number>;
-export const STOCK: Parts = { ram: 0, armour: 0, engine: 0, tyres: 0, weight: 0, brakes: 0, gun: 0 };
+export const STOCK: Parts = { ram: 0, armour: 0, engine: 0, tyres: 0, nitro: 0, weight: 0, brakes: 0, gun: 0 };
 
 export interface PartDef {
   kind: PartKind;
@@ -58,6 +59,14 @@ export const PARTS: PartDef[] = [
     effect: L('pito mutkissa', 'grip in the corners'),
     cost: [0.12, 0.2, 0.32],
     levels: [L('Pehmeät soranastat', 'Soft gravel tyres'), L('Kilparenkaat', 'Rally tyres'), L('Tehdasrenkaat', 'Works tyres')],
+    from: 'JM',
+  },
+  {
+    kind: 'nitro',
+    name: L('Typpi', 'Nitro'),
+    effect: L('isompi tankki, täyttyy nopeammin', 'a bigger tank that fills faster'),
+    cost: [0.12, 0.2, 0.32],
+    levels: [L('Typpipullo', 'A nitro bottle'), L('Kaksi pulloa', 'Two bottles'), L('Typpitankki', 'A nitro tank')],
     from: 'JM',
   },
   {
@@ -109,6 +118,7 @@ export function tuned(car: CarDef, parts: Parts): CarDef {
   const a = parts.armour;
   const r = parts.ram;
   const g = parts.gun;
+  const n = parts.nitro;
   return {
     ...car,
     grip: car.grip * (1 + 0.1 * t),
@@ -120,14 +130,18 @@ export function tuned(car: CarDef, parts: Parts): CarDef {
     armour: a,
     ram: r,
     gun: g,
+    // read by the boost (weapons.ts nitroTank, nitroFill) and drawn on the car
+    nitro: n,
     // not read by the car model: the sprite draws them
     tyres: t,
     engine: e,
+    brakes: b,
+    weight: w,
   };
 }
 
 /** Everything fitted, for the balance tool and the opponents of a tough event. */
-export const FULL: Parts = { ram: 3, armour: 3, engine: 3, tyres: 3, weight: 3, brakes: 3, gun: 3 };
+export const FULL: Parts = { ram: 3, armour: 3, engine: 3, tyres: 3, nitro: 3, weight: 3, brakes: 3, gun: 3 };
 
 /** Everything the class fits, fitted: FULL cut down to the parts the car can take. */
 export function fullFor(cls: CarClass): Parts {

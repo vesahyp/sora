@@ -1,5 +1,5 @@
 import type { Car, SimState } from './state';
-import { BOOST, DAMAGE, RAM, RAM_CREDIT, SPIN_TIME } from './content/weapons';
+import { BOOST, DAMAGE, RAM, RAM_CREDIT, SPIN_TIME, nitroFill } from './content/weapons';
 import { CLASS_RANK } from './types';
 import { GRUDGE } from './content/drivers';
 
@@ -72,7 +72,7 @@ export function ram(s: SimState, i: number, j: number, closing: number, nx: numb
   rammer.rams++;
   victim.rammed++;
   anger(s, victim, ri, GRUDGE.ram);
-  rammer.boost = Math.min(1, rammer.boost + BOOST.perRam);
+  rammer.boost = Math.min(1, rammer.boost + BOOST.perRam * nitroFill(rammer.def));
   // the monster truck throws whoever it hits; anything else has to hit hard
   if (closing > (rammer.def.spinOnShunt ? RAM.minClosing * 1.5 : RAM.spinClosing)) {
     throwVictim(victim);

@@ -72,6 +72,7 @@ classes below.
 | Armour | JM | takes hits |
 | Engine | JM | top speed and pull |
 | Tyres | JM | grip in the corners |
+| Nitro | JM | a tank 25% bigger a level that fills 15% faster |
 | Weight | C | acceleration and braking |
 | Brakes | C | braking |
 | Machine gun | C | the gun, then its rate and punch |
@@ -79,6 +80,10 @@ classes below.
 Prices are a share of the car's price, so the same shop fits every
 class; on the Tauno the first ram bar costs about a third-place prize
 in the first race.
+
+The paint shop sells a colour (5% of the car's price) and a livery
+(8%), each bought once per car; the red and the car's own livery are
+free. Paint is only looks.
 
 ## The money curve
 

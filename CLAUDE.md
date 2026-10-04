@@ -69,7 +69,8 @@ src/
     content/
       cars.ts         the class car per class (classCar(), the Tauno first), then the dealer's wild
                         buys (a Niva, a Valmet tractor, a monster truck, a hearse): the balance knobs, a price
-      parts.ts        the shop: seven parts, three levels, each from a class; tuned(car, parts)
+      parts.ts        the shop: eight parts (nitro among them), three levels, each from a class; tuned(car, parts)
+      paint.ts        the paint shop: the palette, the liveries on sale, their prices; painted(car, paint, livery)
       events.ts       the calendar: class, track, laps, prizes, how built the field is, what it carries
       licences.ts     the tests: one lap under a target, read off make balance
       weapons.ts      combat: the armoury's prices and the class each weapon arrives in, damage, gun,
@@ -85,7 +86,7 @@ src/
                         GRUDGE, Burnout's hostility: what a ram, shot or wreck costs and how the bot uses it
       tracks.ts       the tracks: a centreline in metres, a width, a surface, rivers, crests, patches, shortcuts
       surfaces.ts     what each surface does to a tyre and a car: grip, peak, slide, drag, top
-  career/save.ts      the save: credits, cars owned with parts, licences; one object in localStorage
+  career/save.ts      the save: credits, cars owned with parts and paint, licences; one object in localStorage
   render/
     look.ts           the one light: a low sun from the upper left; shadow direction and
                         length, the palette, the warm grade. Every other render file reads it
@@ -99,10 +100,11 @@ src/
                         nitro, dust and haze, minimap
     sprites.ts        procedural sprite cache: fifteen bodies in Hill Climb proportions lit per heading, the
                         machines (tractor, monster truck, plough lorry) built from their own parts,
-                        liveries and numbers, the fitted parts on the car, damage stages, shadows,
+                        liveries and numbers, every fitted part at every level and the weapons carried
+                        (CarLook.load) on the car, damage stages, shadows,
                         trees and roadside objects
   input/input.ts      one thumb (drag to steer, tap for nitro), the pedal, keyboard
-  ui/                 React: Game (loop + HUD), Screens (title, result), Garage (garage, races, shop, dealer, licences),
+  ui/                 React: Game (loop + HUD), Screens (title, result), Garage (garage, races, shop, paint shop, dealer, licences),
                         Dash (the shared chrome: segmented lamps, inline SVG glyphs, the stencil-or-plain face() rule)
   styles.css          the chrome's look: palette tokens named after the frame (soot, gravel, straw, amber), grain,
                         the two bundled Big Shoulders faces in public/fonts (OFL)
@@ -129,7 +131,8 @@ scripts/
   drive-log.mjs       set pieces by touch on an emulated phone, the physics logged frame by frame
   icon.mjs            render public/icon.svg to the PNG icons: 512, 192, the 180 iOS icon, a 32 favicon
   lineup.mjs          every vehicle in the game on one canvas to shots/lineup.png, a row per class,
-                        the race's own sprites, and the Tauno at five levels of damage
+                        the race's own sprites, the Tauno at five levels of damage, then a row per part
+                        at levels 0-3, the armoury's load and the paints
   pwa-check.mjs       the install check: manifest, every icon at its size, the service worker, offline
 infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs), see TRACKING.md
 ```

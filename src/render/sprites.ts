@@ -14,8 +14,10 @@
  * narrow hood and stack, the monster truck's balloon tyres under a
  * pickup, the bus's row of windows and roof rack, the plough's blade,
  * the hearse's glass back with a coffin in it, the Niva's spare on the
- * tailgate. What the shop fitted is on the car too: the ram bar, armour plate, the guns,
- * the tyres, the scoop and the pipes.
+ * tailgate. Everything the shop fitted is on the car too, each level a clear
+ * step from the last (the ram, armour, engine, tyres, nitro, weight, brakes,
+ * gun), and so is what the armoury loaded: launcher tubes, a mine box, an
+ * oil drum.
  *
  * The sun never moves but the car turns under it, so a car is cached
  * once per sixteenth of a turn with its light baked for that heading:
@@ -37,8 +39,8 @@ export const SPRITE_PPM = 24;
 const SPRITE_RES = 3;
 /** canvas pixels per metre of a cached car sprite: what the renderer divides by */
 export const SPRITE_PX = SPRITE_PPM * SPRITE_RES;
-/** drawing units of margin around the body: room for a plough, a wing and the wheels */
-const PAD = 12;
+/** drawing units of margin around the body: room for a plough, a wing and the mud tyres */
+const PAD = 16;
 /** light bins per turn */
 const LIGHT_BINS = 16;
 /** the outline: dark and thick, so a body reads as a shape before it reads as a colour */
@@ -51,6 +53,24 @@ export interface CarLook {
   faded?: boolean;
   /** the heading the light is baked for, radians */
   heading?: number;
+  /** what the car carries into the race, drawn on it: launcher tubes, a mine box, an oil drum */
+  load?: Load;
+}
+
+export interface Load {
+  missiles: number;
+  mines: number;
+  oil: number;
+}
+
+/**
+ * The load as the sprite draws it, bucketed so the cache stays small: a
+ * tube per missile up to three, then a rack; a bump per mine up to four;
+ * one oil drum, two from five cans.
+ */
+function loadBuckets(l?: Load): [number, number, number] {
+  if (!l) return [0, 0, 0];
+  return [Math.min(4, l.missiles), Math.min(4, l.mines), l.oil >= 5 ? 2 : l.oil > 0 ? 1 : 0];
 }
 
 function lightBin(heading: number): number {
@@ -131,15 +151,24 @@ interface WheelLayout {
   fout: number;
 }
 
+/** the wheel's diameter and tread width per tyres level */
+const TYRE_LONG = [1, 1.05, 1.1, 1.2];
+const TYRE_WIDE = [1, 1.3, 1.55, 1.85];
+const TYRE_PROUD = [0, 0.04, 0.08, 0.12];
+
 /** Wheel size and where the pairs sit, in sprite units; the renderer scales by SPRITE_PPM. */
 export function wheelLayout(def: CarDef): WheelLayout {
   const L = def.length * SPRITE_PPM;
   const sp = SPEC[def.shape];
-  const t = def.tyres ?? 0;
-  // Hill Climb wheels: bigger than life and standing out of the arches, fatter with every set of tyres
-  const wl = (0.52 + 0.07 * def.length) * sp.wheel * (def.wheel ?? 1) * (1 + 0.04 * t) * SPRITE_PPM;
-  const ww = 0.34 * sp.tread * (def.wheel ?? 1) * (1 + 0.12 * t) * SPRITE_PPM;
-  const out = ww * (sp.proud ?? (def.shape === 'rally' ? 0.85 : 0.75));
+  const t = Math.min(3, Math.max(0, def.tyres ?? 0));
+  // Hill Climb wheels: bigger than life and standing out of the arches, a clear step fatter with
+  // every set of tyres, the mud tyres at 3 huge
+  // a machine already on huge wheels grows them a third as much, or the tractor would be all tyre
+  const grow = (f: number) => (sp.wheel >= 1.5 ? 1 + (f - 1) * 0.35 : f);
+  const wl = (0.52 + 0.07 * def.length) * sp.wheel * (def.wheel ?? 1) * grow(TYRE_LONG[t]) * SPRITE_PPM;
+  const ww = 0.34 * sp.tread * (def.wheel ?? 1) * grow(TYRE_WIDE[t]) * SPRITE_PPM;
+  // each set of tyres also stands further out of the arch, kept inside the sprite's margin
+  const out = Math.min(PAD - 4, ww * ((sp.proud ?? (def.shape === 'rally' ? 0.85 : 0.75)) + (sp.wheel >= 1.5 ? 0 : TYRE_PROUD[t])));
   const f = sp.front;
   return { wl, ww, out, frontX: L * sp.frontX, rearX: L * sp.rearX, fwl: f ? wl * f[0] : wl, fww: f ? ww * f[1] : ww, fout: f ? -def.width * SPRITE_PPM * f[2] : out };
 }
@@ -147,7 +176,7 @@ export function wheelLayout(def: CarDef): WheelLayout {
 /** The tread drawn: the monster truck's balloons and the tractor's lugs are knobbly from new. */
 export function tyreLevel(def: CarDef): number {
   const t = def.tyres ?? 0;
-  return def.shape === 'monster' ? Math.max(t, 3) : def.shape === 'tractor' || def.shape === 'niva' ? Math.max(t, 1) : t;
+  return def.shape === 'monster' ? Math.max(t, 3) : def.shape === 'tractor' || def.shape === 'niva' ? Math.max(t, 2) : t;
 }
 
 /** Where the tractor's stack stands, metres from the car's centre (forward, right): the renderer puffs smoke from it. */
@@ -468,43 +497,134 @@ function steel(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: 
   g.fillRect(x, y, w, Math.min(0.7, h));
 }
 
-function rivets(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, step = 3.5): void {
-  g.fillStyle = 'rgba(230,220,200,0.55)';
+function rivets(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, step = 3.5, big = false): void {
+  const d = big ? 1.1 : 0.7;
   for (let i = x + 1.2; i < x + w - 0.5; i += step) {
-    g.fillRect(i, y + 0.6, 0.7, 0.7);
-    g.fillRect(i, y + h - 1.3, 0.7, 0.7);
+    if (big) {
+      g.fillStyle = 'rgba(10,8,6,0.6)';
+      g.fillRect(i + 0.3, y + 0.9, d, d);
+      g.fillRect(i + 0.3, y + h - 1.6 + 0.3, d, d);
+    }
+    g.fillStyle = big ? 'rgba(240,232,212,0.8)' : 'rgba(230,220,200,0.55)';
+    g.fillRect(i, y + 0.6, d, d);
+    g.fillRect(i, y + h - 1.6, d, d);
   }
 }
 
-/** One wheel seen from above: a fat black tread, a pale sidewall, knobs once the tyres are bought. */
-export function tyre(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, level = 0): void {
+/**
+ * One wheel seen from above: a fat black tread and a pale sidewall. The
+ * tyres part grows it: level 1 is wider with white letters on the wall,
+ * 2 knobbly blocks along both shoulders, 3 huge mud blocks caked brown.
+ * The brakes part shows in the hub: a red caliper, then a drilled disc.
+ */
+export function tyre(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, level = 0, brakes = 0, side: -1 | 1 = -1): void {
   const r = Math.min(w, h) * 0.3;
   g.fillStyle = '#121110';
   g.beginPath();
   g.roundRect(x, y, w, h, r);
   g.fill();
-  if (level > 0) {
-    // knobbly: blocks standing proud of the tread along both shoulders
-    const n = 5 + level;
-    const k = 0.5 + level * 0.35;
+  if (level >= 2) {
+    // blocks standing proud of the tread along both shoulders; at 3 fewer, far bigger ones
+    const mud = level >= 3;
+    const n = mud ? 6 : 7;
+    const k = mud ? 2.4 : 1.2;
+    const bw = mud ? 2.8 : 1.8;
+    g.fillStyle = '#121110';
     for (let i = 0; i < n; i++) {
-      const bx = x + 1 + ((w - 2) * (i + 0.5)) / n - 0.9;
-      g.fillRect(bx, y - k, 1.8, k + 1);
-      g.fillRect(bx + (i % 2 ? 0.6 : -0.6), y + h - 1, 1.8, k + 1);
+      const bx = x + 1 + ((w - 2) * (i + 0.5)) / n - bw / 2;
+      g.fillRect(bx, y - k, bw, k + 1);
+      g.fillRect(bx + (i % 2 ? 0.7 : -0.7), y + h - 1, bw, k + 1);
+    }
+    if (mud) {
+      g.strokeStyle = INK;
+      g.lineWidth = 0.5;
+      for (let i = 0; i < n; i++) {
+        const bx = x + 1 + ((w - 2) * (i + 0.5)) / n - bw / 2;
+        g.strokeRect(bx, y - k, bw, k);
+        g.strokeRect(bx + (i % 2 ? 0.7 : -0.7), y + h, bw, k);
+      }
     }
   }
   // the sidewalls: grey rubber caught by the light, so a wheel reads on dark ground too
+  const sw = Math.max(0.9, h * 0.14);
   g.fillStyle = '#4a453e';
-  g.fillRect(x + r * 0.6, y + 0.4, w - r * 1.2, Math.max(0.9, h * 0.14));
-  g.fillRect(x + r * 0.6, y + h - 0.4 - Math.max(0.9, h * 0.14), w - r * 1.2, Math.max(0.9, h * 0.14));
+  g.fillRect(x + r * 0.6, y + 0.4, w - r * 1.2, sw);
+  g.fillRect(x + r * 0.6, y + h - 0.4 - sw, w - r * 1.2, sw);
+  if (level === 1) {
+    // raised white letters: the first set of proper tyres shows off
+    g.fillStyle = 'rgba(232,224,204,0.85)';
+    for (let i = x + r; i < x + w - r - 1; i += 2.2) {
+      g.fillRect(i, y + 0.6, 1.3, sw * 0.6);
+      g.fillRect(i, y + h - 0.6 - sw * 0.6, 1.3, sw * 0.6);
+    }
+  }
   g.fillStyle = level > 0 ? 'rgba(150,140,120,0.55)' : 'rgba(120,110,95,0.4)';
-  const bars = 5 + level * 2;
-  for (let i = 1; i < bars; i++) g.fillRect(x + (w * i) / bars, y + h * 0.2, 0.7, h * 0.6);
+  if (level >= 3) {
+    // chevrons across the mud tread, then the mud itself
+    g.strokeStyle = 'rgba(150,140,120,0.6)';
+    g.lineWidth = 1;
+    g.beginPath();
+    for (let i = x + 2; i < x + w - 2; i += 3) {
+      g.moveTo(i, y + h * 0.2);
+      g.lineTo(i + 1.5, y + h * 0.5);
+      g.lineTo(i, y + h * 0.8);
+    }
+    g.stroke();
+    g.fillStyle = 'rgba(96,72,42,0.75)';
+    for (let i = 0; i < 9; i++) {
+      const hh = hash32(i * 131 + Math.round(w * 10));
+      g.fillRect(x + ((hh & 0xff) / 255) * (w - 2), y + (((hh >>> 8) & 0xff) / 255) * (h - 1.5), 1.6, 1.2);
+    }
+  } else {
+    const bars = 5 + level * 2;
+    for (let i = 1; i < bars; i++) g.fillRect(x + (w * i) / bars, y + h * 0.2, 0.7, h * 0.6);
+  }
   g.strokeStyle = INK;
   g.lineWidth = 0.8;
   g.beginPath();
   g.roundRect(x, y, w, h, r);
   g.stroke();
+  // the hub sits in the part of the wheel standing out of the arch: `side` is where the outer face is
+  if (brakes > 0) hub(g, x + w / 2, y + h * (side < 0 ? 0.36 : 0.64), w, h * 0.7, brakes);
+}
+
+/**
+ * The brakes in the hub, seen a little from the side so the disc reads:
+ * a red caliper, then a drilled silver disc with the caliper on its edge,
+ * then a bigger caliper.
+ */
+function hub(g: CanvasRenderingContext2D, cx: number, cy: number, w: number, h: number, lvl: number): void {
+  g.strokeStyle = INK;
+  g.lineWidth = 0.6;
+  if (lvl >= 2) {
+    const rx = w * 0.3;
+    const ry = h * 0.3;
+    g.fillStyle = '#d2ccbe';
+    g.beginPath();
+    g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+    g.fillStyle = '#3a3630';
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      g.fillRect(cx + Math.cos(a) * rx * 0.65 - 0.4, cy + Math.sin(a) * ry * 0.65 - 0.4, 0.8, 0.8);
+    }
+    g.fillStyle = '#6f6a60';
+    g.beginPath();
+    g.ellipse(cx, cy, rx * 0.3, ry * 0.3, 0, 0, Math.PI * 2);
+    g.fill();
+  }
+  // the caliper: alone in the hub at 1, on the disc's trailing edge after
+  const cw = lvl >= 2 ? w * (lvl >= 3 ? 0.26 : 0.2) : w * 0.34;
+  const ch = h * (lvl >= 3 ? 0.66 : 0.56);
+  const ox = lvl >= 2 ? -w * 0.28 : 0;
+  g.fillStyle = '#e0281c';
+  g.beginPath();
+  g.roundRect(cx + ox - cw / 2, cy - ch / 2, cw, ch, Math.min(cw, ch) * 0.3);
+  g.fill();
+  g.stroke();
+  g.fillStyle = 'rgba(255,220,200,0.6)';
+  g.fillRect(cx + ox - cw / 2 + 0.4, cy - ch / 2 + 0.4, cw - 0.8, 0.5);
 }
 
 /** The livery's second colour on the body, clipped to it: how it is laid is the car's own. */
@@ -589,7 +709,8 @@ function roofLivery(g: CanvasRenderingContext2D, def: CarDef, geo: Geo, tone: st
 
 /** Everything a car's picture depends on: the body, the paint, every fitted part, the light. */
 function carKey(def: CarDef, look: CarLook): string {
-  return `${def.shape}:${def.length}:${def.width}:${def.wheel ?? 1}:${def.colour}:${def.accent}:${def.livery}:${def.number}:${def.ram}:${def.armour}:${def.gun}:${def.tyres ?? 0}:${def.engine ?? 0}:${look.faded ? 1 : 0}:${lightBin(look.heading ?? -0.3)}`;
+  const parts = [def.ram, def.armour, def.gun, def.tyres ?? 0, def.engine ?? 0, def.brakes ?? 0, def.weight ?? 0, def.nitro ?? 0].join('');
+  return `${def.shape}:${def.length}:${def.width}:${def.wheel ?? 1}:${def.colour}:${def.accent}:${def.livery}:${def.number}:${parts}:${loadBuckets(look.load).join('')}:${look.faded ? 1 : 0}:${lightBin(look.heading ?? -0.3)}`;
 }
 
 export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
@@ -613,23 +734,32 @@ export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
   const wh = wheelLayout(def);
   const eng = def.engine ?? 0;
 
-  // the side pipes run out under the body, so they go down first
+  // the side pipes run out under the body, so they go down first: chrome, a blued tip, fat at 3
   if (eng >= 2) {
+    const pw = eng >= 3 ? 4 : 3.4;
+    const inset = W * SPEC[shape].inset;
     for (const side of eng >= 3 ? [0, 1] : [0]) {
-      const y = side ? W - 0.5 : -1.9;
-      const x0 = wh.rearX + wh.wl + 4;
-      steel(g, x0, y, wh.frontX - x0 - 4, 2.4, '#8d877a');
+      // clear of the body's thick outline, so the whole pipe shows
+      const y = side ? W - inset + 1.3 : inset - pw - 1.3;
+      const x0 = wh.rearX + wh.wl + 2;
+      const x1 = wh.frontX - 2;
+      steel(g, x0, y, x1 - x0, pw, '#cfc8b8');
+      g.fillStyle = 'rgba(70,90,140,0.55)';
+      g.fillRect(x0, y + 0.4, 4, pw - 0.8);
       g.fillStyle = '#16130f';
       g.beginPath();
-      g.arc(x0 + 1, y + 1.2, 0.9, 0, Math.PI * 2);
+      g.ellipse(x0 + 0.6, y + pw / 2, 0.9, pw * 0.36, 0, 0, Math.PI * 2);
       g.fill();
+      // the headers coming out of the body
+      g.fillStyle = '#8d877a';
+      for (let k = 0; k < (eng >= 3 ? 3 : 2); k++) g.fillRect(x1 - 3 - k * 3.2, side ? y - 2.4 : y + pw - 0.2, 1.8, 2.6);
     }
   }
   // rear tyres: the front pair turn, so the renderer draws them. The plough's lorry has a tandem
   const tread = tyreLevel(def);
   for (const x of shape === 'plough' ? [wh.rearX, wh.rearX + wh.wl + 2] : [wh.rearX]) {
-    tyre(g, x, -wh.out, wh.wl, wh.ww, tread);
-    tyre(g, x, W - wh.ww + wh.out, wh.wl, wh.ww, tread);
+    tyre(g, x, -wh.out, wh.wl, wh.ww, tread, def.brakes ?? 0, -1);
+    tyre(g, x, W - wh.ww + wh.out, wh.wl, wh.ww, tread, def.brakes ?? 0, 1);
   }
   if (shape === 'tractor') {
     // the lugs: chevrons across the big rear tread, the tractor's signature from above
@@ -704,6 +834,8 @@ export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
     g.fillStyle = 'rgba(70,54,34,0.7)';
     g.fillRect(x, side ? W - dy - 1 : dy, 0.7 + ((h >>> 17) & 3) * 0.5, 0.7);
   }
+  // the weight part strips the shell over the mud: bare doors, then primer everywhere
+  stripped(g, def, geo, wh);
   g.restore();
 
   // panel seams
@@ -727,16 +859,29 @@ export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
 
   // armour: riveted plates on the doors first; on a machine, wherever its body is
   if (def.armour >= 1) {
-    const x0 = wh.rearX + wh.wl + 3;
-    const w = wh.frontX - x0 - 3;
+    const x0 = wh.rearX + wh.wl + 1.5;
+    const w = wh.frontX - x0 - 1.5;
     g.save();
     if (SPEC[shape].inset >= 0.2) g.clip(body);
-    for (const y of [0.2, W - W * 0.2 - 0.2]) {
-      steel(g, x0, y, w, W * 0.2, STEEL);
-      rivets(g, x0, y, w, W * 0.2);
+    for (const y of [-0.4, W - W * 0.25 + 0.4]) {
+      steel(g, x0, y, w, W * 0.25, '#8f8a7e');
+      rivets(g, x0, y, w, W * 0.25, def.armour >= 3 ? 2.4 : 3, true);
+    }
+    if (def.armour >= 3) {
+      // a plate bolted over the bonnet, heavy rivets round it
+      const bx = geo.bonnetX + 2;
+      const bw = Math.max(6, L - bx - 4);
+      steel(g, bx, W * 0.24, bw, W * 0.52, '#5e5a52');
+      rivets(g, bx, W * 0.24, bw, W * 0.52, 2.4, true);
+      g.fillStyle = 'rgba(230,220,200,0.6)';
+      for (const yy of [W * 0.36, W * 0.5, W * 0.64]) {
+        g.fillRect(bx + 0.6, yy, 1, 1);
+        g.fillRect(bx + bw - 1.6, yy, 1, 1);
+      }
     }
     g.restore();
   }
+  if ((def.brakes ?? 0) >= 3) ducts(g, geo);
 
   // glass: dark, with the sky caught on the side toward the sun
   const glass = new Path2D();
@@ -753,6 +898,7 @@ export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
   g.lineWidth = 0.9;
   g.stroke(glass);
   throughGlass(g, def, geo, paint);
+  cage(g, def, geo, glass, tone);
   if (def.armour >= 3) {
     // mesh over the glass
     g.save();
@@ -775,6 +921,12 @@ export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
   g.fillStyle = shade(paint, 1.07);
   g.fill(roof);
   roofLivery(g, def, geo, tone);
+  if ((def.weight ?? 0) >= 3) {
+    g.save();
+    g.clip(roof);
+    primer(g, geo.roof[0], geo.roof[1], geo.roof[2], geo.roof[3], 7);
+    g.restore();
+  }
   if (def.armour >= 2) {
     // riveted plates along the roof's edges, the paint and the number left between them
     const [rx, ry, rw, rh] = geo.roof;
@@ -803,10 +955,15 @@ export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
 
   tailFeatures(g, def, geo);
   lamps(g, def, geo);
-  if (def.gun > 0) guns(g, def, geo);
   if (eng >= 1) scoop(g, def, geo, eng);
+  if (def.gun > 0) guns(g, def, geo);
   // the plough's blade is its ram
   if (def.ram > 0 && shape !== 'plough') ramBar(g, def, geo);
+  if ((def.nitro ?? 0) > 0) nitro(g, def, geo);
+  const [mis, mines, oil] = loadBuckets(look.load);
+  if (oil) oilDrum(g, geo, oil);
+  if (mines) mineBox(g, geo, mines);
+  if (mis) launchers(g, geo, mis);
   cache.set(key, c);
   return c;
 }
@@ -1423,7 +1580,7 @@ function tailFeatures(g: CanvasRenderingContext2D, def: CarDef, geo: Geo): void 
       // the spare standing on the back door, a tyre across the tail
       steel(g, -1.4, W * 0.06, 2.4, W * 0.88, '#2a2622');
       const d = W * 0.46;
-      tyre(g, -5.6, W / 2 - d / 2, 5, d, 1);
+      tyre(g, -5.6, W / 2 - d / 2, 5, d, 2);
       g.fillStyle = '#4a453e';
       g.fillRect(-4.2, W / 2 - 2, 2.2, 4);
       break;
@@ -1496,34 +1653,66 @@ function guns(g: CanvasRenderingContext2D, def: CarDef, geo: Geo): void {
   }
 }
 
-/** The engine on the outside: a bonnet scoop, then a bigger one, then a blower through the bonnet. */
+/** The engine on the outside: a bonnet scoop, a bigger one with a mesh mouth, then a chrome blower. */
 function scoop(g: CanvasRenderingContext2D, def: CarDef, geo: Geo, lvl: number): void {
   const { L, W } = geo;
   const cx = def.shape === 'van' || def.shape === 'microcar' || def.shape === 'bus' || def.shape === 'plough' ? geo.bonnetX - 3 : (geo.bonnetX + L) / 2;
-  if (lvl >= 3) {
-    // a blower: chrome body, two butterflies on top
-    steel(g, cx - 5, W * 0.36, 10, W * 0.28, '#9a9486');
-    g.fillStyle = '#16130f';
-    g.fillRect(cx - 3.5, W * 0.4, 3, W * 0.2);
-    g.fillRect(cx + 0.5, W * 0.4, 3, W * 0.2);
-    return;
-  }
-  const w = lvl >= 2 ? 9 : 7;
-  g.fillStyle = shade(def.colour, 0.75);
-  poly(g, [[cx - w / 2, W * 0.4], [cx + w / 2, W * 0.36], [cx + w / 2, W * 0.64], [cx - w / 2, W * 0.6]]);
-  g.fill();
   g.strokeStyle = INK;
   g.lineWidth = 0.8;
+  if (lvl >= 3) {
+    // a blower standing through the bonnet: chrome case, the belt on its nose, two intake stacks
+    const bw = 15;
+    const bh = W * 0.46;
+    steel(g, cx - bw / 2, W / 2 - bh / 2, bw, bh, '#a8a294');
+    steel(g, cx + bw / 2 - 0.5, W * 0.4, 3, W * 0.2, '#1c1a16');
+    g.fillStyle = '#c03a22';
+    g.fillRect(cx + bw / 2 + 0.3, W * 0.47, 1.4, W * 0.06);
+    for (const y of [W * 0.38, W * 0.62]) {
+      g.fillStyle = '#d4cec0';
+      g.beginPath();
+      g.arc(cx - 1.5, y, W * 0.1, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+      g.fillStyle = '#16130f';
+      g.beginPath();
+      g.arc(cx - 1.5, y, W * 0.06, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#8d877a';
+      g.fillRect(cx - 1.5 - W * 0.06, y - 0.3, W * 0.12, 0.6);
+    }
+    return;
+  }
+  const w = lvl >= 2 ? 13 : 9;
+  const h = lvl >= 2 ? W * 0.42 : W * 0.3;
+  g.fillStyle = shade(def.colour, 0.72);
+  poly(g, [[cx - w / 2, W / 2 - h * 0.4], [cx + w / 2, W / 2 - h / 2], [cx + w / 2, W / 2 + h / 2], [cx - w / 2, W / 2 + h * 0.4]]);
+  g.fill();
   g.stroke();
+  g.fillStyle = 'rgba(255,236,204,0.3)';
+  g.fillRect(cx - w / 2 + 1, W / 2 - h * 0.4 + 0.5, w - 2, 0.6);
+  // the mouth facing forward; the bigger scoop wears a mesh in it
   g.fillStyle = '#121010';
-  g.fillRect(cx + w / 2 - 1.6, W * 0.39, 1.6, W * 0.22);
+  g.fillRect(cx + w / 2 - 2.2, W / 2 - h * 0.42, 2.2, h * 0.84);
+  if (lvl >= 2) {
+    g.strokeStyle = 'rgba(170,165,150,0.8)';
+    g.lineWidth = 0.4;
+    g.beginPath();
+    for (let y = W / 2 - h * 0.4; y < W / 2 + h * 0.4; y += 1.3) {
+      g.moveTo(cx + w / 2 - 2.2, y);
+      g.lineTo(cx + w / 2, y + 0.8);
+    }
+    g.stroke();
+  }
 }
 
 /** The ram on the nose: a steel bar, then a bull bar, then a welded plough. */
 function ramBar(g: CanvasRenderingContext2D, def: CarDef, geo: Geo): void {
   const { L, W } = geo;
   if (def.ram === 1) {
-    steel(g, L, W * 0.05, 2.4, W * 0.9, STEEL_DARK);
+    // a pipe bumper on two brackets, a little wider than the car
+    steel(g, L - 1, W * 0.25, 3, 1.6, STEEL_DARK);
+    steel(g, L - 1, W * 0.75 - 1.6, 3, 1.6, STEEL_DARK);
+    steel(g, L + 1.5, -1, 3.4, W + 2, '#8d877a');
     return;
   }
   if (def.ram === 2) {
@@ -1546,8 +1735,22 @@ function ramBar(g: CanvasRenderingContext2D, def: CarDef, geo: Geo): void {
     g.stroke(path);
     return;
   }
-  // a plough: a welded wedge wider than the car, its seams and its lit edge
-  const p = polyPath([[L - 1, -2], [L + 3, -2.5], [L + 8, W * 0.5], [L + 3, W + 2.5], [L - 1, W + 2]]);
+  // a plough: a welded wedge well wider than the car, teeth along its edge, its seams and its lit edge
+  const sp = 6;
+  g.fillStyle = '#d8d0b8';
+  g.strokeStyle = INK;
+  g.lineWidth = 0.5;
+  for (let i = 1; i < 6; i++) {
+    for (const side of [-1, 1]) {
+      const k = i / 6;
+      const x = L + 3 + 5 * k;
+      const y = side < 0 ? -sp + (W * 0.5 + sp) * k : W + sp - (W * 0.5 + sp) * k;
+      poly(g, [[x - 1.2, y - side * 0.8], [x + 2.6, y + side * 1.4], [x + 0.6, y + side * 1.8]]);
+      g.fill();
+      g.stroke();
+    }
+  }
+  const p = polyPath([[L - 1, -sp + 0.5], [L + 3, -sp], [L + 8, W * 0.5], [L + 3, W + sp], [L - 1, W + sp - 0.5]]);
   g.fillStyle = '#4a453d';
   g.fill(p);
   g.strokeStyle = INK;
@@ -1556,9 +1759,9 @@ function ramBar(g: CanvasRenderingContext2D, def: CarDef, geo: Geo): void {
   g.strokeStyle = 'rgba(255,236,204,0.4)';
   g.lineWidth = 0.7;
   g.beginPath();
-  g.moveTo(L + 3, -2.5);
+  g.moveTo(L + 3, -sp);
   g.lineTo(L + 8, W * 0.5);
-  g.lineTo(L + 3, W + 2.5);
+  g.lineTo(L + 3, W + sp);
   g.stroke();
   g.strokeStyle = 'rgba(20,16,12,0.6)';
   g.lineWidth = 0.5;
@@ -1568,6 +1771,299 @@ function ramBar(g: CanvasRenderingContext2D, def: CarDef, geo: Geo): void {
     g.lineTo(L + 3 + 5 * (1 - Math.abs(y - 0.5) * 2), W * y);
   }
   g.stroke();
+}
+
+/** Grey primer over bare panels, rust at their edges: a shell stripped for weight. */
+function primer(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, n: number, seed = 0): void {
+  for (let i = 0; i < n; i++) {
+    const hh = hash32(i * 613 + seed * 97 + 5);
+    const pw = w * (0.18 + ((hh & 0xff) / 255) * 0.3);
+    const ph = h * (0.25 + (((hh >>> 8) & 0xff) / 255) * 0.45);
+    const px = x + (((hh >>> 16) & 0xff) / 255) * (w - pw);
+    const py = y + (((hh >>> 24) & 0xff) / 255) * (h - ph);
+    g.fillStyle = i % 3 ? '#86827a' : '#6f6c66';
+    g.beginPath();
+    g.roundRect(px, py, pw, ph, 1.5);
+    g.fill();
+    g.strokeStyle = 'rgba(128,64,30,0.6)';
+    g.lineWidth = 0.6;
+    g.stroke();
+  }
+}
+
+/**
+ * The weight part on the shell, inside the body's clip: the doors
+ * stripped to bare metal at 2, the whole shell in primer patches at 3.
+ */
+function stripped(g: CanvasRenderingContext2D, def: CarDef, geo: Geo, wh: WheelLayout): void {
+  const w = def.weight ?? 0;
+  if (w < 2) return;
+  const { L, W } = geo;
+  if (w >= 3) primer(g, 0, 0, L, W, 16, 1);
+  const x0 = wh.rearX + wh.wl + 1;
+  const x1 = wh.frontX - 1;
+  for (const [y, h] of [[-1, W * 0.28], [W * 0.72, W * 0.28 + 1]]) {
+    g.fillStyle = '#a8a398';
+    g.fillRect(x0, y, x1 - x0, h);
+    g.strokeStyle = 'rgba(60,56,50,0.5)';
+    g.lineWidth = 0.4;
+    g.beginPath();
+    for (let yy = y + 1; yy < y + h; yy += 1.4) {
+      g.moveTo(x0, yy);
+      g.lineTo(x1, yy);
+    }
+    g.stroke();
+    // torn paint along the edge
+    g.strokeStyle = INK;
+    g.lineWidth = 0.6;
+    g.strokeRect(x0, y, x1 - x0, h);
+  }
+}
+
+/** The brakes at 3: cooling ducts cut into the bonnet, red surrounds. */
+function ducts(g: CanvasRenderingContext2D, geo: Geo): void {
+  const { L, W } = geo;
+  const bon = L - geo.bonnetX;
+  // a cab-over has no bonnet to speak of: the ducts go in its nose panel
+  const dw = Math.max(7, bon * 0.34);
+  const x = bon > 12 ? geo.bonnetX + bon * 0.5 : L - dw - 3;
+  for (const y of [W * 0.15, W * 0.85 - W * 0.14]) {
+    g.fillStyle = '#d8261a';
+    g.beginPath();
+    g.roundRect(x - 1, y - 1, dw + 2, W * 0.14 + 2, 1.6);
+    g.fill();
+    g.strokeStyle = INK;
+    g.lineWidth = 0.7;
+    g.stroke();
+    g.fillStyle = '#121010';
+    g.fillRect(x, y, dw, W * 0.14);
+    g.fillStyle = 'rgba(160,150,135,0.7)';
+    for (let k = x + 1.5; k < x + dw - 0.5; k += 1.8) g.fillRect(k, y + 0.5, 0.6, W * 0.14 - 1);
+  }
+}
+
+/**
+ * The weight part through the glass: a lexan rear window with a stripe
+ * at 1, a roll cage at 2, and at 3 the cage with a single bucket seat.
+ */
+function cage(g: CanvasRenderingContext2D, def: CarDef, geo: Geo, glass: Path2D, tone: string): void {
+  const w = def.weight ?? 0;
+  if (w < 1) return;
+  const { L, W } = geo;
+  const [rx, ry, rw, rh] = geo.roof;
+  // the lexan: where the rear window is, or the side glass on a body with none
+  const lexan = new Path2D();
+  if (geo.rear.length) poly(lexan, geo.rear);
+  else {
+    poly(lexan, geo.sideL);
+    poly(lexan, geo.sideR);
+  }
+  g.fillStyle = 'rgba(176,196,200,0.75)';
+  g.fill(lexan);
+  g.save();
+  g.clip(lexan);
+  // a stripe across it, and the rivets that hold it in
+  g.fillStyle = tone;
+  if (geo.rear.length) {
+    const x0 = geo.rear[1][0];
+    const x1 = geo.rear[0][0];
+    g.fillRect(x0 + (x1 - x0) * 0.3, 0, (x1 - x0) * 0.3, W);
+  } else g.fillRect(0, 0, L, W * 0.13);
+  g.restore();
+  g.strokeStyle = INK;
+  g.lineWidth = 0.9;
+  g.stroke(lexan);
+  if (w < 2) return;
+  g.save();
+  g.clip(glass);
+  if (w >= 3) {
+    // one bucket seat, the driver's, its back showing behind the cage
+    g.fillStyle = '#9a1e18';
+    g.strokeStyle = INK;
+    g.lineWidth = 0.7;
+    g.beginPath();
+    g.roundRect(rx - 7, ry + rh * 0.08, 10, rh * 0.42, 2.5);
+    g.fill();
+    g.stroke();
+    g.fillStyle = '#1a1714';
+    g.fillRect(rx - 6, ry + rh * 0.22, 2, rh * 0.14);
+  }
+  // the cage: two hoops across, rails along the roof's edges, an X in the back
+  const bars = new Path2D();
+  const xb = rx + 1.5;
+  const xf = rx + rw - 1.5;
+  for (const x of [xb, xf]) {
+    bars.moveTo(x, ry - 3);
+    bars.lineTo(x, ry + rh + 3);
+  }
+  const back = geo.rear.length ? geo.rear[1][0] + 2 : rx - 6;
+  for (const y of [ry + 1.2, ry + rh - 1.2]) {
+    bars.moveTo(back, y);
+    bars.lineTo(geo.bonnetX + 2, y);
+  }
+  bars.moveTo(xb, ry + 1.2);
+  bars.lineTo(back, ry + rh - 1.2);
+  bars.moveTo(xb, ry + rh - 1.2);
+  bars.lineTo(back, ry + 1.2);
+  g.strokeStyle = INK;
+  g.lineWidth = 2.6;
+  g.stroke(bars);
+  g.strokeStyle = w >= 3 ? '#e2d24a' : '#cfc9bb';
+  g.lineWidth = 1.4;
+  g.stroke(bars);
+  g.restore();
+}
+
+/** Where the boot is: the deck behind the rear glass, or the tail of a body with none. */
+function bootDeck(geo: Geo): number {
+  return Math.max(geo.bootX, geo.L * 0.12);
+}
+
+/** A bottle or tank lying along the car: blue, a white band, a brass valve to the front. */
+function bottle(g: CanvasRenderingContext2D, x: number, cy: number, len: number, d: number): void {
+  g.fillStyle = '#2f68c8';
+  g.strokeStyle = INK;
+  g.lineWidth = 0.8;
+  g.beginPath();
+  g.roundRect(x, cy - d / 2, len, d, d / 2);
+  g.fill();
+  g.stroke();
+  g.fillStyle = '#ece6d4';
+  g.fillRect(x + len * 0.35, cy - d / 2 + 0.4, len * 0.14, d - 0.8);
+  g.fillStyle = 'rgba(220,235,255,0.55)';
+  g.fillRect(x + d * 0.4, cy - d * 0.3, len - d * 0.8, Math.max(0.6, d * 0.14));
+  g.fillStyle = '#c9a85a';
+  g.fillRect(x + len - 0.5, cy - d * 0.18, 2, d * 0.36);
+  g.fillStyle = INK;
+  g.fillRect(x + len + 1.2, cy - d * 0.28, 1, d * 0.56);
+}
+
+/** The nitro part: one bottle in the boot, then two, then a big tank with its pipes run forward. */
+function nitro(g: CanvasRenderingContext2D, def: CarDef, geo: Geo): void {
+  const { L, W } = geo;
+  const lvl = def.nitro ?? 0;
+  const deck = bootDeck(geo);
+  if (lvl >= 3) {
+    const len = Math.max(L * 0.26, deck * 0.9);
+    const d = W * 0.4;
+    const x = Math.max(2, deck * 0.5 - len / 2);
+    // the feed lines: blue, along both flanks to the engine
+    g.strokeStyle = INK;
+    g.lineWidth = 1.6;
+    const lines = new Path2D();
+    for (const y of [W * 0.2, W * 0.8]) {
+      lines.moveTo(x + len, W / 2 + (y < W / 2 ? -d * 0.3 : d * 0.3));
+      lines.lineTo(x + len + 4, y);
+      lines.lineTo(geo.bonnetX + 2, y);
+    }
+    g.stroke(lines);
+    g.strokeStyle = '#4a8ae8';
+    g.lineWidth = 0.8;
+    g.stroke(lines);
+    bottle(g, x, W / 2, len, d);
+    // the gauge on the tank's end
+    g.fillStyle = '#ece6d4';
+    g.beginPath();
+    g.arc(x + d * 0.5, W / 2, d * 0.2, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = INK;
+    g.lineWidth = 0.5;
+    g.stroke();
+    return;
+  }
+  const len = Math.max(L * 0.2, deck * 0.75);
+  const d = W * 0.2;
+  const x = Math.max(2, deck * 0.5 - len / 2);
+  for (const y of lvl >= 2 ? [W * 0.3, W * 0.7] : [W * 0.3]) bottle(g, x, y, len, d);
+}
+
+/** Oil cans carried: a rust-red drum behind the rear window, two from five cans. */
+function oilDrum(g: CanvasRenderingContext2D, geo: Geo, n: number): void {
+  const { W } = geo;
+  const r = W * 0.15;
+  const x = Math.max(r + 1.5, bootDeck(geo) - r - 1);
+  for (const y of n >= 2 ? [W * 0.32, W * 0.68] : [W * 0.5]) {
+    g.fillStyle = '#9c3e1c';
+    g.strokeStyle = INK;
+    g.lineWidth = 0.9;
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+    g.strokeStyle = 'rgba(20,12,8,0.6)';
+    g.lineWidth = 0.6;
+    g.beginPath();
+    g.arc(x, y, r * 0.68, 0, Math.PI * 2);
+    g.stroke();
+    // a black oil stain down its side, the bung on top
+    g.fillStyle = 'rgba(16,12,8,0.7)';
+    g.beginPath();
+    g.ellipse(x + r * 0.2, y + r * 0.3, r * 0.35, r * 0.22, 0.5, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = '#d8cfb4';
+    g.beginPath();
+    g.arc(x - r * 0.35, y - r * 0.35, r * 0.16, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
+/** Mines carried: a dispenser box hung off the tail, one bump on it per mine up to four. */
+function mineBox(g: CanvasRenderingContext2D, geo: Geo, n: number): void {
+  const { W } = geo;
+  const y0 = W * 0.54;
+  const h = W * 0.38;
+  steel(g, -5, y0, 7, h, '#3c4228');
+  g.fillStyle = '#e0b030';
+  g.fillRect(-5, y0 + h - 1.2, 7, 1.2);
+  for (let i = 0; i < n; i++) {
+    const cy = y0 + (h * (i + 0.5)) / 4;
+    g.fillStyle = '#1a1814';
+    g.beginPath();
+    g.arc(-1.5, cy, Math.min(2, h / 9), 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = '#d8261a';
+    g.fillRect(-1.9, cy - 0.4, 0.8, 0.8);
+  }
+}
+
+/** Missiles carried: a launcher tube on the roof per missile up to three, then a six-shot rack. */
+function launchers(g: CanvasRenderingContext2D, geo: Geo, n: number): void {
+  const [rx, ry, rw, rh] = geo.roof;
+  const { W } = geo;
+  if (n >= 4) {
+    const bx = rx - 1;
+    const bw = Math.max(12, rw * 0.62);
+    steel(g, bx, ry - 1, bw, rh + 2, '#4d5532');
+    // two rows of three tubes, the red noses out of the front
+    const tw = bw / 2 - 2;
+    for (let i = 0; i < 2; i++) {
+      for (let j = 0; j < 3; j++) {
+        const cy = ry - 1 + ((rh + 2) * (j + 0.5)) / 3;
+        const tx = bx + 1 + i * (tw + 1.5);
+        steel(g, tx, cy - rh / 9, tw, (rh * 2) / 9, '#5e6840');
+        g.fillStyle = '#d8261a';
+        g.beginPath();
+        g.arc(tx + tw - 0.5, cy, rh / 11, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+    return;
+  }
+  const d = Math.max(3.4, W * 0.12);
+  const len = rw + 8;
+  // tubes laid from the roof's edges inward, the left first
+  const ys = [ry + d * 0.6, ry + rh - d * 0.6, ry + d * 1.75].slice(0, n);
+  for (const y of ys) {
+    steel(g, rx - 3, y - d / 2, len, d, '#4d5532');
+    g.fillStyle = '#d8261a';
+    g.beginPath();
+    g.moveTo(rx - 3 + len, y - d / 2 + 0.4);
+    g.lineTo(rx - 3 + len + 2.6, y);
+    g.lineTo(rx - 3 + len, y + d / 2 - 0.4);
+    g.fill();
+    g.fillStyle = '#121010';
+    g.fillRect(rx - 3.5, y - d / 2 + 0.5, 1.2, d - 1);
+  }
 }
 
 /**
@@ -1587,8 +2083,8 @@ export function carPicture(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
   g.translate(PAD, PAD);
   const wh = wheelLayout(def);
   const W = def.width * SPRITE_PPM;
-  tyre(g, wh.frontX, -wh.fout, wh.fwl, wh.fww, tyreLevel(def));
-  tyre(g, wh.frontX, W - wh.fww + wh.fout, wh.fwl, wh.fww, tyreLevel(def));
+  tyre(g, wh.frontX, -wh.fout, wh.fwl, wh.fww, tyreLevel(def), def.brakes ?? 0, -1);
+  tyre(g, wh.frontX, W - wh.fww + wh.fout, wh.fwl, wh.fww, tyreLevel(def), def.brakes ?? 0, 1);
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.drawImage(spr, 0, 0);
   cache.set(key, c);
