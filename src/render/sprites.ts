@@ -9,8 +9,12 @@
  * saloon's big bumpers and three boxes, the hatch's tailgate, the
  * coupe's long nose and lip, the rally car's arches and wing, the
  * estate's long roof and rails, the beetle's dome and fenders, the van's
- * ladder, the pickup's loaded bed, the microcar's being tiny. What the
- * shop fitted is on the car too: the ram bar, armour plate, the guns,
+ * ladder, the pickup's loaded bed, the microcar's being tiny. Then the
+ * machines, drawn from their own parts: the tractor's huge rear wheels,
+ * narrow hood and stack, the monster truck's balloon tyres under a
+ * pickup, the bus's row of windows and roof rack, the plough's blade,
+ * the hearse's glass back with a coffin in it, the Niva's spare on the
+ * tailgate. What the shop fitted is on the car too: the ram bar, armour plate, the guns,
  * the tyres, the scoop and the pipes.
  *
  * The sun never moves but the car turns under it, so a car is cached
@@ -86,6 +90,10 @@ interface BodySpec {
   wheel: number;
   tread: number;
   height: number;
+  /** how far the tread stands out of the flank, a share of its width: 0.75 when absent */
+  proud?: number;
+  /** a front pair unlike the rear: diameter and tread on the rear's, and how far in from the flank (share of the width) */
+  front?: [number, number, number];
 }
 
 const SPEC: Record<CarShape, BodySpec> = {
@@ -97,19 +105,56 @@ const SPEC: Record<CarShape, BodySpec> = {
   beetle: { bonnet: 0.66, screen: 0.58, roofB: 0.3, rear: 0.22, wF: 0.22, wR: 0.24, inset: 0.16, nose: [0, 0], tail: [0, 0], frontX: 0.7, rearX: 0.12, wheel: 1, tread: 0.9, height: 1.5 },
   van: { bonnet: 0.87, screen: 0.8, roofB: 0.02, rear: 0, wF: 0.1, wR: 0.1, inset: 0.015, nose: [0.02, 0.09], tail: [0.006, 0.03], frontX: 0.76, rearX: 0.12, wheel: 1, tread: 1.1, height: 2.1 },
   pickup: { bonnet: 0.71, screen: 0.61, roofB: 0.43, rear: 0.41, wF: 0.12, wR: 0.14, inset: 0.03, nose: [0.015, 0.07], tail: [0.008, 0.04], frontX: 0.74, rearX: 0.11, wheel: 1.08, tread: 1.15, height: 1.75 },
-  microcar: { bonnet: 0.82, screen: 0.72, roofB: 0.14, rear: 0.05, wF: 0.12, wR: 0.12, inset: 0.035, nose: [0.06, 0.18], tail: [0.025, 0.12], frontX: 0.7, rearX: 0.08, wheel: 0.82, tread: 0.75, height: 1.55 },
+  microcar: { bonnet: 0.84, screen: 0.72, roofB: 0.1, rear: 0.04, wF: 0.12, wR: 0.12, inset: 0.035, nose: [0.06, 0.2], tail: [0.025, 0.12], frontX: 0.71, rearX: 0.08, wheel: 0.66, tread: 0.7, height: 1.7 },
+  // the machines: the tractor, the monster truck and the plough draw their own bodies (machineGeometry),
+  // so only their wheels and height are read from here
+  tractor: { bonnet: 0.46, screen: 0.42, roofB: 0.1, rear: 0.05, wF: 0.2, wR: 0.2, inset: 0.2, nose: [0, 0], tail: [0, 0], frontX: 0.74, rearX: 0.056, wheel: 2.07, tread: 1.8, height: 2.6, proud: 0.3, front: [0.47, 0.42, 0.16] },
+  monster: { bonnet: 0.68, screen: 0.6, roofB: 0.42, rear: 0.4, wF: 0.2, wR: 0.2, inset: 0.2, nose: [0, 0], tail: [0, 0], frontX: 0.6, rearX: 0.02, wheel: 2.1, tread: 2.5, height: 3.0, proud: 0.2 },
+  bus: { bonnet: 0.985, screen: 0.955, roofB: 0.012, rear: 0, wF: 0.05, wR: 0.05, inset: 0.02, nose: [0.012, 0.06], tail: [0.006, 0.03], frontX: 0.76, rearX: 0.13, wheel: 0.95, tread: 1.15, height: 3.0, proud: 0.5 },
+  plough: { bonnet: 0.955, screen: 0.92, roofB: 0.79, rear: 0.79, wF: 0.07, wR: 0.07, inset: 0.05, nose: [0, 0], tail: [0, 0], frontX: 0.78, rearX: 0.1, wheel: 1.15, tread: 1.3, height: 2.9, proud: 0.5 },
+  hearse: { bonnet: 0.77, screen: 0.68, roofB: 0.48, rear: 0.025, wF: 0.13, wR: 0.09, inset: 0.03, nose: [0.015, 0.06], tail: [0.008, 0.03], frontX: 0.75, rearX: 0.14, wheel: 0.95, tread: 1, height: 1.55 },
+  niva: { bonnet: 0.72, screen: 0.63, roofB: 0.08, rear: 0.02, wF: 0.13, wR: 0.12, inset: 0.06, nose: [0.015, 0.06], tail: [0.01, 0.04], frontX: 0.7, rearX: 0.1, wheel: 1.15, tread: 1.15, height: 1.8 },
 };
 
+/** The bodies that are boxes to the roof: their whole outline casts the tall shadow. */
+const BOXES: CarShape[] = ['van', 'microcar', 'bus', 'monster'];
+
+interface WheelLayout {
+  wl: number;
+  ww: number;
+  out: number;
+  frontX: number;
+  rearX: number;
+  /** the front pair: the tractor's are small and tucked in under the hood */
+  fwl: number;
+  fww: number;
+  fout: number;
+}
+
 /** Wheel size and where the pairs sit, in sprite units; the renderer scales by SPRITE_PPM. */
-export function wheelLayout(def: CarDef): { wl: number; ww: number; out: number; frontX: number; rearX: number } {
+export function wheelLayout(def: CarDef): WheelLayout {
   const L = def.length * SPRITE_PPM;
   const sp = SPEC[def.shape];
   const t = def.tyres ?? 0;
   // Hill Climb wheels: bigger than life and standing out of the arches, fatter with every set of tyres
   const wl = (0.52 + 0.07 * def.length) * sp.wheel * (def.wheel ?? 1) * (1 + 0.04 * t) * SPRITE_PPM;
   const ww = 0.34 * sp.tread * (def.wheel ?? 1) * (1 + 0.12 * t) * SPRITE_PPM;
-  const out = ww * (def.shape === 'rally' ? 0.85 : 0.75);
-  return { wl, ww, out, frontX: L * sp.frontX, rearX: L * sp.rearX };
+  const out = ww * (sp.proud ?? (def.shape === 'rally' ? 0.85 : 0.75));
+  const f = sp.front;
+  return { wl, ww, out, frontX: L * sp.frontX, rearX: L * sp.rearX, fwl: f ? wl * f[0] : wl, fww: f ? ww * f[1] : ww, fout: f ? -def.width * SPRITE_PPM * f[2] : out };
+}
+
+/** The tread drawn: the monster truck's balloons and the tractor's lugs are knobbly from new. */
+export function tyreLevel(def: CarDef): number {
+  const t = def.tyres ?? 0;
+  return def.shape === 'monster' ? Math.max(t, 3) : def.shape === 'tractor' || def.shape === 'niva' ? Math.max(t, 1) : t;
+}
+
+/** Where the tractor's stack stands, metres from the car's centre (forward, right): the renderer puffs smoke from it. */
+export function stackAt(def: CarDef): [number, number] | null {
+  if (def.shape === 'tractor') return [def.length * 0.06, -def.width * 0.1];
+  if (def.shape === 'plough') return [def.length * 0.2, def.width * 0.42];
+  return null;
 }
 
 type Pt = [number, number];
@@ -129,6 +174,9 @@ function mirrored(start: Pt, segs: Seg[], W: number): Path2D {
     else p.lineTo(...s.to);
   }
   const m = (q: Pt): Pt => [q[0], W - q[1]];
+  // across the nose to the mirror of the last point, then back down the other flank
+  const last = segs[segs.length - 1].to;
+  if (Math.abs(last[1] - W / 2) > 0.01) p.lineTo(...m(last));
   for (let i = segs.length - 1; i >= 0; i--) {
     const s = segs[i];
     const from = i ? segs[i - 1].to : start;
@@ -155,6 +203,8 @@ interface Geo {
   /** x of the bonnet seam and the boot seam */
   bonnetX: number;
   bootX: number;
+  /** what casts the low shadow when it is not the body: a machine's wheels stand outside it */
+  foot?: Path2D;
 }
 
 const geoCache = new Map<string, Geo>();
@@ -168,6 +218,11 @@ function geometry(def: CarDef): Geo {
   const W = def.width * SPRITE_PPM;
   const sp = SPEC[def.shape];
   const wh = wheelLayout(def);
+  const machine = machineGeometry(def, L, W, wh);
+  if (machine) {
+    geoCache.set(gk, machine);
+    return machine;
+  }
   const inset = W * sp.inset;
   let body: Path2D;
   if (def.shape === 'beetle') {
@@ -211,7 +266,7 @@ function geometry(def: CarDef): Geo {
   }
 
   const g0 = inset + W * 0.06;
-  const rIn = def.shape === 'beetle' ? inset + W * 0.06 : inset + W * 0.12;
+  const rIn = def.shape === 'beetle' ? inset + W * 0.06 : def.shape === 'bus' ? inset + W * 0.2 : inset + W * 0.12;
   const roof: [number, number, number, number] = [L * sp.roofB, rIn, L * (sp.screen - sp.roofB), W - 2 * rIn];
   const roofPath = new Path2D();
   if (def.shape === 'beetle') roofPath.ellipse(roof[0] + roof[2] / 2, W / 2, roof[2] / 2 + 3, roof[3] / 2, 0, 0, Math.PI * 2);
@@ -251,6 +306,115 @@ function geometry(def: CarDef): Geo {
   const geo = { L, W, body, cabin, roof, roofPath, screen, rear, sideL, sideR, bonnetX: L * sp.bonnet, bootX: L * sp.rear };
   geoCache.set(gk, geo);
   return geo;
+}
+
+/** A flank's outline, tail to nose, with its mirror traced back: one symmetric polygon. */
+function both(top: Pt[], W: number): Pt[] {
+  return [...top, ...top.map(([x, y]) => [x, W - y] as Pt).reverse()];
+}
+
+function rectPts(x: number, y: number, w: number, h: number): Pt[] {
+  return [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+}
+
+/**
+ * The machines that are not cars, built from their own parts instead of
+ * the car's three boxes: the tractor's cab between its fenders and its
+ * narrow hood, the monster truck's pickup riding high between its tyres,
+ * the plough's cab and sand box with the chassis between them. Null for
+ * the cars.
+ */
+function machineGeometry(def: CarDef, L: number, W: number, wh: WheelLayout): Geo | null {
+  const tyres = (p: Path2D) => {
+    for (const [x, wl, ww, out] of [[wh.rearX, wh.wl, wh.ww, wh.out], [wh.frontX, wh.fwl, wh.fww, wh.fout]]) {
+      p.rect(x, -out, wl, ww);
+      p.rect(x, W - ww + out, wl, ww);
+    }
+  };
+  switch (def.shape) {
+    case 'tractor': {
+      // the cab sits between the fenders over the huge rear wheels; the hood runs forward, narrow,
+      // with the small front wheels tucked in under it
+      const half = W * 0.19;
+      const cab0 = wh.rearX + 1;
+      const cab1 = wh.rearX + wh.wl + 2;
+      const cy = wh.ww - wh.out - 1.5;
+      const f0 = wh.rearX + wh.wl * 0.2;
+      const f1 = wh.rearX + wh.wl * 0.8;
+      const fy = cy - 3;
+      const body = polyPath(both([[cab0, W / 2], [cab0, cy], [f0, cy], [f0 + 2, fy], [f1 - 2, fy], [f1, cy], [cab1, cy], [cab1, W / 2 - half], [L - 2, W / 2 - half], [L, W / 2 - half + 2]], W));
+      const roof: [number, number, number, number] = [cab0 + 4, cy + 2.5, cab1 - cab0 - 9, W - 2 * cy - 5];
+      const [rx, ry, rw, rh] = roof;
+      const foot = new Path2D(body);
+      tyres(foot);
+      return {
+        L,
+        W,
+        body,
+        cabin: polyPath(rectPts(cab0, cy, cab1 - cab0, W - 2 * cy)),
+        roof,
+        roofPath: polyPath(rectPts(...roof)),
+        screen: [[rx + rw, ry], [cab1 - 1, cy + 1.2], [cab1 - 1, W - cy - 1.2], [rx + rw, ry + rh]],
+        rear: [[rx, ry], [cab0 + 1, cy + 1.2], [cab0 + 1, W - cy - 1.2], [rx, ry + rh]],
+        sideL: [[rx + 1, cy + 1], [rx + rw - 1, cy + 1], [rx + rw - 1, ry - 0.6], [rx + 1, ry - 0.6]],
+        sideR: [[rx + 1, W - cy - 1], [rx + rw - 1, W - cy - 1], [rx + rw - 1, W - ry + 0.6], [rx + 1, W - ry + 0.6]],
+        bonnetX: cab1,
+        bootX: 0,
+        foot,
+      };
+    }
+    case 'monster': {
+      // a pickup a size too small for its wheels, riding between them
+      const bi = W * 0.25;
+      const body = polyPath(both([[2, W / 2], [2, bi + 3], [5, bi], [L - 6, bi], [L - 1, bi + 4]], W));
+      const roof: [number, number, number, number] = [L * 0.42, bi + 4, L * 0.18, W - 2 * bi - 8];
+      const [rx, ry, rw, rh] = roof;
+      const foot = new Path2D(body);
+      tyres(foot);
+      return {
+        L,
+        W,
+        body,
+        cabin: polyPath(rectPts(L * 0.4, bi, L * 0.28, W - 2 * bi)),
+        roof,
+        roofPath: polyPath(rectPts(...roof)),
+        screen: [[rx + rw, ry], [L * 0.68, bi + 3], [L * 0.68, W - bi - 3], [rx + rw, ry + rh]],
+        rear: [[rx, ry + 1], [rx - 2, ry + 2], [rx - 2, ry + rh - 2], [rx, ry + rh - 1]],
+        sideL: [[rx + 2, bi + 1.5], [rx + rw - 2, bi + 1.5], [rx + rw - 3, ry - 0.6], [rx + 2, ry - 0.6]],
+        sideR: [[rx + 2, W - bi - 1.5], [rx + rw - 2, W - bi - 1.5], [rx + rw - 3, W - ry + 0.6], [rx + 2, W - ry + 0.6]],
+        bonnetX: L * 0.68,
+        bootX: L * 0.4,
+        foot,
+      };
+    }
+    case 'plough': {
+      // a lorry: the cab at the front, a sand box behind it, the chassis rails between; the blade is
+      // drawn ahead of the nose (tailFeatures)
+      const box1 = L * 0.72;
+      const cab0 = L * 0.755;
+      const body = new Path2D();
+      poly(body, rectPts(1.5, 1.5, box1 - 1.5, W - 3));
+      poly(body, rectPts(cab0, 3, L - cab0, W - 6));
+      const roof: [number, number, number, number] = [L * 0.78, 6, L * 0.14, W - 12];
+      const [rx, ry, rw, rh] = roof;
+      return {
+        L,
+        W,
+        body,
+        cabin: polyPath(rectPts(cab0, 3, L - cab0, W - 6)),
+        roof,
+        roofPath: polyPath(rectPts(...roof)),
+        screen: [[rx + rw, ry], [L * 0.955, 4.5], [L * 0.955, W - 4.5], [rx + rw, ry + rh]],
+        rear: [],
+        sideL: [[rx + 1, 4], [rx + rw - 1, 4], [rx + rw - 1, ry - 0.6], [rx + 1, ry - 0.6]],
+        sideR: [[rx + 1, W - 4], [rx + rw - 1, W - 4], [rx + rw - 1, W - ry + 0.6], [rx + 1, W - ry + 0.6]],
+        bonnetX: L * 0.955,
+        bootX: 0,
+      };
+    }
+    default:
+      return null;
+  }
 }
 
 function poly(g: CanvasRenderingContext2D | Path2D, pts: Pt[]): void {
@@ -447,7 +611,6 @@ export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
   const paint = look.faded ? faded(def.colour, 0.25) : def.colour;
   const tone = look.faded ? faded(def.accent, 0.2) : def.accent;
   const wh = wheelLayout(def);
-  const tl = def.tyres ?? 0;
   const eng = def.engine ?? 0;
 
   // the side pipes run out under the body, so they go down first
@@ -462,9 +625,31 @@ export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
       g.fill();
     }
   }
-  // rear tyres: the front pair turn, so the renderer draws them
-  tyre(g, wh.rearX, -wh.out, wh.wl, wh.ww, tl);
-  tyre(g, wh.rearX, W - wh.ww + wh.out, wh.wl, wh.ww, tl);
+  // rear tyres: the front pair turn, so the renderer draws them. The plough's lorry has a tandem
+  const tread = tyreLevel(def);
+  for (const x of shape === 'plough' ? [wh.rearX, wh.rearX + wh.wl + 2] : [wh.rearX]) {
+    tyre(g, x, -wh.out, wh.wl, wh.ww, tread);
+    tyre(g, x, W - wh.ww + wh.out, wh.wl, wh.ww, tread);
+  }
+  if (shape === 'tractor') {
+    // the lugs: chevrons across the big rear tread, the tractor's signature from above
+    g.strokeStyle = 'rgba(150,140,120,0.6)';
+    g.lineWidth = 1.3;
+    g.beginPath();
+    for (const [y0, y1] of [[-wh.out, -wh.out + wh.ww], [W - wh.ww + wh.out, W + wh.out]]) {
+      const ym = (y0 + y1) / 2;
+      for (let x = wh.rearX + 3; x < wh.rearX + wh.wl - 3; x += 4.2) {
+        g.moveTo(x, y0 + 1);
+        g.lineTo(x + 2.5, ym);
+        g.lineTo(x, y1 - 1);
+      }
+    }
+    g.stroke();
+  }
+  if (shape === 'tractor' || shape === 'monster') {
+    // the axles, visible between the wheels where the body does not cover them
+    for (const [x, wl, ww, out] of [[wh.rearX, wh.wl, wh.ww, wh.out], [wh.frontX, wh.fwl, wh.fww, wh.fout]]) steel(g, x + wl / 2 - 1.5, ww - out, 3, W - 2 * (ww - out), '#24211c');
+  }
   if (shape === 'rally') {
     // mud flaps behind every wheel
     g.fillStyle = '#1c1915';
@@ -525,7 +710,7 @@ export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
   g.strokeStyle = 'rgba(12,8,6,0.45)';
   g.lineWidth = 0.7;
   g.beginPath();
-  if (shape !== 'van' && shape !== 'microcar') {
+  if (!BOXES.includes(shape) && shape !== 'tractor' && shape !== 'plough') {
     g.moveTo(geo.bonnetX + 1, W * 0.14);
     g.lineTo(L - 3, W * 0.14);
     g.moveTo(geo.bonnetX + 1, W * 0.86);
@@ -540,14 +725,17 @@ export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
   // what makes each body itself, below the glass
   bodyFeatures(g, def, geo);
 
-  // armour: riveted plates on the doors first
+  // armour: riveted plates on the doors first; on a machine, wherever its body is
   if (def.armour >= 1) {
     const x0 = wh.rearX + wh.wl + 3;
     const w = wh.frontX - x0 - 3;
+    g.save();
+    if (SPEC[shape].inset >= 0.2) g.clip(body);
     for (const y of [0.2, W - W * 0.2 - 0.2]) {
       steel(g, x0, y, w, W * 0.2, STEEL);
       rivets(g, x0, y, w, W * 0.2);
     }
+    g.restore();
   }
 
   // glass: dark, with the sky caught on the side toward the sun
@@ -564,6 +752,7 @@ export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
   g.strokeStyle = INK;
   g.lineWidth = 0.9;
   g.stroke(glass);
+  throughGlass(g, def, geo, paint);
   if (def.armour >= 3) {
     // mesh over the glass
     g.save();
@@ -616,9 +805,82 @@ export function carSprite(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
   lamps(g, def, geo);
   if (def.gun > 0) guns(g, def, geo);
   if (eng >= 1) scoop(g, def, geo, eng);
-  if (def.ram > 0) ramBar(g, def, geo);
+  // the plough's blade is its ram
+  if (def.ram > 0 && shape !== 'plough') ramBar(g, def, geo);
   cache.set(key, c);
   return c;
+}
+
+/** What shows through the glass: the bus's window pillars, the coffin and the wreath in the hearse. */
+function throughGlass(g: CanvasRenderingContext2D, def: CarDef, geo: Geo, paint: string): void {
+  const { L, W } = geo;
+  if (def.shape === 'bus') {
+    // a row of windows down each flank: pillars every metre across the long side glass
+    g.fillStyle = shade(paint, 0.92);
+    g.strokeStyle = INK;
+    g.lineWidth = 0.6;
+    for (const side of [geo.sideL, geo.sideR]) {
+      const y0 = Math.min(side[0][1], side[3][1]);
+      const y1 = Math.max(side[0][1], side[3][1]);
+      for (let x = side[0][0] + SPRITE_PPM * 0.9; x < side[1][0] - 4; x += SPRITE_PPM * 0.95) {
+        g.fillRect(x, y0 - 0.3, 2, y1 - y0 + 0.6);
+        g.strokeRect(x, y0 - 0.3, 2, y1 - y0 + 0.6);
+      }
+    }
+  }
+  if (def.shape === 'hearse') {
+    // the coffin under the long rear glass, a wreath on its lid, curtains pleated along the sides
+    const x0 = L * 0.06;
+    const x1 = geo.roof[0] - 3;
+    const hw = W * 0.17;
+    const cy = W / 2;
+    const lid = polyPath([[x0, cy - hw * 0.7], [x0 + (x1 - x0) * 0.72, cy - hw], [x1, cy - hw * 0.8], [x1, cy + hw * 0.8], [x0 + (x1 - x0) * 0.72, cy + hw], [x0, cy + hw * 0.7]]);
+    g.fillStyle = '#6a4024';
+    g.fill(lid);
+    g.strokeStyle = INK;
+    g.lineWidth = 0.8;
+    g.stroke(lid);
+    g.strokeStyle = 'rgba(255,220,170,0.35)';
+    g.lineWidth = 0.5;
+    g.beginPath();
+    g.moveTo(x0 + 2, cy);
+    g.lineTo(x1 - 2, cy);
+    g.stroke();
+    g.fillStyle = '#c9a85a';
+    for (const x of [x0 + (x1 - x0) * 0.25, x0 + (x1 - x0) * 0.6]) {
+      g.fillRect(x, cy - hw - 0.4, 2.2, 0.9);
+      g.fillRect(x, cy + hw - 0.5, 2.2, 0.9);
+    }
+    const wx = x0 + (x1 - x0) * 0.66;
+    const wr = hw * 0.75;
+    g.strokeStyle = '#2f4a26';
+    g.lineWidth = wr * 0.55;
+    g.beginPath();
+    g.arc(wx, cy, wr, 0, Math.PI * 2);
+    g.stroke();
+    g.fillStyle = '#e8e0cc';
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2;
+      g.beginPath();
+      g.arc(wx + Math.cos(a) * wr, cy + Math.sin(a) * wr, 0.9, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.fillStyle = '#9a1e18';
+    poly(g, [[wx - 1, cy], [wx - 6, cy - 2.5], [wx - 6.5, cy - 0.5]]);
+    g.fill();
+    poly(g, [[wx - 1, cy], [wx - 6, cy + 2.5], [wx - 6.5, cy + 0.5]]);
+    g.fill();
+    g.strokeStyle = 'rgba(200,190,170,0.4)';
+    g.lineWidth = 0.5;
+    g.beginPath();
+    for (let x = x0; x < x1; x += 2.2) {
+      g.moveTo(x, W * 0.12);
+      g.lineTo(x + 1, W * 0.2);
+      g.moveTo(x, W * 0.88);
+      g.lineTo(x + 1, W * 0.8);
+    }
+    g.stroke();
+  }
 }
 
 /** The signature panels of each body, painted over the paint and under the glass. */
@@ -715,6 +977,76 @@ function bodyFeatures(g: CanvasRenderingContext2D, def: CarDef, geo: Geo): void 
       g.lineWidth = 0.7;
       g.strokeRect(2, W * 0.1, L - 4, W * 0.8);
       break;
+    case 'tractor': {
+      // the engine out in the open behind the hood: a ribbed block, the grille ahead of it
+      const half = W * 0.19;
+      steel(g, geo.bonnetX, W / 2 - half - 1.2, 9, half * 2 + 2.4, '#3a362f');
+      g.fillStyle = 'rgba(255,236,204,0.25)';
+      for (let x = geo.bonnetX + 1.5; x < geo.bonnetX + 8.5; x += 1.8) g.fillRect(x, W / 2 - half, 0.7, half * 2);
+      g.fillStyle = 'rgba(10,8,6,0.55)';
+      for (let i = 0; i < 6; i++) g.fillRect(L * 0.62 + i * 2.6, W / 2 - half + 1.5, 1.1, half * 2 - 3);
+      break;
+    }
+    case 'monster': {
+      // the bed: dark floor, a roll bar across it, a spare balloon tyre lying in it
+      const bi = W * 0.25;
+      const x0 = 5;
+      const x1 = geo.bootX - 1.5;
+      g.fillStyle = '#1f1b16';
+      g.fillRect(x0, bi + 2.5, x1 - x0, W - 2 * bi - 5);
+      g.strokeStyle = INK;
+      g.lineWidth = 0.9;
+      g.strokeRect(x0, bi + 2.5, x1 - x0, W - 2 * bi - 5);
+      const r = (W - 2 * bi) * 0.3;
+      g.fillStyle = '#121110';
+      g.beginPath();
+      g.arc(x0 + (x1 - x0) * 0.42, W / 2, r, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = 'rgba(150,140,120,0.55)';
+      g.lineWidth = 0.8;
+      g.stroke();
+      g.fillStyle = '#4a453e';
+      g.beginPath();
+      g.arc(x0 + (x1 - x0) * 0.42, W / 2, r * 0.45, 0, Math.PI * 2);
+      g.fill();
+      steel(g, x1 - 4, bi + 1, 2.4, W - 2 * bi - 2, '#2a2622');
+      break;
+    }
+    case 'plough': {
+      // the sand box: steel sides, a heap of grit, the spreader at its tail; the chassis rails to the cab
+      const box1 = L * 0.72;
+      g.fillStyle = '#4a453d';
+      g.fillRect(1.5, 1.5, box1 - 1.5, W - 3);
+      g.fillStyle = '#7d6e55';
+      g.beginPath();
+      g.ellipse(box1 * 0.5, W / 2, box1 * 0.42, W * 0.36, 0, 0, Math.PI * 2);
+      g.fill();
+      for (let i = 0; i < 120; i++) {
+        const h = hash32(i * 613 + 5);
+        g.fillStyle = (h >>> 12) & 1 ? 'rgba(30,24,18,0.35)' : 'rgba(220,206,176,0.3)';
+        g.fillRect(box1 * (0.1 + ((h & 0xff) / 255) * 0.8), W * (0.2 + (((h >>> 8) & 0xff) / 255) * 0.6), 1, 1);
+      }
+      g.strokeStyle = INK;
+      g.lineWidth = 0.8;
+      g.beginPath();
+      for (let x = 10; x < box1 - 4; x += 12) {
+        g.moveTo(x, 1.5);
+        g.lineTo(x, 4.5);
+        g.moveTo(x, W - 1.5);
+        g.lineTo(x, W - 4.5);
+      }
+      g.stroke();
+      g.strokeRect(4.5, 4.5, box1 - 7.5, W - 9);
+      steel(g, box1, W * 0.25, L * 0.755 - box1, 2.5, '#1d1a15');
+      steel(g, box1, W * 0.75 - 2.5, L * 0.755 - box1, 2.5, '#1d1a15');
+      break;
+    }
+    case 'niva':
+      // the bonnet's raised centre and the black plastic arches
+      g.strokeStyle = 'rgba(10,8,6,0.5)';
+      g.lineWidth = 0.8;
+      g.strokeRect(geo.bonnetX + 2, W * 0.3, L - geo.bonnetX - 5, W * 0.4);
+      break;
     default:
       break;
   }
@@ -773,13 +1105,84 @@ function roofFeatures(g: CanvasRenderingContext2D, def: CarDef, geo: Geo): void 
       steel(g, rx + rw * 0.66, W * 0.62, 6, 6, '#3a362f');
       break;
     }
-    case 'microcar':
-      // a stubby aerial with a pennant: the one bit of pride it has
-      g.fillStyle = INK;
-      g.fillRect(rx + rw * 0.1, ry + rh - 2, 0.8, 0.8);
+    case 'microcar': {
+      // a whip aerial taller than the car, bent back by the wind, a big orange flag on it: the one bit of pride it has
+      const ax = rx + rw * 0.12;
+      const ay = ry + rh - 1.5;
+      g.strokeStyle = INK;
+      g.lineWidth = 0.7;
+      g.beginPath();
+      g.moveTo(ax, ay);
+      g.quadraticCurveTo(ax - 8, ay + 2, ax - 16, ay + 3);
+      g.stroke();
       g.fillStyle = '#d06a2a';
-      poly(g, [[rx + rw * 0.1, ry + rh - 1.6], [rx + rw * 0.1 - 5, ry + rh + 0.5], [rx + rw * 0.1 - 5, ry + rh - 3.6]]);
+      poly(g, [[ax - 9, ay + 2.3], [ax - 16, ay + 3], [ax - 15, ay + 9], [ax - 8, ay + 7]]);
       g.fill();
+      g.strokeStyle = INK;
+      g.lineWidth = 0.5;
+      g.stroke();
+      break;
+    }
+    case 'bus': {
+      // a roof rack over the back third, loaded: suitcases, skis, a milk can; two hatches ahead of it
+      const x0 = rx + 2;
+      const x1 = rx + rw * 0.36;
+      g.strokeStyle = '#a49e8e';
+      g.lineWidth = 1;
+      g.strokeRect(x0, ry + 1.5, x1 - x0, rh - 3);
+      g.beginPath();
+      for (let x = x0 + 5; x < x1; x += 5) {
+        g.moveTo(x, ry + 1.5);
+        g.lineTo(x, ry + rh - 1.5);
+      }
+      g.stroke();
+      const bags: [number, number, number, number, string][] = [
+        [x0 + 3, ry + 3, 14, 9, '#6a4a2c'],
+        [x0 + 4, ry + 13, 11, 8, '#3c4a3a'],
+        [x0 + 20, ry + 4, 9, 12, '#8a6a3a'],
+        [x0 + 32, ry + 14, 13, 8, '#5a3a2a'],
+      ];
+      for (const [bx, by, bw, bh, col] of bags) steel(g, bx, by, bw, bh, col);
+      g.fillStyle = '#c8c0a8';
+      g.beginPath();
+      g.arc(x0 + 38, ry + 7, 3.2, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = INK;
+      g.lineWidth = 0.6;
+      g.stroke();
+      // the skis, a pair longer than the rack
+      g.fillStyle = '#b8321e';
+      g.fillRect(x0 - 2, ry + rh - 6, x1 - x0 + 6, 1.2);
+      g.fillRect(x0 - 2, ry + rh - 4.2, x1 - x0 + 6, 1.2);
+      for (const hx of [rx + rw * 0.45, rx + rw * 0.8]) steel(g, hx, W / 2 - 4, 8, 8, '#3a362f');
+      break;
+    }
+    case 'monster':
+      // a light bar across the roof's front edge: five lamps
+      steel(g, rx + rw - 3.5, ry - 1, 3, rh + 2, '#1d1a15');
+      g.fillStyle = '#efe4b8';
+      for (let i = 0; i < 5; i++) {
+        g.beginPath();
+        g.arc(rx + rw - 2, ry + ((i + 0.5) / 5) * rh, 1.2, 0, Math.PI * 2);
+        g.fill();
+      }
+      break;
+    case 'plough':
+      // the amber beacon on the cab
+      g.fillStyle = '#e09a2a';
+      g.beginPath();
+      g.arc(rx + rw * 0.25, ry + rh * 0.2, 2.4, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = INK;
+      g.lineWidth = 0.7;
+      g.stroke();
+      g.fillStyle = 'rgba(255,240,200,0.7)';
+      g.fillRect(rx + rw * 0.25 - 1, ry + rh * 0.2 - 1.4, 1, 1);
+      break;
+    case 'niva':
+      // a roof rack with a jerrycan
+      steel(g, rx + 2, ry + 1, rw * 0.5, rh - 2, '#2a2622');
+      steel(g, rx + 4, ry + rh * 0.55, 8, rh * 0.3, '#3c5a2e');
       break;
     default:
       break;
@@ -791,7 +1194,7 @@ function roofNumber(g: CanvasRenderingContext2D, def: CarDef, geo: Geo, old: boo
   if (!def.number) return;
   const { W } = geo;
   const [rx, , rw, rh] = geo.roof;
-  const at = def.shape === 'rally' ? 0.3 : def.shape === 'van' ? 0.8 : def.shape === 'estate' ? 0.4 : 0.5;
+  const at = def.shape === 'rally' ? 0.3 : def.shape === 'van' ? 0.8 : def.shape === 'bus' ? 0.66 : def.shape === 'estate' || def.shape === 'niva' ? 0.62 : 0.5;
   const r = Math.min(rh * 0.42, rw * 0.42, 11);
   const cx = rx + rw * at;
   const cy = W / 2;
@@ -857,18 +1260,172 @@ function tailFeatures(g: CanvasRenderingContext2D, def: CarDef, geo: Geo): void 
       steel(g, -1.6, W * 0.06, 2.6, W * 0.88, '#3c3933');
       break;
     case 'microcar': {
-      // the slow-vehicle triangle on its tail, red and orange
+      // the slow-vehicle triangle on its tail, red and orange, too big for it; mirrors on stalks
       const cy = W / 2;
       g.fillStyle = '#b8321e';
-      poly(g, [[-1, cy - 6], [-1, cy + 6], [6, cy]]);
+      poly(g, [[-2, cy - 8], [-2, cy + 8], [7, cy]]);
       g.fill();
       g.fillStyle = '#e07a2a';
-      poly(g, [[0.3, cy - 3.4], [0.3, cy + 3.4], [4.2, cy]]);
+      poly(g, [[-0.5, cy - 4.6], [-0.5, cy + 4.6], [4.6, cy]]);
       g.fill();
       g.strokeStyle = INK;
       g.lineWidth = 0.7;
-      poly(g, [[-1, cy - 6], [-1, cy + 6], [6, cy]]);
+      poly(g, [[-2, cy - 8], [-2, cy + 8], [7, cy]]);
       g.stroke();
+      const mx = geo.screen[0][0] + 1;
+      for (const s of [-1, 1]) {
+        const y = s < 0 ? 0 : W;
+        g.strokeStyle = INK;
+        g.lineWidth = 0.8;
+        g.beginPath();
+        g.moveTo(mx, y);
+        g.lineTo(mx, y + s * 4);
+        g.stroke();
+        g.fillStyle = '#2a2622';
+        g.beginPath();
+        g.arc(mx, y + s * 5.2, 2, 0, Math.PI * 2);
+        g.fill();
+        g.stroke();
+      }
+      break;
+    }
+    case 'tractor': {
+      // front weights stacked on the nose, the lamps on the hood's sides, and the stack
+      const half = W * 0.19;
+      steel(g, L - 2, W / 2 - half - 3, 5, half * 2 + 6, '#3a362f');
+      g.fillStyle = 'rgba(10,8,6,0.6)';
+      for (let y = W / 2 - half - 1.5; y < W / 2 + half + 2; y += 2.6) g.fillRect(L - 1.5, y, 4, 0.7);
+      g.fillStyle = '#e4d6a4';
+      g.fillRect(L - 9, W / 2 - half - 1.4, 3, 1.6);
+      g.fillRect(L - 9, W / 2 + half - 0.2, 3, 1.6);
+      const [sx, sy] = stackAt(def)!;
+      const px = L / 2 + sx * SPRITE_PPM;
+      const py = W / 2 + sy * SPRITE_PPM;
+      g.fillStyle = '#8d877a';
+      g.beginPath();
+      g.arc(px, py, 2.4, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = INK;
+      g.lineWidth = 0.9;
+      g.stroke();
+      g.fillStyle = '#0c0a08';
+      g.beginPath();
+      g.arc(px, py, 1.4, 0, Math.PI * 2);
+      g.fill();
+      break;
+    }
+    case 'monster': {
+      // tube bumpers, and the coil-overs from the body out to every hub, yellow springs
+      const bi = W * 0.25;
+      steel(g, -1.5, bi + 1, 3, W - 2 * bi - 2, '#3c3933');
+      steel(g, L - 1.5, bi + 1, 3, W - 2 * bi - 2, '#3c3933');
+      const wh = wheelLayout(def);
+      for (const x of [wh.rearX + wh.wl / 2, wh.frontX + wh.fwl / 2]) {
+        for (const s of [1, -1]) {
+          const y0 = s > 0 ? bi + 1 : W - bi - 1;
+          const y1 = s > 0 ? wh.ww / 2 - wh.out : W - wh.ww / 2 + wh.out;
+          g.strokeStyle = INK;
+          g.lineWidth = 3;
+          g.beginPath();
+          g.moveTo(x, y0);
+          g.lineTo(x, y1);
+          g.stroke();
+          g.strokeStyle = '#d8b02a';
+          g.lineWidth = 1;
+          g.beginPath();
+          const n = 5;
+          for (let i = 0; i <= n; i++) {
+            const y = y0 + ((y1 - y0) * i) / n;
+            g[i ? 'lineTo' : 'moveTo'](x + (i % 2 ? 1.6 : -1.6), y);
+          }
+          g.stroke();
+          g.fillStyle = '#9a9486';
+          g.beginPath();
+          g.arc(x, y1, 2.2, 0, Math.PI * 2);
+          g.fill();
+          g.strokeStyle = INK;
+          g.lineWidth = 0.7;
+          g.stroke();
+        }
+      }
+      g.fillStyle = '#e4d6a4';
+      g.fillRect(L - 2.4, bi + 2, 2, 4);
+      g.fillRect(L - 2.4, W - bi - 6, 2, 4);
+      break;
+    }
+    case 'bus':
+      // the ladder up the back to the rack, and the big bumpers
+      steel(g, -1.6, W * 0.03, 2.6, W * 0.94, '#3c3933');
+      steel(g, L - 1, W * 0.03, 2.6, W * 0.94, '#3c3933');
+      g.strokeStyle = '#a49e8e';
+      g.lineWidth = 0.9;
+      g.beginPath();
+      g.moveTo(0.5, W * 0.62);
+      g.lineTo(9, W * 0.62);
+      g.moveTo(0.5, W * 0.76);
+      g.lineTo(9, W * 0.76);
+      for (let x = 1.5; x < 9; x += 2.4) {
+        g.moveTo(x, W * 0.62);
+        g.lineTo(x, W * 0.76);
+      }
+      g.stroke();
+      break;
+    case 'plough': {
+      // the blade: an angled steel wing wider than the lorry, hazard stripes on its face, on a push frame
+      const a: Pt = [L + 11.5, -11];
+      const b: Pt = [L + 1.5, W + 11];
+      const blade = polyPath([a, b, [b[0] - 5, b[1]], [a[0] - 5, a[1]]]);
+      g.strokeStyle = INK;
+      g.lineWidth = 2.6;
+      g.beginPath();
+      g.moveTo(L - 1, W * 0.3);
+      g.lineTo(L + 7, W * 0.3);
+      g.moveTo(L - 1, W * 0.7);
+      g.lineTo(L + 4.5, W * 0.7);
+      g.stroke();
+      g.strokeStyle = '#4a453d';
+      g.lineWidth = 1.4;
+      g.stroke();
+      g.fillStyle = '#c9822e';
+      g.fill(blade);
+      g.save();
+      g.clip(blade);
+      g.fillStyle = '#16130f';
+      for (let y = -12; y < W + 12; y += 7) {
+        poly(g, [[L - 4, y], [L + 14, y - 4], [L + 14, y - 0.5], [L - 4, y + 3.5]]);
+        g.fill();
+      }
+      g.restore();
+      g.strokeStyle = INK;
+      g.lineWidth = 1.1;
+      g.stroke(blade);
+      g.strokeStyle = 'rgba(255,236,204,0.5)';
+      g.lineWidth = 0.7;
+      g.beginPath();
+      g.moveTo(...a);
+      g.lineTo(...b);
+      g.stroke();
+      // the lamps on posts above the blade
+      g.fillStyle = '#efe4b8';
+      for (const y of [W * 0.12, W * 0.88]) {
+        g.beginPath();
+        g.arc(L - 1, y, 1.6, 0, Math.PI * 2);
+        g.fill();
+      }
+      break;
+    }
+    case 'hearse':
+      // chrome bumpers, slim
+      steel(g, -1.2, W * 0.06, 2, W * 0.88, '#8d877a');
+      steel(g, L - 0.8, W * 0.06, 2, W * 0.88, '#8d877a');
+      break;
+    case 'niva': {
+      // the spare standing on the back door, a tyre across the tail
+      steel(g, -1.4, W * 0.06, 2.4, W * 0.88, '#2a2622');
+      const d = W * 0.46;
+      tyre(g, -5.6, W / 2 - d / 2, 5, d, 1);
+      g.fillStyle = '#4a453e';
+      g.fillRect(-4.2, W / 2 - 2, 2.2, 4);
       break;
     }
     default:
@@ -879,6 +1436,8 @@ function tailFeatures(g: CanvasRenderingContext2D, def: CarDef, geo: Geo): void 
 /** Lamps: square on the old cars, round on the beetle, the rally car's pod. */
 function lamps(g: CanvasRenderingContext2D, def: CarDef, geo: Geo): void {
   const { L, W } = geo;
+  // the machines carry their own, in tailFeatures
+  if (def.shape === 'tractor' || def.shape === 'monster' || def.shape === 'plough') return;
   g.strokeStyle = INK;
   g.lineWidth = 0.6;
   if (def.shape === 'beetle') {
@@ -940,7 +1499,7 @@ function guns(g: CanvasRenderingContext2D, def: CarDef, geo: Geo): void {
 /** The engine on the outside: a bonnet scoop, then a bigger one, then a blower through the bonnet. */
 function scoop(g: CanvasRenderingContext2D, def: CarDef, geo: Geo, lvl: number): void {
   const { L, W } = geo;
-  const cx = def.shape === 'van' || def.shape === 'microcar' ? geo.bonnetX - 3 : (geo.bonnetX + L) / 2;
+  const cx = def.shape === 'van' || def.shape === 'microcar' || def.shape === 'bus' || def.shape === 'plough' ? geo.bonnetX - 3 : (geo.bonnetX + L) / 2;
   if (lvl >= 3) {
     // a blower: chrome body, two butterflies on top
     steel(g, cx - 5, W * 0.36, 10, W * 0.28, '#9a9486');
@@ -1028,8 +1587,8 @@ export function carPicture(def: CarDef, look: CarLook = {}): HTMLCanvasElement {
   g.translate(PAD, PAD);
   const wh = wheelLayout(def);
   const W = def.width * SPRITE_PPM;
-  tyre(g, wh.frontX, -wh.out, wh.wl, wh.ww, def.tyres ?? 0);
-  tyre(g, wh.frontX, W - wh.ww + wh.out, wh.wl, wh.ww, def.tyres ?? 0);
+  tyre(g, wh.frontX, -wh.fout, wh.fwl, wh.fww, tyreLevel(def));
+  tyre(g, wh.frontX, W - wh.fww + wh.fout, wh.fwl, wh.fww, tyreLevel(def));
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.drawImage(spr, 0, 0);
   cache.set(key, c);
@@ -1061,14 +1620,15 @@ export function carShadow(def: CarDef, heading: number): { img: HTMLCanvasElemen
     const g = img.getContext('2d')!;
     g.fillStyle = SHADOW_INK;
     const sill = 0.75 * SHADOW_PER_M * SPRITE_PPM;
-    // the van is a box to the roof: its whole body stands tall
-    const tall = def.shape === 'van' || def.shape === 'microcar' ? geo.body : geo.cabin;
+    // the van is a box to the roof: its whole body stands tall; a machine's wheels throw the low shadow
+    const tall = BOXES.includes(def.shape) ? geo.body : geo.cabin;
+    const low = geo.foot ?? geo.body;
     // stamped finely enough that the swept edge never shows steps
     const steps = 32;
     for (let i = 0; i <= steps; i++) {
       const k = i / steps;
       g.setTransform(res, 0, 0, res, (-x0 - sun.x * sill * k) * res, (-y0 - sun.y * sill * k) * res);
-      g.fill(geo.body);
+      g.fill(low);
       g.setTransform(res, 0, 0, res, (-x0 - sun.x * reach * k) * res, (-y0 - sun.y * reach * k) * res);
       g.fill(tall);
     }

@@ -18,7 +18,8 @@ browser, phones first. One thumb steers, a tap is nitro, the pedal
 brakes and swings the tail; the guns fire themselves. Cars slide, ram,
 wreck each other and come back. Finnish gravel roads, nineties cars.
 Two tracks with kickers, fords and a shortcut through the forest, four
-cars in four classes, a field of four with the bot driving the other
+classes with a car each and a wild buy beside it (a tractor, a monster
+truck, a hearse), rivals in tractors, buses and plough lorries, a field of four with the bot driving the other
 three, and a career that starts in jokamiesluokka (folk racing) in a
 tired old saloon whose only weapon is the oil it leaks: credits from
 results, a parts shop, an armoury, a dealer, and licence tests that
@@ -50,7 +51,8 @@ src/
     types.ts          CarInput, TrackDef, CarDef
     state.ts          SimState, Car (with its grudges and the race's credits), Driver, createState (the grid), standings
     sim.ts            step(): the automatic guns, bullets, missiles, mines, oil slicks, pickups,
-                        wrecks and respawns, lap counting; hands the cars to the car model
+                        wrecks and respawns, the tow for a car wedged off the road, lap counting;
+                        hands the cars to the car model
     physics.ts        the car model: the tyres, the aids, height and landing, box-against-box
                         and tree contacts by impulse, in SUB substeps a frame
     physics-old.ts    the model before 2026-10-03, at ?physics=old for one release. Delete after
@@ -62,7 +64,8 @@ src/
                         Lane: a shortcut as the sim drives it, its own arc length u
     rng.ts            seeded RNG and hashes
     content/
-      cars.ts         the cars, one per class, the Tauno first: the balance knobs, a price
+      cars.ts         the class car per class (classCar(), the Tauno first), then the dealer's wild
+                        buys (a Niva, a Valmet tractor, a monster truck, a hearse): the balance knobs, a price
       parts.ts        the shop: seven parts, three levels, each from a class; tuned(car, parts)
       events.ts       the calendar: class, track, laps, prizes, how built the field is, what it carries
       licences.ts     the tests: one lap under a target, read off make balance
@@ -70,8 +73,9 @@ src/
                         missile, mine, oil, boost and ram numbers, the wreck bounty, the ram and oil credits
       pickups.ts      what lies on the road, how far apart, how fast it grows back
       rivals.ts       what each rival drives per class: their own body, size, colour, livery, number
-                        and skill on the class car's numbers (vehicleDef, rivalEntry), so the grid is four
-                        different vehicles; size and skill climb with the class
+                        and skill on the class car's numbers, bent by `pace` to the machine (vehicleDef,
+                        rivalEntry), so the grid is four different vehicles, at least one not a car;
+                        size and skill climb with the class
       drivers.ts      the opponents: a name, a colour and an aggression for the bot; PACING, Death Rally's catch-up:
                         sim.ts scales an opponent's engine by its gap to the player, the bot its corners,
                         both by catchUp(), skill squared;
@@ -90,7 +94,8 @@ src/
     renderer.ts       camera (24 m across, leading down the road) and shake, ground chunks, pickups, mines,
                         tracers, sights, cars with damage, the hit flash, smoke, sparks and shadows, wrecks,
                         nitro, dust and haze, minimap
-    sprites.ts        procedural sprite cache: nine car bodies in Hill Climb proportions lit per heading,
+    sprites.ts        procedural sprite cache: fifteen bodies in Hill Climb proportions lit per heading, the
+                        machines (tractor, monster truck, plough lorry) built from their own parts,
                         liveries and numbers, the fitted parts on the car, damage stages, shadows,
                         trees and roadside objects
   input/input.ts      one thumb (drag to steer, tap for nitro), the pedal, keyboard

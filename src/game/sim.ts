@@ -367,6 +367,12 @@ function wreck(s: SimState, c: Car): void {
 function burn(s: SimState, c: Car, dt: number): void {
   c.wreck -= dt;
   if (c.wreck > 0) return;
+  c.damage = RESPAWN_DAMAGE;
+  onRoad(s, c);
+}
+
+/** Back on the centreline a little ahead, standing, the clocks reset: after a wreck or a tow. */
+function onRoad(s: SimState, c: Car): void {
   const p = s.track.at(c.s + 3);
   c.x = p.x;
   c.y = p.y;
@@ -374,7 +380,6 @@ function burn(s: SimState, c: Car, dt: number): void {
   c.vx = c.vy = c.yaw = 0;
   c.z = c.vz = 0;
   c.air = false;
-  c.damage = RESPAWN_DAMAGE;
   c.d = 0;
   c.stall = 0;
   c.stallX = c.x;
@@ -424,7 +429,13 @@ function settle(s: SimState, c: Car, player: boolean): void {
     c.stallX = c.x;
     c.stallY = c.y;
   }
+  // wedged off the road where backing out cannot free it (a bus shoved into a shortcut's mouth):
+  // the marshals tow it back, as a folk race's tractor would
+  if (c.stall > TOW_AFTER && Math.abs(c.d) > t.width / 2 && c.wreck <= 0) onRoad(s, c);
 }
+
+/** seconds stalled off the road before the marshals tow a car back on */
+const TOW_AFTER = 8;
 
 export function wheelbase(def: Car['def']): number {
   return def.length * 0.62;

@@ -71,6 +71,20 @@ try {
   await page.locator('.card.event').first().click();
   await page.waitForFunction(() => window.__sim && window.__sim.time >= 12, null, { timeout: 300000 });
   await shot('08-landscape');
+  // A C-class grid: the bot can buy nothing, so the career is seeded straight into storage with the
+  // red Valmet tractor out of the garage, and the first C race started
+  await page.setViewportSize(devices['iPhone 15'].viewport);
+  await page.evaluate(() => {
+    const parts = { ram: 0, armour: 0, engine: 0, tyres: 0, weight: 0, brakes: 0, gun: 0 };
+    const save = { v: 2, credits: 5000, cars: [{ carId: 'tauno', parts }, { carId: 'valmet', parts }], current: 1, licences: [], races: 5, wins: 5, results: {}, missiles: 0, mines: 2, oil: 3 };
+    localStorage.setItem('sora.career', JSON.stringify(save));
+  });
+  await page.goto(`http://localhost:${port}/?bot=1&speed=3&lang=${lang}`);
+  await page.getByRole('button', { name: say('Jatka', 'Continue'), exact: true }).click();
+  await page.getByRole('button', { name: say('Kisat', 'Races'), exact: true }).click();
+  await page.locator('.card.event', { hasText: say('Kiviahon sprintti', 'Kiviaho Sprint') }).click();
+  await page.waitForTimeout(400);
+  await shot('02-start-c');
   const perf = await page.evaluate(() => window.__perf);
   console.log(`frames ${perf.frames}, avg ${(perf.ms / perf.frames).toFixed(2)} ms, worst ${perf.worst.toFixed(1)} ms (sim+render, headless)`);
   if (errors.length) console.log('page errors:\n' + errors.join('\n'));

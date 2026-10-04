@@ -91,6 +91,10 @@ and each rival has a vehicle of their own in every class
 proportions are the exception to "no rounded toy shapes"; the paint,
 the dust and the light are not. `make lineup` puts every vehicle on one
 canvas: if two could be confused at a glance, the look is not done.
+The cast is wild, Hill Climb Racing's garage (2026-10-04, "i want
+tractors, monster trucks, wild stuff"): every grid has at least one
+machine that is not a car, a tractor, a monster truck, a bus, a plough
+lorry, a hearse, a mopoauto, and each handles like what it is.
 
 ## Shape
 

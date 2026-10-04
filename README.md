@@ -50,15 +50,24 @@ Kaikki nojaavat viereiseen autoon. Kenttä pysyy lähelläsi: edellä ajava
 hiljentää ja takana tuleva painaa.
 
 **Aloitat pienestä.** Jokkiksessa autot ovat pikkuruisia laatikoita,
-alle kolmemetrisiä, ja jokainen luokka on kokoa isompi: C-luokan autot
-ovat tavallisia pikkuautoja, B-luokassa ajetaan pakulla ja ralliautolla,
-ja A-luokan autot ovat viisimetrisiä.
+mopoautosta kolmemetriseen, ja jokainen luokka on kokoa isompi: C-luokassa
+ajetaan pikkuautolla, Nivalla ja traktorilla, B-luokassa ralliautolla,
+monsteriautolla ja linja-autolla, ja A-luokassa ruumisautolla ja
+aura-autolla.
+
+**Kaikki eivät ole autoja.** Joka lähtöruudukossa on ainakin yksi kone,
+joka ei ole auto, ja jokainen käyttäytyy niin kuin näyttää. Traktori
+jää suoralla jälkeen, kääntyy paikallaan ja jyrää kolarissa kenet
+tahansa. Monsteriauto pomppii isoilla renkaillaan, ja kenen päälle se
+tulee, se pyörähtää. Linja-auto on seinä, jonka ohi on vaikea päästä.
+Aura-auton terä on valmiiksi täysi puskuri. Mopoauto kääntyy nopeimmin
+kaikista, ja Niva ja traktori ajavat pientareella kuin tiellä.
 
 **Jokainen auto on omansa.** Jokaisella kuskilla on joka luokassa oma
-autonsa, omat värinsä ja oma numeronsa: Jorma ajaa pientä coupéta,
-sedania, ralliautoa ja kuumaa viistoperää, Marko pientä farmaria,
-lava-autoa, pakua ja laivaa, Tapsa kuplaa, farmaria, viistoperää ja
-coupéta. Paku on painava ja kupla kevyt, kun autot törmäävät. Omasi on aina punainen, ja siitä
+menopelinsä, omat värinsä ja oma numeronsa: Jorma ajaa kuplaa, sedania,
+ralliautoa ja ruumisautoa, Marko pikkupakua, traktoria, monsteriautoa ja
+aura-Sisua, Tapsa mopoautoa, Nivaa, linja-autoa ja coupéta. Painava kone
+voittaa törmäyksen ja kevyt lentää. Omasi on aina punainen, ja siitä
 näkee, mitä olet siihen ostanut: puskurin, panssarilevyt, konekiväärin
 konepellillä, nappularenkaat ja ilmanottimen.
 
@@ -124,9 +133,11 @@ kolmeen paikkaan:
   kukin. Puskuri tekee töytäisystä kipeän heille eikä sinulle. C-luokan
   autoon sopii lisäksi kevennys, jarrut ja konekivääri, jonka
   ensimmäinen taso on itse ase.
-- **Autokauppa**: neljä autoa, luokat JM, C, B ja A. Vanha auto jää
-  talliin. Täyteen rakennettu auto on seuraavan luokan vakioauton
-  veroinen.
+- **Autokauppa**: neljä luokan autoa, JM, C, B ja A, ja niiden rinnalla
+  hullut ostokset: Niva ja Valmet-traktori C-luokassa, monsteriauto
+  B-luokassa ja ruumisauto A-luokassa. Punainen traktori numerolla 7 on
+  ihan oikea valinta. Vanha auto jää talliin. Täyteen rakennettu auto on
+  seuraavan luokan vakioauton veroinen.
 - **Asevarasto**: öljyä, miinoja ja ohjuksia kappaleittain. Mitä jää,
   se jää seuraavaan kisaan. Auto kantaa vain luokkansa aseet: öljyä
   jokkiksesta, miinoja C-luokasta, ohjuksia B-luokasta.

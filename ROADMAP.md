@@ -32,11 +32,19 @@ The design is in `docs/design.md`.
   and `GRADE_R` in `notes.ts`, the skills in `rivals.ts`, `WOBBLE` and
   `LATE` in `autoplayer.ts`, `FUMBLE` and `GUN.spray` in `weapons.ts`,
   `DAMAGE_AT` in `sprites.ts`.
-- **C is a coin toss for the bot player.** With the field at skill 0.5
-  to 0.6 the default bot finishes top two in 10 of 12 C races; a mine
-  or a wreck on lap one costs the rest. The bot passes poorly in a pack
-  and can sit in the trees; a better bot driver would make the career
-  curve checkable to the second.
+- **C is a coin toss for the bot player.** Over 48 C races (the six
+  grids with a hair of skill changed, `tools/dbg/grid2.ts`) the default
+  bot finishes top two 62% of the time with the wild cast, 52% with the
+  field before it; a mine or a wreck on lap one costs the rest, so
+  `sim-check` holds two in three over both tracks. The bot passes poorly
+  in a pack; a better bot driver would make the career curve checkable
+  to the second.
+- **Playtest the wild cast** (2026-10-04): does the tractor's shove and
+  the monster truck's throw feel fair or cheap, is the bus a fun wall or
+  a wall, does anyone buy the hearse. Knobs: `pace`, `massScale`,
+  `offroad` and `spinOnShunt` in `rivals.ts`, the wild buys in
+  `cars.ts`, the root of the mass in `harm.ts`'s `ram`, `TOW_AFTER` in
+  `sim.ts`.
 - The whole Kiviaho hairpin is 70 m across and the camera 24 m: the
   approach shows the entry and the turn, the arrow the rest. A zoom
   that widens with speed or into a hairpin is the next knob if the

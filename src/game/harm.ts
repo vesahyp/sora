@@ -64,13 +64,17 @@ export function ram(s: SimState, i: number, j: number, closing: number, nx: numb
   const vi = rammer === a ? j : i;
   // the ram bar: a shunt with it hurts the other car more and the rammer less
   const force = (closing - RAM.minClosing) * DAMAGE.ram;
-  hurt(s, victim, force * (rammer.def.mass / victim.def.mass) * (1 + 0.35 * rammer.def.ram), ri);
-  hurt(s, rammer, force * 0.35 * (victim.def.mass / rammer.def.mass) * (1 - 0.25 * rammer.def.ram), vi);
+  // the heavier does more, by the root of the weight: the impulse already shoves the light car
+  // aside, and a straight ratio let a tractor (2.6 t) wreck a C car in two knocks (sim-check, 2026-10-04)
+  const heft = Math.sqrt(rammer.def.mass / victim.def.mass);
+  hurt(s, victim, force * heft * (1 + 0.35 * rammer.def.ram), ri);
+  hurt(s, rammer, force * 0.35 * (1 / heft) * (1 - 0.25 * rammer.def.ram), vi);
   rammer.rams++;
   victim.rammed++;
   anger(s, victim, ri, GRUDGE.ram);
   rammer.boost = Math.min(1, rammer.boost + BOOST.perRam);
-  if (closing > RAM.spinClosing) {
+  // the monster truck throws whoever it hits; anything else has to hit hard
+  if (closing > (rammer.def.spinOnShunt ? RAM.minClosing * 1.5 : RAM.spinClosing)) {
     throwVictim(victim);
     anger(s, victim, ri, GRUDGE.spin);
     // a shove that spins someone pays on the spot, the small change of a wreck's bounty
@@ -80,7 +84,7 @@ export function ram(s: SimState, i: number, j: number, closing: number, nx: numb
   }
   s.fx.push({ kind: 'spark', x, y, age: 0 });
   if (i === 0 || j === 0) {
-    s.sounds.push(closing > RAM.spinClosing ? 'crunch' : 'bump');
+    s.sounds.push(closing > RAM.spinClosing || rammer.def.spinOnShunt ? 'crunch' : 'bump');
     s.shake = Math.max(s.shake, Math.min(0.6, closing / 25));
   }
 }

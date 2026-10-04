@@ -81,9 +81,28 @@ export interface TrackDef {
  * that reads at a glance: the saloon's three boxes, the hatch's tailgate,
  * the coupe's long nose, the rally car's arches and wing, the estate's
  * long roof and rails, the beetle's dome and fenders, the van's ladder,
- * the pickup's open bed, the microcar's being tiny.
+ * the pickup's open bed, the microcar's being tiny. Then the machines
+ * that are not cars at all, Hill Climb Racing's garage: the tractor's
+ * huge rear wheels and stack, the monster truck's balloon tyres, the
+ * bus's row of windows, the plough's blade, the hearse's glass back and
+ * coffin, the Niva's spare on the tailgate.
  */
-export type CarShape = 'saloon' | 'hatch' | 'coupe' | 'rally' | 'estate' | 'beetle' | 'van' | 'pickup' | 'microcar';
+export type CarShape =
+  | 'saloon'
+  | 'hatch'
+  | 'coupe'
+  | 'rally'
+  | 'estate'
+  | 'beetle'
+  | 'van'
+  | 'pickup'
+  | 'microcar'
+  | 'tractor'
+  | 'monster'
+  | 'bus'
+  | 'plough'
+  | 'hearse'
+  | 'niva';
 
 /**
  * How the second colour is laid: a white roof, bands along the flanks,
@@ -115,6 +134,17 @@ export interface CarDef {
   frontDrive?: number;
   /** tonnes-ish: who wins a shunt */
   mass: number;
+  /**
+   * Lugs and balloon tyres: the share of what grass, mud and water take from the grip and the
+   * top speed that these tyres keep, 0..1. The Niva and the tractor drive on the verge as on the
+   * road, so a corner cut is theirs. 0 when absent
+   */
+  offroad?: number;
+  /**
+   * A shunt from this car throws the victim into a spin at any ramming speed, not only past
+   * RAM.spinClosing: the monster truck lands on people. False when absent
+   */
+  spinOnShunt?: boolean;
   /** armour level 0..3: less damage taken */
   armour: number;
   /** ram bar level 0..3: a shunt hurts the other car more and this one less */

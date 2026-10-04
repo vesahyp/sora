@@ -11,6 +11,13 @@ import type { CarDef } from '../types';
  * tell them apart. The footprint is real: the car model reads it, and
  * it climbs with the class (the ladder is in rivals.ts): the Tauno is a
  * tiny boxy old saloon, a Fiat 126 of a car.
+ *
+ * The first car of each class is the class car: the rivals' pace and the
+ * licence targets are read off it (classCar()). After the four come the
+ * dealer's wild buys, Hill Climb Racing's garage in a class's money: a
+ * Niva and a Valmet tractor in C, a monster truck in B, a hearse in A.
+ * Each handles like what it is, so the choice is a character, not a
+ * faster number.
  */
 export const CARS: CarDef[] = [
   {
@@ -106,6 +113,109 @@ export const CARS: CarDef[] = [
     livery: 'works',
     number: 1,
   },
+  {
+    id: 'niva',
+    name: L('Niva 1.7 4x4'),
+    cls: 'C',
+    shape: 'niva',
+    price: 3800,
+    blurb: L('Korkea lyhyt laatikko, neliveto ja vararengas takaovessa. Pientare on sille tietä.', 'A tall short box, four-wheel drive and a spare on the back door. The verge is road to it.'),
+    accel: 13,
+    topSpeed: 39,
+    brake: 15,
+    turnRate: 2.9,
+    grip: 19,
+    frontDrive: 0.5,
+    offroad: 0.65,
+    mass: 1.15,
+    armour: 0,
+    ram: 0,
+    gun: 0,
+    length: 3.7,
+    width: 1.7,
+    colour: '#c8352a',
+    accent: '#e6dfcc',
+    livery: 'stripe',
+    number: 4,
+  },
+  {
+    id: 'valmet',
+    name: L('Valmet 702'),
+    cls: 'C',
+    shape: 'tractor',
+    price: 3200,
+    blurb: L('Traktori. Suoralla kaikki menevät ohi, mutkassa se kääntyy paikallaan, ja kolarissa se jyrää kenet tahansa.', 'A tractor. Everyone passes it on a straight; it turns on the spot, and in a shunt it flattens anyone.'),
+    accel: 16,
+    topSpeed: 25.5,
+    brake: 17,
+    turnRate: 3.9,
+    grip: 21,
+    offroad: 0.85,
+    mass: 2.6,
+    armour: 0,
+    ram: 0,
+    gun: 0,
+    length: 3.6,
+    width: 1.9,
+    colour: '#c8352a',
+    accent: '#e6dfcc',
+    livery: 'roof',
+    number: 7,
+  },
+  {
+    id: 'monsteri',
+    name: L('Monsteri'),
+    cls: 'B',
+    shape: 'monster',
+    price: 13500,
+    blurb: L('Lava-auto renkailla, jotka ovat isompia kuin hytti. Pomppii, ja kenen päälle se tulee, se pyörähtää.', 'A pickup on tyres bigger than its cab. It bounces, and whoever it lands on spins.'),
+    accel: 18,
+    topSpeed: 47,
+    brake: 16,
+    turnRate: 2.8,
+    grip: 21,
+    frontDrive: 0.5,
+    offroad: 0.6,
+    spinOnShunt: true,
+    mass: 2.1,
+    armour: 0,
+    ram: 0,
+    gun: 0,
+    length: 4.6,
+    width: 2.6,
+    colour: '#c8352a',
+    accent: '#e8c040',
+    livery: 'split',
+    number: 88,
+  },
+  {
+    id: 'ruumis',
+    name: L('Ruumisauto'),
+    cls: 'A',
+    shape: 'hearse',
+    price: 31000,
+    blurb: L('Pitkä farmari lasiperällä, arkku ja seppele kyydissä. Nopea ja hiljainen, eikä kukaan halua sen eteen.', 'A long estate with a glass back, a coffin and a wreath aboard. Fast and quiet, and nobody wants to be in front of it.'),
+    accel: 21,
+    topSpeed: 61,
+    brake: 21,
+    turnRate: 2.9,
+    grip: 25,
+    mass: 1.4,
+    armour: 0,
+    ram: 0,
+    gun: 0,
+    length: 5.2,
+    width: 1.8,
+    colour: '#c8352a',
+    accent: '#16130f',
+    livery: 'band',
+    number: 44,
+  },
 ];
+
+/** The class car: the first of its class, whose numbers the rivals race on. */
+export function classCar(cls: CarDef['cls']): CarDef {
+  return CARS.find((c) => c.cls === cls)!;
+}
 
 export const CAR_BY_ID: Record<string, CarDef> = Object.fromEntries(CARS.map((c) => [c.id, c]));

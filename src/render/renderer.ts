@@ -20,6 +20,8 @@ import {
   spruceSprite,
   wheelLayout,
   tyre,
+  tyreLevel,
+  stackAt,
   SPRITE_PPM,
   SPRITE_PX,
   TREE_SPAN,
@@ -131,6 +133,8 @@ export class Renderer {
   private hurt = new WeakMap<Car, { damage: number; flash: number }>();
   /** the frame's real seconds, for the flash */
   private frameDt = 0;
+  /** seconds drawn, for the cosmetic wobbles */
+  private clock = 0;
   /** dust puffs a second, smoothed: how thick the haze hangs */
   private activity = 0;
   private roadPath: Path2D | null = null;
@@ -216,6 +220,7 @@ export class Renderer {
     const c = s.cars[0];
     const t = s.track;
     this.frameDt = dt;
+    this.clock += dt;
     this.ensureTrack(t);
     const sc = this.scenery!;
     // camera: down the road, the car a third up from the bottom. The lead is smoothed, not the
@@ -461,6 +466,13 @@ export class Renderer {
     // smoke out of a hurt engine, from the bonnet, by the damage stage: a thin grey trail at 2,
     // thick black at 3 and 4; sparks off the hanging bumper from 3 when the car is moving
     for (const car of s.cars) {
+      // the tractor's and the lorry's stack puffs black on the throttle, grey idling
+      const stack = car.wreck > 0 ? null : stackAt(car.def);
+      if (stack && Math.random() < dt * (car.speed > 3 ? 7 : 3)) {
+        const c0 = Math.cos(car.heading);
+        const s0 = Math.sin(car.heading);
+        this.puff(car.x + c0 * stack[0] - s0 * stack[1], car.y + s0 * stack[0] + c0 * stack[1], (Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.6, 1.1, 0.32, car.speed > 3 ? 2 : 3);
+      }
       const stage = damageStage(car.damage);
       if (stage < 2 || car.wreck > 0 || s.hold > 0) continue;
       const smoke = SMOKE[stage - 2];
@@ -686,17 +698,22 @@ export class Renderer {
     g.rotate(car.heading);
     // in the air the car comes up toward the camera
     if (car.z > 0.02) g.scale(1 + car.z * 0.1, 1 + car.z * 0.1);
+    // the monster truck wallows on its balloon tyres: a bob that grows with speed
+    if (car.def.shape === 'monster') {
+      const bob = 1 + 0.035 * Math.min(1, car.speed / 15) * Math.sin(this.clock * 9 + i * 2);
+      g.scale(bob, bob);
+    }
     // the front wheels, turned with the steering, under the body
     const wh = wheelLayout(car.def);
     const k = 1 / SPRITE_PPM;
-    const fx = wh.frontX * k + (wh.wl * k) / 2 - L / 2;
+    const fx = wh.frontX * k + (wh.fwl * k) / 2 - L / 2;
     const ang = car.steer * 0.55;
-    for (const y of [-wh.out * k + (wh.ww * k) / 2 - W / 2, (W - wh.ww + wh.out) * k + (wh.ww * k) / 2 - W / 2]) {
+    for (const y of [-wh.fout * k + (wh.fww * k) / 2 - W / 2, (W - wh.fww + wh.fout) * k + (wh.fww * k) / 2 - W / 2]) {
       g.save();
       g.translate(fx, y);
       g.rotate(ang);
       g.scale(k, k);
-      tyre(g, -wh.wl / 2, -wh.ww / 2, wh.wl, wh.ww, car.def.tyres ?? 0);
+      tyre(g, -wh.fwl / 2, -wh.fww / 2, wh.fwl, wh.fww, tyreLevel(car.def));
       g.restore();
     }
     const spr = carSprite(car.def, { faded: i > 0, heading: car.heading });

@@ -244,7 +244,8 @@ export function Dealer({ save, onBuy, onBack }: { save: Save; onBuy: (car: CarDe
       <Top save={save} title={tr('Autokauppa', 'Dealer')} onBack={onBack} />
       <p className="help">{tr('Vanha auto jää talliin. Luokka kertoo, mihin kisoihin autolla pääsee.', 'Your old car stays in the garage. The class says which races the car may enter.')}</p>
       <div className="cards">
-        {CARS.map((c) => {
+        {/* by class, the class car first and its wild buys after it */}
+        {[...CARS].sort((a, b) => CLASS_RANK[a.cls] - CLASS_RANK[b.cls]).map((c) => {
           const owned = save.cars.some((o) => o.carId === c.id);
           const can = !owned && c.price <= save.credits;
           const above = CLASS_RANK[c.cls] > CLASS_RANK[mine.cls];

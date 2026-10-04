@@ -1,5 +1,5 @@
 import type { Car, SimState } from './state';
-import type { CarInput } from './types';
+import type { CarInput, Surface } from './types';
 import { BOOST, DAMAGE, DAMAGE_PACE, OIL, SPIN_TIME } from './content/weapons';
 import { enginePace } from './content/drivers';
 import { SURFACES, type SurfaceDef } from './content/surfaces';
@@ -73,6 +73,26 @@ const CLEAR_HEIGHT = 0.9;
 /** a landing harder than this, m/s down, bounces; harder than LAND_HURT it costs damage */
 const LAND_BOUNCE = 2.5;
 const LAND_HURT = 7;
+
+const bitten = new Map<string, SurfaceDef>();
+
+/**
+ * A surface under tyres that bite off the road (CarDef.offroad): grass, mud and water give back
+ * that share of the grip, the top speed and the drag they take. Gravel, tarmac and ice are as
+ * they are: a lug does nothing on ice. Memoised, since it is asked three times a substep.
+ */
+function bite(surface: Surface, offroad = 0): SurfaceDef {
+  const sd = SURFACES[surface];
+  if (offroad <= 0 || (sd.drag <= 0 && sd.top >= 1)) return sd;
+  const key = `${surface}:${offroad}`;
+  let out = bitten.get(key);
+  if (!out) {
+    const k = offroad;
+    out = { ...sd, grip: sd.grip + (1 - sd.grip) * k, top: sd.top + (1 - sd.top) * k, drag: sd.drag * (1 - k) };
+    bitten.set(key, out);
+  }
+  return out;
+}
 
 /** What the driver and the race ask of a car this frame, read once and held through the substeps. */
 interface Ask {
@@ -181,10 +201,10 @@ function integrate(s: SimState, c: Car, a: Ask, h: number, last: boolean): void 
   // the surface under each axle: the road's frame tells how far along and across each one sits
   const along = fx * road.tx + fy * road.ty;
   const across = fx * -road.ty + fy * road.tx;
-  const sf = SURFACES[t.surfaceAt(loc.s + b * along, loc.d + b * across, c.x + fx * b, c.y + fy * b)];
-  const sr = SURFACES[t.surfaceAt(loc.s - cc * along, loc.d - cc * across, c.x - fx * cc, c.y - fy * cc)];
+  const sf = bite(t.surfaceAt(loc.s + b * along, loc.d + b * across, c.x + fx * b, c.y + fy * b), def.offroad);
+  const sr = bite(t.surfaceAt(loc.s - cc * along, loc.d - cc * across, c.x - fx * cc, c.y - fy * cc), def.offroad);
   const here = t.surfaceAt(loc.s, loc.d, c.x, c.y);
-  const sc = SURFACES[here];
+  const sc = bite(here, def.offroad);
 
   // height: on the ground the car follows it; when the ground falls away faster than gravity can pull, it flies
   const ground = t.groundAt(loc.s, loc.d);

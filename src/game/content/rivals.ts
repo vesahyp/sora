@@ -1,31 +1,37 @@
 import { L, type Text } from '../../i18n';
 import type { CarClass, CarDef, CarShape, Livery } from '../types';
 import type { Driver } from '../state';
-import { CARS } from './cars';
+import { classCar } from './cars';
 import { OPPONENTS, type Rival } from './drivers';
 import { tuned, type Parts } from './parts';
 
 /**
  * What each rival drives, per class: their own vehicle, not the player's
  * car repainted. The body says who they are: Jorma, cold and fast, in a
- * coupe, a saloon, a rally car, a hot hatch; Marko, the brawler, in a
- * box of an estate, a pickup, a van, a land yacht; Tapsa, timid, in a
- * Beetle, a little estate, a hatch, a coupe. In every class the four
- * bodies on the grid differ, and no rival drives the same body twice,
- * so a body in a driver's colour is one vehicle.
+ * Beetle, a saloon, a rally car and a hearse; Marko, the brawler, in
+ * whatever shoves hardest: a tiny van, a Valmet tractor, a monster truck,
+ * a lorry with a snowplough blade; Tapsa, timid, in a mopoauto, a Niva,
+ * a country bus (he cannot pass, so he blocks) and a coupe. In every
+ * class the four bodies on the grid differ, every grid has at least one
+ * machine that is not a car (Hill Climb Racing's garage, the owner on
+ * 2026-10-04: "i want tractors, monster trucks, wild stuff"), and no
+ * rival drives the same body twice, so a body in a driver's colour is
+ * one vehicle.
  *
  * Size climbs with the class, Hill Climb Racing's first jeep to its
- * monster: JM cars are tiny boxes, 2.8 to 3.2 m (a Fiat 126, a Mini),
- * C 3.6 to 4.1, B 4.1 to 4.7, A 4.5 to 5.0, so a class reads a size up
- * at a glance. The player's cars (cars.ts) sit on the same ladder.
+ * monster: JM cars are tiny boxes, 2.4 to 3.2 m (a mopoauto, a Fiat
+ * 126), C 3.6 to 4.1, B 4.4 to 7.5 with the bus, A 4.7 to 6.0 with the
+ * plough, so a class reads a size up at a glance. The player's cars
+ * (cars.ts) sit on the same ladder.
  *
  * The pace is the class car's numbers (through tuned()), so the balance
- * holds whatever the body; the footprint, the wheels and the mass come
- * from the vehicle, a van heavier in a shunt and a Beetle lighter. Any
- * length, width, wheel and mass is fine: the car model reads the box and
- * the sprite scales the body to it. The colour stays in the driver's hue,
- * so the minimap and the standings still know them; the livery, the
- * accent and the number are the vehicle's own.
+ * holds whatever the body; `pace` then bends them to what the machine
+ * is: the tractor slow on a straight and quick to turn, the bus slow and
+ * a wall. The footprint, the wheels and the mass come from the vehicle,
+ * so a tractor wins a shunt and a mopoauto loses it. The car model reads
+ * the box and the sprite scales the body to it. The colour stays in the
+ * driver's hue, so the minimap and the standings still know them; the
+ * livery, the accent and the number are the vehicle's own.
  *
  * `skill` is how hard the bot drives this vehicle in this class, 0..1.
  * It climbs with the class: JM rivals are weekend jokkis drivers who
@@ -45,34 +51,43 @@ export interface Vehicle {
   massScale: number;
   /** the wheels drawn, on the body's own: bigger for a vehicle that stands tall. 1 when absent */
   wheel?: number;
+  /** the class car's numbers bent to the machine, each a factor, 1 when absent */
+  pace?: { top?: number; accel?: number; turn?: number; grip?: number; brake?: number };
+  /** a ram built in, 0..3: the plough's blade */
+  ram?: number;
+  /** CarDef.offroad: tyres that bite on grass */
+  offroad?: number;
+  /** CarDef.spinOnShunt: the monster truck throws whoever it hits */
+  spinOnShunt?: boolean;
   /** how hard the bot drives it, 0..1 */
   skill: number;
 }
 
 export const RIVAL_CARS: Record<string, Record<CarClass, Vehicle>> = {
   jorma: {
-    JM: { shape: 'coupe', name: L('Mantta'), colour: '#2f6fd6', accent: '#e6dfcc', livery: 'stripe', number: 3, length: 3.1, width: 1.4, massScale: 0.95, skill: 0.4 },
+    JM: { shape: 'beetle', name: L('Kupla'), colour: '#2f6fd6', accent: '#e6dfcc', livery: 'stripe', number: 3, length: 2.9, width: 1.4, massScale: 0.9, skill: 0.4 },
     C: { shape: 'saloon', name: L('Mosse'), colour: '#2a5bb0', accent: '#e6dfcc', livery: 'checker', number: 33, length: 4.1, width: 1.65, massScale: 1, skill: 0.6 },
     B: { shape: 'rally', name: L('Kiituri'), colour: '#2f6fd6', accent: '#e6dfcc', livery: 'split', number: 8, length: 4.4, width: 1.85, massScale: 1.05, skill: 0.8 },
-    A: { shape: 'hatch', name: L('Ohjus'), colour: '#2456b8', accent: '#e6dfcc', livery: 'works', number: 2, length: 4.5, width: 1.8, massScale: 1, skill: 1.0 },
+    A: { shape: 'hearse', name: L('Saattaja'), colour: '#22345e', accent: '#c9b07a', livery: 'band', number: 2, length: 5.2, width: 1.8, massScale: 1.1, pace: { top: 1.02 }, skill: 1.0 },
   },
   marko: {
-    JM: { shape: 'estate', name: L('Vollari'), colour: '#d8a428', accent: '#77756c', livery: 'primer', number: 66, length: 3.2, width: 1.45, massScale: 1.1, skill: 0.35 },
-    C: { shape: 'pickup', name: L('Lava'), colour: '#d0a02c', accent: '#7a2a1e', livery: 'split', number: 99, length: 4.1, width: 1.75, massScale: 1.15, skill: 0.55 },
-    B: { shape: 'van', name: L('Paku'), colour: '#e0b030', accent: '#2c2a26', livery: 'band', number: 44, length: 4.7, width: 1.95, massScale: 1.3, skill: 0.74 },
-    A: { shape: 'saloon', name: L('Laiva'), colour: '#d4a52c', accent: '#2c2a26', livery: 'roof', number: 69, length: 5.0, width: 1.9, massScale: 1.25, skill: 0.92 },
+    JM: { shape: 'van', name: L('Pikkupaku'), colour: '#d8a428', accent: '#77756c', livery: 'primer', number: 66, length: 3.2, width: 1.5, massScale: 1.15, skill: 0.35 },
+    C: { shape: 'tractor', name: L('Valmet'), colour: '#d0a02c', accent: '#2c2a26', livery: 'roof', number: 99, length: 3.6, width: 1.9, massScale: 1.8, pace: { top: 0.6, accel: 1.15, turn: 1.4 }, offroad: 0.85, skill: 0.55 },
+    B: { shape: 'monster', name: L('Monsteri'), colour: '#e0b030', accent: '#2c2a26', livery: 'split', number: 44, length: 4.6, width: 2.6, massScale: 2.1, pace: { top: 0.96, grip: 0.92 }, offroad: 0.6, spinOnShunt: true, skill: 0.74 },
+    A: { shape: 'plough', name: L('Aura-Sisu'), colour: '#d4a52c', accent: '#2c2a26', livery: 'band', number: 69, length: 6.0, width: 2.4, massScale: 3.2, pace: { top: 0.88, accel: 0.85, turn: 1.3 }, ram: 3, skill: 0.92 },
   },
   tapsa: {
-    JM: { shape: 'beetle', name: L('Kupla'), colour: '#ecebe0', accent: '#3c7a5a', livery: 'stripe', number: 12, length: 2.8, width: 1.35, massScale: 0.85, skill: 0.3 },
-    C: { shape: 'estate', name: L('Farkku'), colour: '#f2f2ea', accent: '#2a2a26', livery: 'checker', number: 21, length: 3.8, width: 1.6, massScale: 1, skill: 0.5 },
-    B: { shape: 'hatch', name: L('Kirppu'), colour: '#e6e4d8', accent: '#2f6f8a', livery: 'twin', number: 18, length: 4.2, width: 1.7, massScale: 0.95, skill: 0.68 },
+    JM: { shape: 'microcar', name: L('Mopoauto'), colour: '#ecebe0', accent: '#3c7a5a', livery: 'stripe', number: 12, length: 2.4, width: 1.3, massScale: 0.6, pace: { top: 0.88, accel: 0.85, turn: 1.4 }, skill: 0.3 },
+    C: { shape: 'niva', name: L('Niva'), colour: '#f2f2ea', accent: '#2a2a26', livery: 'stripe', number: 21, length: 3.7, width: 1.7, massScale: 1.15, pace: { top: 0.94, turn: 1.05 }, offroad: 0.3, skill: 0.5 },
+    B: { shape: 'bus', name: L('Linja-auto'), colour: '#e6e4d8', accent: '#2f6f8a', livery: 'band', number: 18, length: 7.5, width: 2.3, massScale: 3.0, pace: { top: 0.86, accel: 0.8, turn: 1.3 }, skill: 0.68 },
     A: { shape: 'coupe', name: L('Liitäjä'), colour: '#f2f2ea', accent: '#d06a2a', livery: 'split', number: 5, length: 4.7, width: 1.8, massScale: 1.05, skill: 0.84 },
   },
 };
 
-/** The rival's vehicle as a def: the class car built to `parts`, under this body. */
+/** The rival's vehicle as a def: the class car built to `parts`, under this body, bent to the machine. */
 export function vehicleDef(v: Vehicle, cls: CarClass, parts: Parts): CarDef {
-  const base = tuned(CARS.find((c) => c.cls === cls)!, parts);
+  const base = tuned(classCar(cls), parts);
+  const p = v.pace ?? {};
   return {
     ...base,
     id: `${base.id}:${v.shape}:${v.number}`,
@@ -86,6 +101,14 @@ export function vehicleDef(v: Vehicle, cls: CarClass, parts: Parts): CarDef {
     width: v.width,
     wheel: v.wheel,
     mass: base.mass * v.massScale,
+    topSpeed: base.topSpeed * (p.top ?? 1),
+    accel: base.accel * (p.accel ?? 1),
+    turnRate: base.turnRate * (p.turn ?? 1),
+    grip: base.grip * (p.grip ?? 1),
+    brake: base.brake * (p.brake ?? 1),
+    ram: Math.max(base.ram, v.ram ?? 0),
+    offroad: v.offroad,
+    spinOnShunt: v.spinOnShunt,
   };
 }
 

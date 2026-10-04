@@ -1,6 +1,7 @@
 // Every vehicle in the game on one dark canvas, to the same scale, names
-// under them: one row per class, the player's car first and the rivals'
-// vehicles beside it, so each row reads a size up from the one above;
+// under them: one row per class, the player's cars first (the class car,
+// then the dealer's wild buys) and the rivals' vehicles beside them, each
+// in a column as wide as it is long, so the bus takes the room it takes, so each row reads a size up from the one above;
 // then the player's cars fully built, then the Tauno at five levels of
 // damage so the stages sit side by side. `make lineup` writes shots/lineup.png.
 // If two vehicles in it could be confused at a glance, the look is not
@@ -29,21 +30,22 @@ try {
     const { tuned, fullFor } = await import('/src/game/content/parts.ts');
     const { CLASSES } = await import('/src/game/types.ts');
     const PPM = 44;
-    const COL = 6.4 * PPM;
+    // a column per vehicle: its length and room for the plough's blade, the wing and the names
+    const colOf = (def) => Math.max(5.6, def.length + 1.8) * PPM;
     const ROW = 4.3 * PPM;
     const stock = { ram: 0, armour: 0, engine: 0, tyres: 0, weight: 0, brakes: 0, gun: 0 };
     const rows = [
       ...CLASSES.map((cls) => {
-        const mine = CARS.find((c) => c.cls === cls);
+        const mine = CARS.filter((c) => c.cls === cls);
         return {
           title: `Luokka ${cls}`,
-          cars: [{ def: mine, who: 'sinä', faded: false }, ...OPPONENTS.map((d) => ({ def: vehicleDef(RIVAL_CARS[d.id][cls], cls, stock), who: d.name.fi, faded: true }))],
+          cars: [...mine.map((def, k) => ({ def, who: k ? 'sinä, kaupasta' : 'sinä', faded: false })), ...OPPONENTS.map((d) => ({ def: vehicleDef(RIVAL_CARS[d.id][cls], cls, stock), who: d.name.fi, faded: true }))],
         };
       }),
       { title: 'Sinun autosi, täysin rakennettuina', cars: CARS.map((c) => ({ def: tuned(c, fullFor(c.cls)), who: `${c.cls}, kaikki osat`, faded: false })) },
       { title: 'Vauriot: Tauno 0, 20, 45, 70, 95', cars: [0, 20, 45, 70, 95].map((d) => ({ def: CARS[0], who: `vauriot ${d} · vaihe ${damageStage(d)}`, faded: false, damage: d })) },
     ];
-    const W = Math.round(COL * Math.max(...rows.map((r) => r.cars.length)) + 80);
+    const W = Math.round(Math.max(...rows.map((r) => r.cars.reduce((a, v) => a + colOf(v.def), 0))) + 80);
     const H = Math.round(ROW * rows.length + 40);
     const c = document.createElement('canvas');
     c.width = W;
@@ -66,8 +68,11 @@ try {
       g.font = '600 15px "Big Shoulders Text", "Arial Narrow", Arial, sans-serif';
       g.textAlign = 'left';
       g.fillText(row.title.toUpperCase(), 40, y0 + 18);
-      row.cars.forEach((v, k) => {
-        const cx = 40 + COL * k + COL / 2;
+      let x = 40;
+      row.cars.forEach((v) => {
+        const col = colOf(v.def);
+        const cx = x + col / 2;
+        x += col;
         const cy = y0 + ROW * 0.46;
         // the shadow, then the car, facing right, the same metres for every vehicle
         const sh = carShadow(v.def, 0);
