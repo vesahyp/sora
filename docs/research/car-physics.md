@@ -154,6 +154,26 @@ slide a hairpin's 75 to 90; a held half lock drifts at about 12 degrees
 on the rear-drive cars. The Kiila, four-wheel drive, grips: it barely
 slides at half lock.
 
+## The caster steered against the thumb (2026-10-05)
+
+Vesa played the folk car and said it understeers. A steady-state sweep
+(`tools/dbg/thumb.ts`: a held thumb at a held speed, the yaw asked
+against the yaw delivered) found the gain at 0.6 to 0.8 above 70 km/h
+for every thumb short of full lock, and over 1 below 50 km/h. The cause
+was the caster aid: the free share of the wheel, `(1 - |steer|)`,
+followed the front axle's direction of travel in full. In a steady
+corner at speed the nose points a shade inside the path, so that
+direction lies a degree or so *against* the turn, and at a medium thumb
+the caster took a quarter of the wheel angle back. At low speed the
+same term points into the turn and over-delivers, which is why the car
+felt alive at 40 km/h and dead at 90. The caster now acts only on the
+part of the front's travel angle beyond a fifth of the tyre's peak
+(`CASTER_FROM`), which leaves the slide-recovery it was built for
+(`physics-check` cases 2 and 3 still pass) and gives a yaw gain of 0.96
+to 0.98 at every thumb up to 80% of lock. A full thumb at speed still
+asks for more than the grip holds and slides the rear a little, as
+intended.
+
 ## Measuring instead of feeling
 
 A step response at constant steer and speed tells more than a lap:

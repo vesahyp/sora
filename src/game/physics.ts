@@ -47,8 +47,9 @@ const TRACTION = 1.0;
  */
 const COUNTER_FROM = 2;
 const COUNTER = 0.8;
-/** how far a free wheel follows the front axle's direction of travel */
+/** how far a free wheel follows the front axle's direction of travel, past CASTER_FROM peaks of it */
 const CASTER = 0.8;
+const CASTER_FROM = 0.2;
 /** slip, in peaks, past which a sliding tyre bites again */
 const GUARD = 1.5;
 /** per second: how hard a sliding car's rotation is damped once the tail is well past its peak */
@@ -301,7 +302,12 @@ function integrate(s: SimState, c: Car, a: Ask, h: number, last: boolean): void 
     const asked = Math.atan((c.steer * yawMax(def, vx) * L) / vxs);
     const past = Math.abs(alphaR) - sr.peak * COUNTER_FROM;
     const tailOut = past > 0 && Math.abs(vx) > 6 ? Math.sign(alphaR) * past * COUNTER : 0;
-    const delta = clamp(asked + tailOut, -lock, lock) + free * clamp(Math.atan2(vyF, vxs), -swing, swing) * Math.sign(vx || 1);
+    // only the part of the front's travel beyond CASTER_FROM of the tyre's peak: in a steady turn at
+    // speed the nose points a shade inside the path, and a caster that followed every degree of it
+    // steered against the thumb, a quarter of the wheel gone at 80 km/h (tools/dbg/thumb.ts, 2026-10-05)
+    const travelF = Math.atan2(vyF, vxs);
+    const caster = Math.sign(travelF) * Math.max(0, Math.abs(travelF) - sf.peak * CASTER_FROM);
+    const delta = clamp(asked + tailOut, -lock, lock) + free * clamp(caster, -swing, swing) * Math.sign(vx || 1);
     const alphaF = Math.atan2(vyF, vxs) - delta * Math.sign(vx || 1);
     // the thumb has no throttle to lift, so the car lifts for it: past the rear's peak the drive
     // fades, the way a driver feathers a slide instead of powering it into a spin
