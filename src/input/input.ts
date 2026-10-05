@@ -20,13 +20,24 @@ import { type CarInput } from '../game/types';
  */
 /** px of thumb travel that do nothing, so a resting thumb does not wander the car */
 const DEAD = 4;
-/** the response curve's power: 1 is linear, higher makes the centre finer and the ends steeper */
-const CURVE = 1.7;
+/**
+ * the response curve's power: 1 is linear, higher makes the centre finer and the ends steeper.
+ * 1.7 until 2026-10-05: the first third of the swing gave a tenth of the steer, and with the car
+ * answering a thumb honestly since the caster fix (physics.ts) that read as a car that would not
+ * turn in; at 1.3 a third of the swing is a fifth of the steer and half the swing is 0.4
+ */
+export const CURVE = 1.3;
 
 /** thumb travel in css px to a steer of -1..1 */
 export function thumbToSteer(dx: number, lock: number): number {
   const a = Math.min(1, Math.max(0, (Math.abs(dx) - DEAD) / (lock - DEAD)));
   return Math.sign(dx) * Math.pow(a, CURVE);
+}
+
+/** the inverse: the px of thumb travel that give a steer of -1..1, for the scripted hands (tools/hand.ts, scripts/playthrough.mjs) */
+export function steerToThumb(steer: number, lock: number): number {
+  const a = Math.pow(Math.min(1, Math.abs(steer)), 1 / CURVE);
+  return Math.sign(steer) * (DEAD + a * (lock - DEAD));
 }
 
 export class InputController {
@@ -113,6 +124,11 @@ export class InputController {
     }
     window.removeEventListener('keydown', this.onKey);
     window.removeEventListener('keyup', this.onKey);
+  }
+
+  /** px of thumb travel for a steer, on this controller's lock: the scripted hand's way in */
+  travel(steer: number): number {
+    return steerToThumb(steer, this.lock);
   }
 
   read(): CarInput {
