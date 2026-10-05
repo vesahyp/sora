@@ -17,7 +17,8 @@ Super Cars II, with a career in the shape of Gran Turismo, for the
 browser, phones first. One thumb steers, a tap is nitro, the pedal
 brakes and swings the tail; the guns fire themselves. Cars slide, ram,
 wreck each other and come back. Finnish gravel roads, nineties cars.
-Two tracks with a river to jump, a crest and a shortcut through the forest, four
+Four tracks, each with a river to jump and a crest, two of them short folk-class loops
+of about 400 m, and a shortcut through the forest on the Kiviaho ones; four
 classes with a car each and a wild buy beside it (a tractor, a monster
 truck, a hearse), rivals in tractors, buses and plough lorries, a field of four with the bot driving the other
 three, and a career that starts in jokamiesluokka (folk racing) in a
@@ -84,7 +85,8 @@ src/
                         sim.ts scales an opponent's engine by its gap to the player, the bot its corners,
                         both by catchUp(), skill squared;
                         GRUDGE, Burnout's hostility: what a ram, shot or wreck costs and how the bot uses it
-      tracks.ts       the tracks: a centreline in metres, a width, a surface, rivers, crests, patches, shortcuts
+      tracks.ts       the tracks: a centreline in metres, a width, a surface, rivers, crests, patches, shortcuts;
+                        the two lenkki loops are the folk class's, the two full tracks C and up
       surfaces.ts     what each surface does to a tyre and a car: grip, peak, slide, drag, top
   career/save.ts      the save: credits, cars owned with parts and paint, licences; one object in localStorage
   render/
@@ -113,6 +115,11 @@ src/
   version.ts          build id and the newer-build check behind the update banner
   i18n.ts             the language: fi or en, tr() and t(), picked from the browser
 tools/
+  hand.ts             the thumb driver: a hand on a phone, headless. Heading error to thumb px through
+                        input.ts's own curve, a reaction delay, a thumb's speed, tremor, brakes when a bend
+                        looks too fast and now and then too late, goes round a car ahead, jumps a river;
+                        skill 0..1. The playthrough injects this same class into the page; sim-check
+                        and balance read the folk laps off it. It does not know the tyres' limit
   autoplayer.ts       the bot driver: yaw-rate steering through the wheelbase, braking to
                         the speed a bend allows, a running-wide reflex, leaning on neighbours,
                         blocking, punting and waiting for whoever it holds a grudge against;
@@ -120,11 +127,14 @@ tools/
   physics-check.ts    npm run physics-check: the car model's promises as set pieces with numbers:
                         a straight line, full lock, a pedal stab, tree hits, car hits, a crest,
                         a river cleared flat out and dropped into at half speed, water
-  sim-check.ts        npm run sim-check: the bot laps every track in every car, asserts;
-                        asserts the field is on the player's screen and in the sights, that
-                        aggression pays the player more than the road, and the career curve:
-                        the bot player wins every JM race, is top two in C, does not win every A
-  balance.ts          npm run balance: lap times per car, side by side
+  sim-check.ts        npm run sim-check: the bot laps every track in the cars of the classes that race
+                        there, asserts; asserts the field is on the player's screen and in the sights,
+                        that aggression pays the player more than the road, and the career curve: the
+                        hand with the hour's parts wins the first two folk races from every grid, is top
+                        two in the next two and has a fight in the final; the bot is top two in C, does
+                        not win every A
+  balance.ts          npm run balance: lap times per car on its class's tracks, side by side; the folk
+                        class by the hand too, stock and full, so the upgrade gap is read off a thumb
 scripts/
   shots.mjs           phone screenshots with Playwright, the bot driving
   touch-check.mjs     drives the race by touch on an emulated phone: steer, brake, pause
@@ -135,7 +145,7 @@ scripts/
                         at levels 0-3, the armoury's load and the paints
   pwa-check.mjs       the install check: manifest, every icon at its size, the service worker, offline
   playthrough.mjs     the first hour by thumb: every folk race on an emulated iPhone in landscape, every
-                        input a touch through input.ts, a hand with a reaction delay and a thumb's speed
+                        input a touch through input.ts, tools/hand.ts built and injected into the page
                         at the wheel (not the bot), parts bought between races; a video, a result sheet
                         and frame sheets per race, summary.md with the places and laps, and the rules of
                         a fun hour asserted at the end
@@ -194,6 +204,12 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
   in `shots/playthrough/`. Read the sheets before claiming a change is felt: the
   bot laps 30 s where that thumb laps 35, and a dozen fixes checked only against
   the bot left the game playing badly (2026-10-04). `RACES=jm-kiviaho` for one race.
+  The same hand drives headless in `tools/hand.ts` (`sim-check`'s folk checks,
+  `make balance`'s folk rows), so a folk-class number is tuned in seconds and
+  the video is the proof, not the search. A steady-state sweep (a held thumb at a
+  held speed, the yaw asked against the yaw delivered) found the understeer the
+  owner felt on 2026-10-05 in one table; build one in `tools/dbg/` before
+  touching a handling constant.
 - **A track feature is checked before it is driven.** `sim-check` jumps
   every river with every class car and asserts it is cleared every lap,
   lands every flight (a crest's too) on the road, drives every shortcut
@@ -204,11 +220,13 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
   out of) and the crest's (a fast car flies, a slow one is lifted).
   `make drive-log` adds the first river by touch.
 - **Balance with `make balance`.** It prints the bot's laps per car, stock
-  and fully built, per track. The bot is a floor, not a player: a human
-  who looks through the corner beats it. A change that moves the bot's
-  lap moves the human's too, in the same direction. The classes should
-  sit about 10% apart stock, and a full car should reach the next class's
-  stock pace. The licence targets are read off this table.
+  and fully built, on the tracks its class races, and the hand's for the
+  folk car. The bot is a floor, not a player: a human who looks through
+  the corner beats it. A change that moves the bot's lap moves the
+  human's too, in the same direction. C, B and A should sit about 10%
+  apart stock, and a full car should reach the next class's stock pace;
+  the folk car is slow on purpose and races its own loops, so JM to C is
+  a bigger step. The licence targets are read off this table.
 - Deploy is automatic: every push to `main` builds and publishes to GitHub
   Pages (`.github/workflows/deploy.yml`) at https://vesahyp.github.io/sora/.
 - Screenshots come from `make shots` (Playwright, iPhone emulation, the

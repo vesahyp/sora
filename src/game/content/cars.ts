@@ -20,10 +20,20 @@ import type { CarDef } from '../types';
  * faster number.
  *
  * The pace (2026-10-04, the phone playthrough, scripts/playthrough.mjs): the lap is grip-limited,
- * so every car's grip went up 12% together and the Tauno got a tenth more pull, after a thumb
- * lapped Kiviaho in 37 s against the bot's 32 and the owner asked for laps around 30. The bot now
- * laps Kiviaho in 30.4 in the Tauno, 27.6 in the Kortteli, 25.7 in the Sorsa, 23.7 in the Kiila
+ * so every car's grip went up 12% together, after a thumb lapped Kiviaho in 37 s against the
+ * bot's 32. The bot laps Kiviaho in 27.6 in the Kortteli, 25.7 in the Sorsa, 23.7 in the Kiila
  * (tools/dbg/gripsweep.ts); the drag was not the lever, a third of it moved the lap half a second.
+ *
+ * The Tauno is slow on purpose (2026-10-05, after the owner played it: "the speed now is like a
+ * really upgraded car"). Stock it pulls 10 m/s² and runs out at about 80 km/h on a straight
+ * (the engine's push fades toward topSpeed and the drag takes the rest), with 1.3 g of grip;
+ * before, 15 m/s², 105 km/h and 1.9 g, and a thumb at that speed got 60 to 80% of the yaw it
+ * asked for and ran wide, while a first engine upgrade made the thumb's lap slower, not faster
+ * (tools/dbg/jmlaps.ts). The folk class races its own short loops (tracks.ts, the lenkki
+ * tracks), where a new thumb laps in about 25 s stock and the full car is a clear step: the
+ * engine parts show as top speed and as pull out of every bend, the tyres as a corner taken
+ * without the pedal. JM to C is a bigger step than the other classes' tenth; the C car is as
+ * it was.
  */
 export const CARS: CarDef[] = [
   {
@@ -33,11 +43,11 @@ export const CARS: CarDef[] = [
     shape: 'saloon',
     price: 1200,
     blurb: L('Pieni kulmikas jokkisauto: takaveto, pehmeä ja väsynyt. Vuotaa öljyä, ja se on ainoa aseesi.', 'A tiny boxy folk-racing saloon: rear drive, soft and tired. It leaks oil, and that is your only weapon.'),
-    accel: 15,
-    topSpeed: 39,
-    brake: 13,
+    accel: 10,
+    topSpeed: 32,
+    brake: 10,
     turnRate: 2.6,
-    grip: 19,
+    grip: 13,
     mass: 1.25,
     armour: 0,
     ram: 0,

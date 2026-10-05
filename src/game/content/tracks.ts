@@ -14,6 +14,67 @@ import type { TrackDef } from '../types';
  */
 export const TRACKS: TrackDef[] = [
   {
+    id: 'kiviaho-lenkki',
+    name: L('Kiviahon lenkki'),
+    width: 6,
+    surface: 'gravel',
+    // The folk class's first track (2026-10-05), Kiviaho's opening in little: about 400 m, a lap
+    // of 25 s for a new thumb in the stock Tauno. The crest on the start straight, the right
+    // sweeper, the river jumped from its bank on the diagonal, a hairpin back toward the start
+    // and a gap in the forest across its inside on grass, then esses home. The folk cars are slow
+    // (docs/progression.md), so the river is 8 m, not Kiviaho's 12, and the road runs straight
+    // for 30 m past the lip.
+    crests: [{ s: 18, len: 20, h: 0.9 }],
+    rivers: [{ s: 171, gap: 8, bank: 0.45 }],
+    shortcuts: [{ points: [[34, 88], [14, 90], [-6, 86], [-22, 74]], width: 4, surface: 'grass' }],
+    points: [
+      [0, 0],
+      [50, 0],
+      [76, 6],
+      [92, 28],
+      [84, 54],
+      [62, 68],
+      [40, 82],
+      [20, 100],
+      [6, 116],
+      [-12, 118],
+      [-24, 104],
+      [-22, 80],
+      [-28, 56],
+      [-24, 34],
+      [-26, 14],
+      [-14, 2],
+    ],
+  },
+  {
+    id: 'hirvisuo-lenkki',
+    name: L('Hirvisuon lenkki'),
+    width: 6,
+    surface: 'gravel',
+    // The folk class's second track: Hirvisuo in little, about 420 m. A longer start straight
+    // over a crest, a right-left, a sweeping right onto the bottom straight with the river on it,
+    // a right-hander home up the left. About 410 m.
+    crests: [{ s: 24, len: 20, h: 0.9 }],
+    rivers: [{ s: 246, gap: 8, bank: 0.45 }],
+    points: [
+      [0, 0],
+      [60, 0],
+      [88, 8],
+      [100, 30],
+      [86, 50],
+      [64, 54],
+      [52, 72],
+      [42, 94],
+      [22, 108],
+      [-6, 110],
+      [-30, 106],
+      [-40, 84],
+      [-42, 54],
+      [-38, 26],
+      [-22, 6],
+    ],
+  },
+  {
     id: 'kiviaho',
     name: L('Kiviaho'),
     width: 6,

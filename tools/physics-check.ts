@@ -266,11 +266,13 @@ for (const p of pieces) {
   assert(crooked.v < straight.v - 2, `a crooked landing costs more (${f(crooked.v * 3.6, 0)} against ${f(straight.v * 3.6, 0)} km/h)`);
 }
 
-// 7b. a river: the Tauno flat out clears it and comes down on the road past it; at half speed it
-// drops in, splashes, and drives out up the far bank
+// 7b. a river: the Tauno flat out clears the folk loops' 8 m river and comes down on the road past
+// it; at a crawl it drops in, splashes, and drives out up the far bank. (The Tauno is slow since
+// 2026-10-05 and never races Kiviaho's 12 m river; sim-check jumps each river with the cars of
+// the classes that race there)
 {
   const tauno = CAR_BY_ID.tauno;
-  const river = { s: 100, gap: 12, bank: 0.45 };
+  const river = { s: 100, gap: 8, bank: 0.45 };
   // the throttle on from the start flat out; coasting to the lip at half speed, then on to drive out
   const jump = (v: number, from: number, coast = false) => {
     const s = setup(oval(6, { rivers: [river] }), { s: from, v }, tauno);
@@ -293,11 +295,11 @@ for (const p of pieces) {
     return { lip, down: down as { s: number; d: number; wet: boolean } | null, wet: wetAt >= 0, out: outAt - wetAt, splashes };
   };
   const flat = jump(tauno.topSpeed, 20);
-  const half = jump(tauno.topSpeed / 2, 80, true);
+  const half = jump(11, 80, true);
   const fd = flat.down;
   const hd = half.down;
   assert(!!fd && !flat.wet && fd.s > river.gap && Math.abs(fd.d) < 3, `the Tauno flat out (${f(flat.lip * 3.6, 0)} km/h at the lip) clears a ${river.gap} m river and lands on the road (down at +${f(fd?.s ?? 0, 1)} m, d ${f(fd?.d ?? 0, 1)})`);
-  assert(!!hd && hd.wet && half.splashes > 0, `at half speed (${f(half.lip * 3.6, 0)} km/h at the lip) it drops into the water (down at +${f(hd?.s ?? 0, 1)} m) and splashes (${half.splashes})`);
+  assert(!!hd && hd.wet && half.splashes > 0, `at a crawl (${f(half.lip * 3.6, 0)} km/h at the lip) it drops into the water (down at +${f(hd?.s ?? 0, 1)} m) and splashes (${half.splashes})`);
   assert(half.out > 0 && half.out < 4, `and drives out up the far bank (${f(half.out, 2)} s in the water)`);
 }
 

@@ -15,7 +15,9 @@ game follows your browser's language.*
 
 **Puhelimella:** kaasu on aina pohjassa. Paina peukalo ruudulle mihin
 tahansa ja vedä sivulle: auto kääntyy sen verran kuin peukalo on siirtynyt.
-Pieni liike on pieni korjaus, täysi käännös vaatii kunnon vedon.
+Pieni liike on pieni korjaus, puoli vetoa on tavallinen mutka, ja täysi
+veto vauhdissa pyytää autolta enemmän kuin renkaat antavat: perä lähtee
+hieman.
 Nosta peukalo, niin ratti suoristuu. Napautus sytyttää **nitron**.
 Vasemmassa alakulmassa on **poljin**, ja toinen sormi missä tahansa on
 sama poljin: se jarruttaa ja irrottaa perän, eli jarrutus mutkaan heittää
@@ -118,7 +120,8 @@ vauhdissa auto hyppää veden yli ja laskeutuu vastarannalle. Hidas auto
 putoaa jokeen, roiskuu ja ajaa rantaa ylös takaisin tielle. Ilmassa auto
 ei ohjaa, joten linja valitaan ennen reunaa, ja vinossa alastulo maksaa
 vauhtia. Kiviaholla joki on heti ensimmäisen pitkän kaarteen jälkeen,
-Hirvisuolla pitkällä alasuoralla.
+Hirvisuolla pitkällä alasuoralla; jokkiksen lenkeillä joki on kapeampi,
+kahdeksan metriä, ja vakioauto ylittää sen täydessä vauhdissa.
 
 Jos auto juuttuu nokka edellä puihin, se **peruuttaa itse** irti ja
 kääntyy tielle päin. Jos se ei vieläkään pääse liikkeelle, ratamiehet
@@ -148,14 +151,21 @@ https://vesahyp.github.io/sora/?physics=old.
 - Nurmi on liukas, metsä pysäyttää. Maalissa korjaus maksaa osan
   palkinnosta.
 
-Kaksi rataa: **Kiviaho**, vajaa 700 metriä ja noin puoli minuuttia
-kierros, ja **Hirvisuo**, kilometrin lenkki.
+Neljä rataa. Jokkis ajetaan kahdella pikkuradalla, **Kiviahon lenkki** ja
+**Hirvisuon lenkki**, kumpikin noin 400 metriä ja vakioautolla noin 25
+sekuntia kierros: nyppylä lähtösuoralla, joki heti ensimmäisen kaarteen
+jälkeen, Kiviaholla oikotie hiusneulan sisäkautta. C-luokasta ylöspäin
+ajetaan isot radat: **Kiviaho**, vajaa 700 metriä ja noin puoli
+minuuttia kierros, ja **Hirvisuo**, kilometrin lenkki.
 
 ## Ura
 
 Ura alkaa jokamiesluokasta: tallissa on Tauno 2.0, pieni kulmikas
 takavetoinen jokkisauto, kolme kanisteria öljyä ja 150 krediittiä, eli juuri
-puskurin hinta. Kisat tuovat rahaa sijoituksen mukaan, ja raha menee
+puskurin hinta. Tauno on hidas ja kevyt: suoralla se loppuu noin 80
+kilometriin tunnissa, ja kääntyy kevyellä peukalolla. Moottori ja renkaat
+tuntuvat siinä heti: täyteen rakennettu Tauno vetää mutkista ulos
+neljänneksen kovemmin ja kiertää lenkin pari sekuntia nopeammin. Kisat tuovat rahaa sijoituksen mukaan, ja raha menee
 kolmeen paikkaan:
 
 - **Osakauppa**: puskuri, panssari, moottori, renkaat ja typpi, kolme

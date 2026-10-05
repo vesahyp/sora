@@ -14,7 +14,7 @@ enter its own class or any below it, never above.
 
 | Class | Car | What it is | Weapons that exist in it |
 |---|---|---|---|
-| JM | Tauno 2.0 | A tiny boxy jokkis saloon: rear drive, soft, slow | Oil |
+| JM | Tauno 2.0 | A tiny boxy jokkis saloon: rear drive, soft, slow, about 80 km/h flat out | Oil |
 | C | Kortteli 1.3 | A tired town car on gravel tyres | Oil, mines, the machine gun |
 | B | Sorsa 1.6 GT | Light and sharp | All of the above and missiles |
 | A | Kiila 4x4 Turbo | Four-wheel drive and a turbo | All |
@@ -26,15 +26,25 @@ A 4.7 m up to the 6 m plough lorry; the rivals' vehicles sit on the same
 ladder (`rivals.ts`). Beside each class car the dealer sells a wild buy
 in that class's money: a Niva and a Valmet tractor in C, a monster
 truck in B, a hearse in A (`cars.ts`). So does the
-field's skill: JM rivals are weekend drivers at 0.3 to 0.4, C 0.5 to
-0.6, B 0.68 to 0.8, A 0.84 to 1.0. `sim-check` holds the curve: the bot
-player wins every JM race by 3 s or more, finishes top two in two of
-three C races over both tracks, and does not win every A race.
+field's skill: the folk rivals' ceiling is 0.75 to 0.85 and each folk
+event scales it, from 0.4 in the first race (weekend drivers who wobble
+and brake late, 4 s a lap off a new thumb) to 1.1 at the final; C sits
+at 0.5 to 0.6, B 0.68 to 0.8, A 0.84 to 1.0. `sim-check` holds the
+curve with the thumb driver (`tools/hand.ts`) in the Tauno with the
+parts a winning player has by each race: it wins the first two folk
+races from every grid, is top two in the next two, has a fight in the
+final; the bot finishes top two in two of three C races over both
+tracks, and does not win every A race.
 
-The stock cars should sit about 10% apart on a lap, and a fully built
-car should reach the next class's stock pace (`make balance` is the
-table; `README.md` of the repo's `CLAUDE.md` says how to read it). The
-Tauno is tuned to that rule against the Kortteli.
+C, B and A should sit about 10% apart on a lap, and a fully built car
+should reach the next class's stock pace (`make balance` is the table;
+the repo's `CLAUDE.md` says how to read it). The Tauno is outside that
+rule on purpose (2026-10-05, after Vesa played it: "the speed now is
+like a really upgraded car"): stock it is slow and light, about 80 km/h
+flat out with 1.3 g of grip, so the engine and tyre parts are a step
+felt at once, and it races its own short loops, so its lap is not
+compared with the Kortteli's. JM to C is a bigger step than the
+others: the full tracks and a car half again as fast arrive together.
 
 The step from JM to C costs money only: buy the Kortteli. B and A keep
 their licence tests.
@@ -114,31 +124,37 @@ it.
 
 ## The first five races
 
-All in JM, in the Tauno, against Jorma, Marko and Tapsa in their own tiny cars. The
-field's cars stay stock: the rivals never drive a better car than the
-player's in the folk class. What grows is the driver: each event sets
-the share of their skill the rivals drive at (`fieldSkill`), from 0.45
-in the first race to 1.1 at the final, so the fifth race is the
-hardest without a single part the player could not have bought. The
+All in JM, in the Tauno, on the two folk loops (about 400 m, a lap of
+25 s for a new thumb in the stock car), against Jorma, Marko and Tapsa
+in their own tiny cars. The field's cars stay stock until the final:
+the rivals never drive a better car than the player's in the folk
+class. What grows is the driver: each event sets the share of their
+skill the rivals drive at (`fieldSkill`), from 0.4 in the first race to
+1.1 at the final, so the fifth race is the hardest without a single
+part the player could not have bought. A folk rival brings one can of
+oil to the early races and two from the fourth: on a 400 m loop two
+cans each covered the road in slicks by lap two. The
 parts and the pace gap arrive with the classes: C fields are stock
 for two races, then lightly built; B and A fields are built. This was
 changed on 2026-10-04 after the field gained a part a race and a new
 player in a stock Tauno met cars 2 s a lap faster than his by the
 fourth race, and asked why the rivals had better cars. The proof is
-in `sim-check`: a half-margin bot, a stand-in for a thumb that has not
-learnt the car, must win the first two folk races from every grid.
+in `sim-check`: the thumb driver with the parts of the hour must win
+the first two folk races from every grid.
 
-1. **Kiviahon jokkis**, Kiviaho, 3 laps. The field is stock with oil,
-   driving at 0.45 of its skill. The race must be fun in its first ten
-   seconds: the crest on the start straight lifts the whole field on
-   lap one, the first bend is a long sweeper, and right after it the
-   road jumps a river from its bank. Skill 0.45.
-2. **Hirvisuon jokkis**, Hirvisuo, 3 laps. The kilometre lap, a crest
-   on its straight, a river on the long bottom straight. Skill 0.8.
-3. **Kiviahon kahlaus**, Kiviaho, 4 laps. Skill 0.9, more oil.
-4. **Hirvisuon pitkä**, Hirvisuo, 4 laps. Skill 1.
-5. **Jokkisfinaali**, Kiviaho, 6 laps. Skill 1.1, and the field has a
-   ram bar and an engine, the two parts a winning Tauno has by then.
+1. **Kiviahon jokkis**, Kiviahon lenkki, 3 laps. The field is stock
+   with oil, driving at 0.4 of its skill. The race must be fun in its
+   first ten seconds: the crest on the start straight lifts the whole
+   field on lap one, the first bend is a long sweeper, and right after
+   it the road jumps a river from its bank.
+2. **Hirvisuon jokkis**, Hirvisuon lenkki, 3 laps. A longer straight
+   over a crest, a right-left, a sweeping right onto the bottom
+   straight with the river on it. Skill 0.5.
+3. **Kiviahon kahlaus**, Kiviahon lenkki, 4 laps. Skill 0.7, more oil.
+4. **Hirvisuon pitkä**, Hirvisuon lenkki, 4 laps. Skill 0.9.
+5. **Jokkisfinaali**, Kiviahon lenkki, 6 laps. Skill 1.1, and the field
+   has a ram bar, an engine and tyres, the parts a winning Tauno has by
+   then.
 
 Winning the five pays for the Kortteli with a ram bar and tyres on the
 Tauno along the way.
@@ -148,17 +164,21 @@ Tauno along the way.
 What Vesa asked for (2026-10-04): at least one jump on track one, a
 river crossing early, and a shortcut worth taking; then, the same day,
 that the jumps be part of the track, a jump over a river, not planked
-kickers. Kiviaho has all three, the jump being its river; Hirvisuo has
-a river and a crest. The shortcut is a gap in the
-forest across the inside of Kiviaho's hairpin, a car and a half wide,
-on grass: shorter, slower underfoot, walled by the trees, and a gamble
-when the field is on your bumper. The bots drive the road; the
-shortcut is the player's.
+kickers. Then (2026-10-05) that the first tracks were too long and too
+fast for the folk car: the folk class now races two short loops,
+Kiviahon lenkki and Hirvisuon lenkki, each about 400 m with a crest on
+the start straight and an 8 m river jumped from its bank, the Kiviaho
+one with a shortcut; the full Kiviaho and Hirvisuo arrive with class C.
+Kiviahon lenkki has all three asked for, the jump being its river. The
+shortcut is a gap in the forest across the inside of the loop's
+hairpin, a car and a half wide, on grass: shorter, slower underfoot,
+walled by the trees, and a gamble when the field is on your bumper. The
+bots drive the road; the shortcut is the player's.
 
-The checks: `sim-check` jumps every river with every car and asserts it
-is cleared every lap at racing speed and every flight lands on the road,
-and drives the shortcut and asserts it saves time against the road
-without being a free lap; `physics-check` holds that the Tauno flat out
-clears the river and at half speed falls in and drives out; `make
-drive-log` takes the river by touch on an emulated phone and prints the
-flight.
+The checks: `sim-check` jumps every river with the cars of the classes
+that race there and asserts it is cleared every lap at racing speed and
+every flight lands on the road, and drives the shortcut and asserts it
+saves time against the road without being a free lap; `physics-check`
+holds that the Tauno flat out clears the folk river and at a crawl
+falls in and drives out; `make drive-log` takes the river by touch on
+an emulated phone and prints the flight.

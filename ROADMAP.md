@@ -5,29 +5,45 @@ The design is in `docs/design.md`.
 
 ## Next
 
-- **Vesa's own phone playtest of the first hour.** The scripted thumb
-  (`make playthrough`, 2026-10-04) has answered what a script can: the
-  Tauno holds the road by thumb (5 to 15% of a race off it), a thumb
-  laps Kiviaho in 34 to 38 s stock and under 30 with the ram bar and
-  tyres, the first race is close, the next three are won clearly and
-  the final is lost or won by tenths to Marko, the river is cleared and
-  landed on the road, nobody sits stuck. What only a hand can answer:
-  is the Tauno fun to slide or merely safe now that the wheel asks for
-  yaw, does a nudge feel like a correction, is the oil read on screen
-  before it is driven over, is the co-driver's arrow looked at, does
-  the pace feel quick or twitchy, does the crest lift the field in a
-  way that is fun, the frame rate on the device. Knobs: `YAW_ROOM` in
-  `sim.ts`, `COUNTER` in `physics.ts`, the response curve in
-  `input.ts`, the grips in `cars.ts`, `fieldSkill` in `events.ts`,
-  `OIL` in `weapons.ts`, `CARS_ACROSS` and `LEAD_*` in `renderer.ts`.
-  Then the shortcut by hand: is a second a lap the right gain for a
-  lane that narrow, and should Marko take it too (`laneFor` in
-  `autoplayer.ts`).
-- **The thumb driver is a model, and a floor.** `scripts/playthrough.mjs`
-  steers by heading error with a reaction delay and never brakes to
-  rotate the car; a real thumb uses the pedal to swing the tail into
-  the hairpin and would lap quicker. Teach it the pedal stab, then the
-  shortcut, then read the hour again.
+- **Vesa's own phone playtest of the first hour, on the slow folk car and
+  the short loops** (rebuilt 2026-10-05 after he played the first cut:
+  "the basic car really just understeers", "the first tracks should be
+  shorter and the cars slower"). What the scripted thumb has answered
+  (`make playthrough`, `tools/hand.ts`): a held thumb now gets 96 to 98%
+  of the yaw it asks for at every speed (the caster was steering against
+  it), a new thumb laps Kiviahon lenkki in about 25 s stock and 23 with
+  the engine and tyres, the stock Tauno runs out at 80 km/h, the first
+  two folk races are won from every grid, the final is won or lost by
+  tenths, both rivers are cleared and landed on the road. What only a
+  hand can answer: does the Tauno feel slow and light or merely slow,
+  does a light thumb turn in willingly, does a careless full swing at
+  speed slide the rear the right amount, is the first engine part felt
+  at once, is 25 s a lap the right length, is the shortcut worth it by
+  hand. Knobs: the Tauno's `accel`, `topSpeed` and `grip` in `cars.ts`,
+  `CURVE` in `input.ts`, `CASTER_FROM` and `REAR_GRIP` in `physics.ts`,
+  `YAW_ROOM` in `sim.ts`, `fieldSkill` in `events.ts`, the loops'
+  points in `tracks.ts`.
+- **C, B and A are at their old speeds** and the caster fix made every
+  car answer the thumb honestly at 100 km/h and more: the Kortteli at
+  130 km/h may now feel twitchy where the Tauno feels right. Playtest
+  the first C race in the stock Kortteli before touching anything;
+  the knob is the same `CURVE`, or a `lock` on the thumb that widens
+  with speed. The step from JM to C is also now a car half again as
+  fast on tracks twice as long: if that is too much at once, slow the
+  Kortteli a tenth (`cars.ts`) and the licence targets follow
+  (`make balance`, `licences.ts`).
+- **The upgrade gap on the folk car is 10 to 12% of a lap** (stock 25.3
+  against full 23.1 by the hand, 24.2 against 21.4 by the bot, `make
+  balance`). The pull and the top speed are the felt part (+27% and
+  +15%, with the engine fading toward its top the terminal speed goes 80
+  to 95 km/h). If the step should be bigger, the knob is the per-level
+  effect in `tuned()` (`parts.ts`), which is shared by every class, so
+  read the C to A ladder in `make balance` after.
+- **The thumb driver is a model, and a floor.** `tools/hand.ts` steers
+  by heading error with a reaction delay, goes round a car ahead, jumps
+  a river, and never brakes to rotate the car; a real thumb uses the
+  pedal to swing the tail into the hairpin and would lap quicker. Teach
+  it the pedal stab, then the shortcut, then read the hour again.
 - **Delete the old car model in the next release.** Vesa played the
   new one (2026-10-03) and it is better, so `?physics=old` has done its
   job. Remove `src/game/physics-old.ts`, `SimState.physics` and the
@@ -53,7 +69,8 @@ The design is in `docs/design.md`.
 - The whole Kiviaho hairpin is 70 m across and the camera 24 m: the
   approach shows the entry and the turn, the arrow the rest. A zoom
   that widens with speed or into a hairpin is the next knob if the
-  phone playtest says the hairpin still surprises.
+  phone playtest says the hairpin still surprises. The folk loops'
+  hairpins are tighter still (radius 15 to 20 m) at half the speed.
 - The look, what is still short: the birch crowns are too yellow-green
   and their limbs too stark, the spruce reads as a dark bush more than
   a conifer, the hurt-engine smoke leaves a row of spots, the haze
@@ -108,7 +125,11 @@ the track features below need. All of it is data in `tracks.ts`:
   was) and the grass shortcut across the hairpin, and nothing that
   throws a car into the hairpin; Hirvisuo a 0.9 m crest on the straight
   and the same river on the long bottom straight (s 560: in the esses,
-  where the ford was, a flight landed off the bending road).
+  where the ford was, a flight landed off the bending road). The folk
+  loops (2026-10-05) have the same crest on their start straights and an
+  8 m river each, sized to the slow Tauno: the stock car clears it at
+  60 km/h and lands 11 m past the lip, a crawl drops in; Kiviahon lenkki
+  has a grass shortcut across its hairpin that saves 1.6 s a lap.
 - **Stuck:** any car not a metre along in 1.5 s with its nose at the
   trees reverses on its own for a second, the wheel turned to bring the
   nose round to the road (`sim.ts`, `rescue`); a car off the road and
