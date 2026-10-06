@@ -479,7 +479,7 @@ function drive(c: Car, b: Body, a: Ask, u: Under, h: number): void {
   for (let i = 0; i < 4; i++) {
     const isFront = i < 2;
     const sd = isFront ? u.front : u.rear;
-    let mu = r.mu * sd.grip * a.loose;
+    let mu = r.mu * (isFront ? 1 : r.rearGrip) * sd.grip * a.loose;
     if (oiled) mu *= isFront ? OIL.grip : OIL.rearGrip;
     if (!isFront && handbrake) mu *= 1 - (1 - r.lockedGrip) * a.pedal;
     b.vehicle.setWheelFrictionSlip(i, mu);

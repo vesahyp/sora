@@ -93,7 +93,7 @@ in `cars.ts` are honest now: `topSpeed` is the speed the car reaches.
 | Handbrake force | N on the rear wheels | 13 000 | the pedal above 6 m/s: 0.8 × the force that locks them |
 | Locked-tyre friction | share of μ | 0.85 | a sliding tyre's friction against a rolling one's |
 | Max steer angle | rad | 0.44 | `turnRate` × 0.17 |
-| Lock at speed | m/s that halves it | 20 | constant |
+| Lock at speed | m/s that halves it | 28 | constant |
 | Steer rate | rad/s | 5 | constant |
 
 The live values are in `src/game/rig.ts`; the title screen has a
@@ -130,3 +130,16 @@ the slip angle of each wheel while driving.
   nowhere for 6 s, on the road or off it.
 - ADR 0003's rigid-body contacts, surfaces and heights carry over as
   data; its tyre and its aids are superseded by this record.
+
+## Update 2026-10-06
+
+Vesa played the first Rapier build: "Still understeer". In his
+screenshot the Tauno was on the grass verge at 59 km/h, the wheel at
+0.11 of the 0.24 rad the lock allowed there. The car holds 1.19 g on
+gravel at that speed whatever the axle balance (a skidpad sweep of the
+rear tyres' friction, the weight split and the rear's peak slip angle,
+`tools/dbg/skidpad.ts`), but with the lock halving at 20 m/s a thumb
+reached that limit only at 70% of its swing. The lock now halves at
+28 m/s: a 30% swing turns at 0.76 g instead of 0.66, the limit comes at
+half a swing, and a pedal stab at half lock turns the car 1.4 rad, a
+hairpin's worth, as the old model did. 35 m/s turned a stab into a spin.

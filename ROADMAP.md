@@ -10,13 +10,13 @@ The design is in `docs/design.md`.
   physics"). The scripted thumb says: the yaw rate reaches 63% of its
   turn 0.07 s after the thumb moves, at any swing; the hand laps
   Kiviahon lenkki in 25 to 26 s stock as before. What only a hand can
-  answer, in the readout's terms: is the lock at speed right (0.22 rad at
-  70 km/h, `lockHalf`), does the turn-in at a full swing (the yaw peaks a
+  answer, in the readout's terms: is the lock at speed right (0.26 rad at
+  70 km/h, `lockHalf` 28 m/s since "still understeer" on 2026-10-06), does the turn-in at a full swing (the yaw peaks a
   third over what the car then holds) read as bite or as a twitch, is the
   pedal's tail swing enough (`handbrakeForce`, 0.8 of what locks the
-  rear: a stab at 80 km/h turns the Tauno 0.5 rad, held with the thumb
-  1.2; at the full lock it was a snap the thumb made more than once a
-  race),
+  rear: a stab at 80 km/h at half lock turns the Tauno 1.4 rad, held
+  with the thumb 2.1; at the full lock it was a snap the thumb made more
+  than once a race),
   does the car feel heavy enough (`mass`,
   `comHeight`, `yawInertia`). Every knob is in `src/game/rig.ts`.
   The scripted thumb's open problem: it brakes mid-hairpin without
@@ -25,6 +25,12 @@ The design is in `docs/design.md`.
   tow rules (2026-10-06, Hirvisuon lenkki's hairpin at 43 km/h). Teach
   `tools/hand.ts` to brake before the bend, not in it, before reading
   the hour's off-road numbers as the car's.
+- **B on Hirvisuo got hard for the bot player** (2026-10-06): with the
+  lock at speed raised and the B rivals' skill raised 0.05 so the field
+  stays on screen on Kiviaho, the bot player is third or fourth in all
+  six B races on Hirvisuo (second to fourth before). Read it by thumb in
+  the B class before touching it; the knobs are the B skills in
+  `rivals.ts` and `fieldSkill` on the B events.
 - **C, B and A lap within 0.3 s of the old model** on Rapier (`make
   balance`), and every car answers the thumb the same way: the Kortteli
   at 130 km/h may feel twitchy where the Tauno feels right. Playtest

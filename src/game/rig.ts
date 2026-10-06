@@ -34,6 +34,8 @@ export interface Rig {
   damperRebound: number;
   /** the tyre's friction coefficient on gravel; a surface scales it */
   mu: number;
+  /** the rear tyres' friction as a share of the front's: under 1 the car turns in rather than ploughs */
+  rearGrip: number;
   /** rad: the slip angle at which the tyre reaches its friction limit on gravel, front and rear */
   peakFront: number;
   peakRear: number;
@@ -116,6 +118,7 @@ export function rig(def: CarDef): Rig {
     damperCompression: COMPRESSION_PER_KG * mass,
     damperRebound: REBOUND_PER_KG * mass,
     mu: def.grip / G,
+    rearGrip: 1,
     peakFront: 0.13,
     peakRear: 0.13 * REAR_STIFF,
     engineForce,
@@ -128,7 +131,7 @@ export function rig(def: CarDef): Rig {
     handbrakeForce: HANDBRAKE_SHARE * mass * def.grip,
     lockedGrip: 0.85,
     maxSteer: def.turnRate * LOCK_PER_TURN,
-    lockHalf: 20,
+    lockHalf: 28,
     steerRate: 5,
     length: L,
     width: W,
