@@ -79,6 +79,8 @@ interface Body {
   vehicle: RAPIER.DynamicRayCastVehicleController;
   /** the plain fields as this file last wrote them, to see a write from outside */
   seen: { x: number; y: number; heading: number; vx: number; vy: number; yaw: number };
+  /** m over the ground at rest: the height of the body's reference point, fixed for the race */
+  origin: number;
   /** the wheels' static loads, N */
   loadF: number;
   loadR: number;
@@ -243,22 +245,20 @@ export function wallBoxes(t: Track): { x: number; y: number; a: number; hl: numb
   return out;
 }
 
-/** The car's body: a box with its mass at the centre of mass, four wheels, the rig's springs. */
+/**
+ * The car's body: a box with its mass at the centre of mass, four wheels, the rig's springs. The
+ * body's own reference point is the middle of the wheelbase at the rig's centre-of-mass height
+ * when the race starts, and stays there, so a rig changed mid-race (the tuning panel) moves the
+ * centre of mass and the wheels against it without moving the car.
+ */
 function carBody(world: RAPIER.World, t: Track, c: Car): Body {
   const r = rigOf(c.def);
-  const L = r.wheelbase;
-  const front = L * (1 - r.frontWeight);
-  const rear = L * r.frontWeight;
+  const origin = r.comHeight;
   const loc = t.locate(c.x, c.y);
-  // the springs' static sag: each wheel carries a quarter of the weight
-  const stiff = r.springRate / r.mass;
-  const sag = G / (4 * stiff);
-  const mount = r.wheelRadius + r.restLength - sag - r.comHeight;
   const body = world.createRigidBody(
     RAPIER.RigidBodyDesc.dynamic()
-      .setTranslation(c.x, c.y, t.groundAt(loc.s, loc.d) + r.comHeight + 0.02)
+      .setTranslation(c.x, c.y, t.groundAt(loc.s, loc.d) + origin + 0.02)
       .setRotation(yawQuat(c.heading))
-      .setAdditionalMassProperties(r.mass, { x: 0, y: 0, z: 0 }, { x: r.rollInertia, y: r.pitchInertia, z: r.yawInertia }, { w: 1, x: 0, y: 0, z: 0 })
       .setCanSleep(false)
       .setCcdEnabled(true),
   );
@@ -266,7 +266,7 @@ function carBody(world: RAPIER.World, t: Track, c: Car): Body {
     // rounded at every edge, as a car's bumpers and sills are: a square edge dug into a river's far
     // bank and stopped a car dead from 57 km/h (tools/dbg/splash.ts, 2026-10-06)
     RAPIER.ColliderDesc.roundCuboid(r.length / 2 - BODY_ROUND, r.width / 2 - BODY_ROUND, r.height / 2 - BODY_ROUND, BODY_ROUND)
-      .setTranslation((front - rear) / 2, 0, CLEARANCE + r.height / 2 - r.comHeight)
+      .setTranslation(0, 0, CLEARANCE + r.height / 2 - origin)
       .setDensity(0)
       .setFriction(CAR_FRICTION)
       .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
@@ -279,28 +279,44 @@ function carBody(world: RAPIER.World, t: Track, c: Car): Body {
   const vehicle = world.createVehicleController(body);
   vehicle.indexUpAxis = 2;
   vehicle.setIndexForwardAxis = 0;
-  // front left, front right, rear left, rear right; +y is the car's right on the screen
-  for (const [x, y] of [[front, -r.track / 2], [front, r.track / 2], [-rear, -r.track / 2], [-rear, r.track / 2]]) {
-    vehicle.addWheel({ x, y, z: mount }, { x: 0, y: 0, z: -1 }, { x: 0, y: -1, z: 0 }, r.restLength, r.wheelRadius);
-  }
+  // front left, front right, rear left, rear right; +y is the car's right on the screen. Placed by applyRig
+  for (let i = 0; i < 4; i++) vehicle.addWheel({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: -1 }, { x: 0, y: -1, z: 0 }, r.restLength, r.wheelRadius);
+  const b: Body = { rig: r, origin, body, collider, vehicle, seen: { x: NaN, y: NaN, heading: NaN, vx: NaN, vy: NaN, yaw: NaN }, loadF: 0, loadR: 0, wrecked: false };
+  applyRig(b, r);
+  return b;
+}
+
+/** Put a rig into a car's body and wheels: mass, centre of mass, inertia, wheel places, springs. */
+function applyRig(b: Body, r: Rig): void {
+  b.rig = r;
+  const L = r.wheelbase;
+  b.body.setAdditionalMassProperties(r.mass, { x: L * (r.frontWeight - 0.5), y: 0, z: r.comHeight - b.origin }, { x: r.rollInertia, y: r.pitchInertia, z: r.yawInertia }, { w: 1, x: 0, y: 0, z: 0 }, true);
+  // the springs' static sag: each wheel carries a quarter of the weight
+  const stiff = r.springRate / r.mass;
+  const sag = G / (4 * stiff);
+  const mount = r.wheelRadius + r.restLength - sag - b.origin;
+  const places = [[L / 2, -r.track / 2], [L / 2, r.track / 2], [-L / 2, -r.track / 2], [-L / 2, r.track / 2]];
   for (let i = 0; i < 4; i++) {
-    vehicle.setWheelSuspensionStiffness(i, stiff);
-    vehicle.setWheelSuspensionCompression(i, r.damperCompression / r.mass);
-    vehicle.setWheelSuspensionRelaxation(i, r.damperRebound / r.mass);
-    vehicle.setWheelMaxSuspensionTravel(i, r.travel);
-    vehicle.setWheelMaxSuspensionForce(i, r.maxSpringForce);
-    vehicle.setWheelFrictionSlip(i, r.mu);
+    b.vehicle.setWheelChassisConnectionPointCs(i, { x: places[i][0], y: places[i][1], z: mount });
+    b.vehicle.setWheelSuspensionRestLength(i, r.restLength);
+    b.vehicle.setWheelRadius(i, r.wheelRadius);
+    b.vehicle.setWheelSuspensionStiffness(i, stiff);
+    b.vehicle.setWheelSuspensionCompression(i, r.damperCompression / r.mass);
+    b.vehicle.setWheelSuspensionRelaxation(i, r.damperRebound / r.mass);
+    b.vehicle.setWheelMaxSuspensionTravel(i, r.travel);
+    b.vehicle.setWheelMaxSuspensionForce(i, r.maxSpringForce);
+    b.vehicle.setWheelFrictionSlip(i, r.mu);
   }
-  return {
-    rig: r,
-    body,
-    collider,
-    vehicle,
-    seen: { x: NaN, y: NaN, heading: NaN, vx: NaN, vy: NaN, yaw: NaN },
-    loadF: (r.mass * G * r.frontWeight) / 2,
-    loadR: (r.mass * G * (1 - r.frontWeight)) / 2,
-    wrecked: false,
-  };
+  b.loadF = (r.mass * G * r.frontWeight) / 2;
+  b.loadR = (r.mass * G * (1 - r.frontWeight)) / 2;
+}
+
+/** The rig a car in the race is running on, and a new one for it, live: the tuning panel's way in. */
+export function rigInRace(s: SimState, i: number): Rig {
+  return s.world.bodies[i].rig;
+}
+export function setRigInRace(s: SimState, i: number, r: Rig): void {
+  applyRig(s.world.bodies[i], r);
 }
 
 const bitten = new Map<string, SurfaceDef>();
@@ -370,7 +386,7 @@ function takeWrites(c: Car, b: Body, t: Track): void {
   const seen = b.seen;
   if (c.x !== seen.x || c.y !== seen.y || c.heading !== seen.heading) {
     const loc = t.locate(c.x, c.y);
-    b.body.setTranslation({ x: c.x, y: c.y, z: t.groundAt(loc.s, loc.d) + b.rig.comHeight + 0.02 }, true);
+    b.body.setTranslation({ x: c.x, y: c.y, z: t.groundAt(loc.s, loc.d) + b.origin + 0.02 }, true);
     b.body.setRotation(yawQuat(c.heading), true);
     b.body.setLinvel({ x: c.vx, y: c.vy, z: 0 }, true);
     b.body.setAngvel({ x: 0, y: 0, z: c.yaw }, true);
@@ -517,7 +533,7 @@ function readBack(c: Car, b: Body, t: Track, dt: number, u?: Under): void {
   c.vx = v.x;
   c.vy = v.y;
   c.yaw = av.z;
-  c.z = p.z - b.rig.comHeight;
+  c.z = p.z - b.origin;
   c.vz = v.z;
   let contact = 0;
   for (let i = 0; i < 4; i++) {
@@ -528,11 +544,9 @@ function readBack(c: Car, b: Body, t: Track, dt: number, u?: Under): void {
     contact++;
     // the slip angle: where the tyre's contact patch goes against where the wheel points
     const cp = b.vehicle.wheelContactPoint(i)!;
-    const rx = cp.x - p.x;
-    const ry = cp.y - p.y;
-    const rz = cp.z - p.z;
-    const vx = v.x + av.y * rz - av.z * ry;
-    const vy = v.y + av.z * rx - av.x * rz;
+    const pv = b.body.velocityAtPoint(cp);
+    const vx = pv.x;
+    const vy = pv.y;
     const a = heading + (i < 2 ? c.steerAngle : 0);
     const wf = vx * Math.cos(a) + vy * Math.sin(a);
     const wl = vx * -Math.sin(a) + vy * Math.cos(a);

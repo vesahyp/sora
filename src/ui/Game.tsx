@@ -13,8 +13,10 @@ import { fmt, track } from '../records';
 import { t, tr } from '../i18n';
 import { Lamps, MineIcon, MissileIcon, NoteArrow, OilIcon, PauseIcon, SoundIcon, WheelIcon } from './Dash';
 import { nextNote, type PaceNote } from '../game/notes';
-import { physicsReadout } from '../settings';
-import { lockAt, rigOf } from '../game/rig';
+import { loadTuned, physicsReadout, saveTuned, tuningMode, type Tuned } from '../settings';
+import { TuningPanel, tunedRig } from './Tuning';
+import { lockAt, rigOf, type Rig } from '../game/rig';
+import { rigInRace, setRigInRace } from '../game/physics';
 import type { Car } from '../game/state';
 
 /**
@@ -22,8 +24,7 @@ import type { Car } from '../game/state';
  * engine's own terms. Speed, yaw rate, the wheel's angle against the lock at this speed, and
  * each tyre's slip angle, amber past its peak slip angle (the tyre is at its friction limit).
  */
-function readout(c: Car): string {
-  const r = rigOf(c.def);
+function readout(c: Car, r: Rig): string {
   const f = (x: number, n = 2) => (x >= 0 ? ' ' : '') + x.toFixed(n);
   const slip = (i: number) => {
     const a = c.wheelSlip[i];
@@ -107,6 +108,11 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
   const [hud, setHud] = useState<Hud | null>(null);
   const [paused, setPaused] = useState(false);
   const pausedRef = useRef(false);
+  // the tuning mode (title screen): the panel, what it has changed, the game pace it sets
+  const [tuningOn] = useState(tuningMode());
+  const [tuneOpen, setTuneOpen] = useState(false);
+  const [tuned, setTuned] = useState<Tuned>(() => loadTuned());
+  const paceRef = useRef(tuningMode() ? (loadTuned().pace ?? GAME_PACE) : GAME_PACE);
   const [muted, setMuted] = useState(audio.muted);
   const endedRef = useRef(false);
 
@@ -161,8 +167,14 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
     // ?speed=3 runs the bot at triple speed for screenshots; under 1 is slow motion, for a
     // script that drives by touch and cannot keep up with sixty frames a second
     // the game pace (sim.ts) on top: the world runs faster than the wall clock
-    const speed = Math.max(0.25, Number(params.get('speed') ?? 1)) * GAME_PACE;
+    const scriptSpeed = Math.max(0.25, Number(params.get('speed') ?? 1));
+    let speed = scriptSpeed * paceRef.current;
     (window as unknown as { __pace: number }).__pace = speed;
+    // what the tuning panel changed last time, on the player's car from the lights
+    if (tuningMode()) {
+      const changes = loadTuned().cars[car.id];
+      if (changes) setRigInRace(s, 0, tunedRig(rigOf(car), changes));
+    }
     const perf = { frames: 0, ms: 0, worst: 0 };
     (window as unknown as { __perf: typeof perf }).__perf = perf;
 
@@ -240,6 +252,8 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
       let dt = Math.min(0.1, (now - last) / 1000);
       last = now;
       if (pausedRef.current) dt = 0;
+      speed = scriptSpeed * paceRef.current;
+      (window as unknown as { __pace: number }).__pace = speed;
       acc += dt * speed;
       let n = 0;
       while (acc >= DT && n < 4 * speed) {
@@ -292,7 +306,7 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
       if (now - hudAt > 50) {
         hudAt = now;
         publishHud();
-        if (debugRef.current) debugRef.current.innerHTML = readout(s.cars[0]);
+        if (debugRef.current) debugRef.current.innerHTML = readout(s.cars[0], rigInRace(s, 0));
       }
       const ms = performance.now() - t0;
       perf.frames++;
@@ -319,6 +333,21 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
   const pause = (p: boolean) => {
     pausedRef.current = p;
     setPaused(p);
+  };
+  const openTune = () => {
+    pausedRef.current = true;
+    setTuneOpen(true);
+  };
+  const closeTune = () => {
+    pausedRef.current = paused;
+    setTuneOpen(false);
+  };
+  const retune = (changes: Record<string, number>, pace: number) => {
+    const next: Tuned = { pace, cars: { ...tuned.cars, [car.id]: changes } };
+    setTuned(next);
+    saveTuned(next);
+    paceRef.current = pace;
+    if (simRef.current) setRigInRace(simRef.current, 0, tunedRig(rigOf(car), changes));
   };
   const toggleMute = () => {
     audio.setMuted(!audio.muted);
@@ -426,6 +455,22 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
       <button className={`iconbtn mute${muted ? ' off' : ''}`} data-ui onClick={toggleMute} aria-label={tr('Ääni', 'Sound')}>
         <SoundIcon off={muted} />
       </button>
+      {tuningOn && (
+        <button className="tune-btn" data-ui onClick={openTune}>
+          {tr('SÄÄDÄ', 'TUNE')}
+        </button>
+      )}
+      {tuneOpen && (
+        <TuningPanel
+          carId={car.id}
+          base={rigOf(car)}
+          basePace={GAME_PACE}
+          changes={tuned.cars[car.id] ?? {}}
+          pace={paceRef.current}
+          onChange={retune}
+          onClose={closeTune}
+        />
+      )}
       {count > 0 && (
         <div className="banner count" key={count}>
           <div className="t">{count}</div>

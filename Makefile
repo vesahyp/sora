@@ -13,6 +13,7 @@
 #   make icon          # render public/icon.svg to the PNG icons
 #   make lineup        # every vehicle in the game on one canvas -> shots/lineup.png
 #   make car-shots     # every player car from the race camera, a crop each -> shots/cars/
+#   make tuning-check  # the tuning mode by touch on the phone: open, slide, copy JSON, reset -> shots/tuning/
 #   make readout-shot  # the physics readout on the phone in a race -> shots/readout/
 #   make touch-check   # drives the race by touch on an emulated phone
 #   make newcareer-check # New career on the title: confirm defaults to No, Yes wipes only the career (iPhone landscape)
@@ -34,7 +35,7 @@ PROFILE ?= personal
 AWS      = AWS_PROFILE=$(PROFILE) aws
 TF       = AWS_PROFILE=$(PROFILE) terraform -chdir=infra
 
-.PHONY: dev build preview check balance shots-setup shots shots-en readout-shot icon lineup car-shots touch-check newcareer-check drive-log stuck-check rotate-check playthrough pwa-check plan apply outputs env deploy-pixel
+.PHONY: dev build preview check balance shots-setup shots shots-en readout-shot tuning-check icon lineup car-shots touch-check newcareer-check drive-log stuck-check rotate-check playthrough pwa-check plan apply outputs env deploy-pixel
 
 dev:
 	npm run dev
@@ -76,6 +77,10 @@ car-shots:
 	node scripts/car-shots.mjs
 
 # the physics readout switched on in the title screen and shown in the first folk race, the bot driving
+# the tuning mode by touch on an emulated phone: the panel opens, the sliders reach the running car
+tuning-check:
+	node scripts/tuning-check.mjs
+
 readout-shot:
 	node scripts/readout-shot.mjs
 

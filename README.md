@@ -134,7 +134,9 @@ jälkeen.
 Autot ajavat oikealla fysiikkamoottorilla (Rapier): massa, painonsiirto,
 renkaiden pito ja ohjauskulma ovat oikeita suureita. Alkuruudun
 **Fysiikkalukemat**-kytkin näyttää kisan aikana nopeuden, kiertonopeuden,
-ohjauskulman ja jokaisen renkaan luistokulman.
+ohjauskulman ja jokaisen renkaan luistokulman. **Säätötila**-kytkin tuo kisaan
+SÄÄDÄ-napin: jokainen auton fysiikan luku ja pelin tahti liukusäätimenä,
+voimassa heti, ja Kopioi JSON lähettää säädöt eteenpäin.
 
 - **Sivuluisu** täyttää nitrotankkia. Niin täyttää myös töytäisy ja
   erityisesti toisen auton romuttaminen, joka täyttää tankin kerralla.

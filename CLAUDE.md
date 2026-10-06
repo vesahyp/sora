@@ -119,7 +119,10 @@ src/
   audio.ts            Web Audio synth: the engine note and the event beeps
   version.ts          build id and the newer-build check behind the update banner
   i18n.ts             the language: fi or en, tr() and t(), picked from the browser
-  settings.ts         the physics readout switch (title screen); Game.tsx draws the readout
+  settings.ts         the title screen's switches (physics readout, tuning mode) and the tuning panel's saved
+                        changes; Game.tsx draws the readout
+  ui/Tuning.tsx       the tuning panel: a slider per rig number and the game pace, grouped by system, applied
+                        live to the player's car (physics.ts, setRigInRace); reset, copy as JSON
 tools/
   hand.ts             the thumb driver: a hand on a phone, headless. Heading error to thumb px through
                         input.ts's own curve, a reaction delay, a thumb's speed, tremor, brakes when a bend
@@ -145,6 +148,8 @@ scripts/
   shots.mjs           phone screenshots with Playwright, the bot driving
   touch-check.mjs     drives the race by touch on an emulated phone: steer, brake, pause
   readout-shot.mjs    the physics readout switched on and shown in a race on the phone
+  tuning-check.mjs    the tuning mode by touch on the phone: the panel opens, a slider reaches the running car,
+                        copy as JSON, reset
   drive-log.mjs       set pieces by touch on an emulated phone, the physics logged frame by frame
   icon.mjs            render public/icon.svg to the PNG icons: 512, 192, the 180 iOS icon, a 32 favicon
   lineup.mjs          every vehicle in the game on one canvas to shots/lineup.png, a row per class,
@@ -214,7 +219,12 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
 - **The physics readout** (title screen: Physics readout) shows the
   speed, the yaw rate, the wheel's angle against the lock and each
   tyre's slip angle live in the race; `make playthrough` records with it
-  on. Talk about the handling in its numbers.
+  on. Talk about the handling in its numbers. **The tuning mode** (title
+  screen: Tuning mode) adds a TUNE button in the race: every rig number
+  and the game pace on a slider, live on the player's car, and Copy JSON
+  to send the set back. A set that comes back is read into `rig.ts` (or
+  `cars.ts` for one car) and checked like any other change. Run `make
+  tuning-check` after touching the panel or `applyRig`.
 - **A handling or balance change is proved by thumb, on video.** `make playthrough`
   plays the first hour on an emulated phone with a hand that is not the bot
   (`scripts/playthrough.mjs`: a reaction delay, a thumb that moves at a thumb's
