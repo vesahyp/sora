@@ -48,7 +48,14 @@ const WANT = ['Ram bar', 'Tyres', 'Engine', 'Nitro', 'Ram bar', 'Tyres', 'Engine
 mkdirSync(OUT, { recursive: true });
 for (const f of readdirSync(OUT)) rmSync(join(OUT, f), { recursive: true, force: true });
 const server = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort'], { stdio: 'ignore' });
-await new Promise((r) => setTimeout(r, 2500));
+// wait for the server to answer, not a fixed pause: on a busy machine it took longer than the
+// pause and the first race opened on a refused connection (2026-10-06)
+for (let i = 0; ; i++) {
+  const up = await fetch(`http://localhost:${port}/sora/`).then((r) => r.ok, () => false);
+  if (up) break;
+  if (i > 120) throw new Error(`no preview server on port ${port} after 60 s`);
+  await new Promise((r) => setTimeout(r, 500));
+}
 const browser = await chromium.launch();
 const phone = devices['iPhone 15 landscape'];
 let failed = false;
