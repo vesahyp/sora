@@ -13,6 +13,7 @@
 #   make icon          # render public/icon.svg to the PNG icons
 #   make lineup        # every vehicle in the game on one canvas -> shots/lineup.png
 #   make car-shots     # every player car from the race camera, a crop each -> shots/cars/
+#   make frame-check   # the 3D view's frame rate on the phone layout, CPU slowed (THROTTLE ?= 2)
 #   make tuning-check  # the tuning mode by touch on the phone: open, slide, copy JSON, reset -> shots/tuning/
 #   make readout-shot  # the physics readout on the phone in a race -> shots/readout/
 #   make touch-check   # drives the race by touch on an emulated phone
@@ -35,7 +36,7 @@ PROFILE ?= personal
 AWS      = AWS_PROFILE=$(PROFILE) aws
 TF       = AWS_PROFILE=$(PROFILE) terraform -chdir=infra
 
-.PHONY: dev build preview check balance shots-setup shots shots-en readout-shot tuning-check icon lineup car-shots touch-check newcareer-check drive-log stuck-check rotate-check playthrough pwa-check plan apply outputs env deploy-pixel
+.PHONY: dev build preview check balance shots-setup shots shots-en readout-shot tuning-check frame-check icon lineup car-shots touch-check newcareer-check drive-log stuck-check rotate-check playthrough pwa-check plan apply outputs env deploy-pixel
 
 dev:
 	npm run dev
@@ -78,6 +79,10 @@ car-shots:
 
 # the physics readout switched on in the title screen and shown in the first folk race, the bot driving
 # the tuning mode by touch on an emulated phone: the panel opens, the sliders reach the running car
+# the chase view's frames on an emulated iPhone in landscape with the CPU slowed to a phone's: needs a build
+frame-check: build
+	THROTTLE=$(THROTTLE) node scripts/frame-check.mjs
+
 tuning-check:
 	node scripts/tuning-check.mjs
 
@@ -106,6 +111,7 @@ rotate-check:
 # summary.md with the places and laps. The proof a handling or balance change is read against
 RACES ?=
 SPEED ?= 1
+THROTTLE ?= 2
 playthrough:
 	RACES=$(RACES) SPEED=$(SPEED) node scripts/playthrough.mjs
 

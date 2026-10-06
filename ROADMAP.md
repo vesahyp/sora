@@ -5,6 +5,21 @@ The design is in `docs/design.md`.
 
 ## Next
 
+- **The 3D view on an older phone** (ADR 0006, 2026-10-06): at a quarter
+  CPU speed the chase view runs 55 frames a second with one frame in
+  fifteen two refreshes long; the game's own work is 10.8 ms a frame,
+  6.4 of it the sim (Rapier and the bots), 4.4 the drawing. Vesa's
+  iPhone is far above that; if a slower phone stutters, the knobs are
+  the shadow map (`render3d.ts`, the sun), the trees' count, and the
+  bots' look-ahead (`autoplayer.ts`). `make frame-check THROTTLE=4`.
+- **The chase camera by thumb**: its distance, height and lead, and how
+  far it swings toward the road ahead (`CHASE`, `ROAD_LOOK`,
+  `SPEED_FULL` in `render3d.ts`). Does a hairpin read in time? Seen in
+  the playthrough (2026-10-06): with the car against the tree line the
+  camera ends up behind a spruce for a moment, and a car spun on oil at
+  11 km/h tipped up on two wheels. A camera that pulls in past what it
+  would clip, and the roll inertia or the oil's kick, are the knobs.
+
 - **Vesa's phone playtest of the Rapier car** (ADR 0005, 2026-10-06,
   after "the steering is limp and then suddenly reacts. This is not
   physics"). The scripted thumb says: the yaw rate reaches 63% of its

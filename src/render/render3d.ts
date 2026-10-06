@@ -25,11 +25,47 @@ const FOV = 58;
 const CHASE = { back: 6.2, up: 2.5, ahead: 9, lookUp: 0.2 };
 /** how fast the camera swings round to the car's direction, per second */
 const CAM_EASE = 4.5;
+/** m/s at which the camera has pulled all the way back and opened its lens */
+const SPEED_FULL = 30;
 /** of the camera's direction, the share taken from the road ahead rather than the car: bends read before the car is in them */
 const ROAD_LOOK = 0.35;
 /** metres of road the camera looks down for that */
 const ROAD_AHEAD = 16;
 const FOG = { near: 70, far: 230 };
+const BURNT = new THREE.Color('#1a1712');
+
+/**
+ * Each body's proportions for the chase view: the lower body's height, the cabin's length and where
+ * it sits (shares of the car's length, + toward the front), the roof's height, and the extras.
+ */
+interface Shape {
+  body: number;
+  cabin: number;
+  cabinAt: number;
+  roof: number;
+  roofPaint?: boolean;
+  bed?: number;
+  stack?: boolean;
+  blade?: boolean;
+  bigRear?: boolean;
+}
+const SHAPES: Record<string, Shape> = {
+  saloon: { body: 0.5, cabin: 0.46, cabinAt: -0.04, roof: 0.42 },
+  hatch: { body: 0.5, cabin: 0.5, cabinAt: -0.12, roof: 0.46 },
+  coupe: { body: 0.42, cabin: 0.36, cabinAt: -0.08, roof: 0.36, roofPaint: true },
+  rally: { body: 0.46, cabin: 0.42, cabinAt: -0.06, roof: 0.42, roofPaint: true },
+  estate: { body: 0.5, cabin: 0.62, cabinAt: -0.14, roof: 0.44 },
+  beetle: { body: 0.48, cabin: 0.4, cabinAt: -0.04, roof: 0.5, roofPaint: true },
+  van: { body: 0.7, cabin: 0.8, cabinAt: -0.08, roof: 0.75, roofPaint: true },
+  pickup: { body: 0.55, cabin: 0.3, cabinAt: 0.12, roof: 0.5, bed: 0.42 },
+  microcar: { body: 0.45, cabin: 0.55, cabinAt: -0.08, roof: 0.5, roofPaint: true },
+  tractor: { body: 0.7, cabin: 0.32, cabinAt: -0.18, roof: 0.95, stack: true, bigRear: true },
+  monster: { body: 0.55, cabin: 0.4, cabinAt: -0.05, roof: 0.45 },
+  bus: { body: 0.9, cabin: 0.94, cabinAt: 0, roof: 0.9, roofPaint: true },
+  plough: { body: 0.8, cabin: 0.32, cabinAt: 0.2, roof: 0.8, bed: 0.55, blade: true },
+  hearse: { body: 0.5, cabin: 0.62, cabinAt: -0.12, roof: 0.5 },
+  niva: { body: 0.6, cabin: 0.52, cabinAt: -0.1, roof: 0.5 },
+};
 
 type Pool<T extends THREE.Object3D> = { items: T[]; make: () => T };
 
@@ -47,6 +83,9 @@ export class Renderer3D {
   private cars: { group: THREE.Group; body: THREE.Mesh; wheels: THREE.Group[]; paint: THREE.MeshLambertMaterial; base: THREE.Color }[] = [];
   private carsFor: SimState | null = null;
   private camYaw = 0;
+  private playerPose: ReturnType<typeof carPose> | null = null;
+  /** the ground under what lies still or flies once: read once, not every frame */
+  private zOf = new WeakMap<object, number>();
   private camInit = false;
   private pools: Record<string, Pool<THREE.Mesh>> = {};
   /** render time, ms, as the 2D renderer keeps it */
@@ -311,7 +350,8 @@ export class Renderer3D {
       m.compose(new THREE.Vector3(t.x, t.y, land(t.x, t.y) + h / 2), q, new THREE.Vector3(t.r * 0.95, h, t.r * 0.95));
       cone.setMatrixAt(i, m);
     });
-    cone.castShadow = true;
+    // the forest casts no shadow into the car's shadow map: thousands of cones drawn twice a frame for
+    // shade nobody reads at speed (frame-check: the 95th-percentile frame crossed 33 ms at 4x CPU)
     out.push(cone);
     const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.12, 0.16, 1, 5), new THREE.MeshLambertMaterial({ color: PAL.birchBark }), birch.length);
     const crown = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshLambertMaterial({ color: PAL.birchLeaf[1] }), birch.length);
@@ -323,7 +363,6 @@ export class Renderer3D {
       m.compose(new THREE.Vector3(t.x, t.y, z + h * 0.72), new THREE.Quaternion(), new THREE.Vector3(t.r, t.r, t.r * 1.2));
       crown.setMatrixAt(i, m);
     });
-    crown.castShadow = true;
     out.push(trunk, crown);
     return out;
   }
@@ -386,46 +425,69 @@ export class Renderer3D {
     this.gl.compile(this.scene, this.camera);
   }
 
-  /** A car: a body and a cabin in its colours on the physics' box, four wheels hung where the physics hangs them. */
+  /**
+   * A car in its body's proportions (SHAPES): a lower body and a cabin in its colours, glass, tail
+   * lights, a bed or a stack or a blade where the body has one, and four wheels hung where the
+   * physics hangs them. Drawn a little narrower than the physics' box, so the wheels stand out at the
+   * sides where they can be seen to steer and ride their springs.
+   */
   private carMesh(s: SimState, c: Car, i: number): Renderer3D['cars'][number] {
     const pose = carPose(s, i);
     const def = c.def;
+    const sh = SHAPES[def.shape] ?? SHAPES.saloon;
     const group = new THREE.Group();
     const base = new THREE.Color(i === 0 ? def.colour : faded(def.colour, 0.2));
     const paint = new THREE.MeshLambertMaterial({ color: base.clone() });
     const accent = new THREE.MeshLambertMaterial({ color: def.accent });
-    // the box the physics collides, from 0.25 m over the ground; the body's lower part, then the cabin
-    const zBody = 0.25 - pose.origin;
-    // drawn a little narrower than the physics' box, so the wheels stand out at the sides where they
-    // can be seen to steer and to ride their springs
-    const W = def.width * 0.78;
-    const body = new THREE.Mesh(new THREE.BoxGeometry(def.length, W, 0.5), paint);
-    body.position.z = zBody + 0.32;
-    const cabin = new THREE.Mesh(new THREE.BoxGeometry(def.length * 0.48, W * 0.88, 0.42), accent);
-    cabin.position.set(-def.length * 0.06, 0, zBody + 0.78);
     const dark = new THREE.MeshLambertMaterial({ color: '#2a3036' });
-    const glass = new THREE.Mesh(new THREE.BoxGeometry(def.length * 0.05, W * 0.8, 0.34), dark);
-    glass.position.set(def.length * 0.19, 0, zBody + 0.76);
-    const rearGlass = new THREE.Mesh(new THREE.BoxGeometry(def.length * 0.05, W * 0.8, 0.3), dark);
-    rearGlass.position.set(-def.length * 0.31, 0, zBody + 0.76);
+    const L = def.length;
+    const W = def.width * 0.78;
+    // the body's bottom a little over the physics' box's, its height by the body
+    const z0 = 0.2 - pose.origin;
+    const box = (l: number, w: number, h: number, x: number, z: number, m: THREE.Material) => {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(l, w, h), m);
+      b.position.set(x, 0, z + h / 2);
+      b.castShadow = true;
+      group.add(b);
+      return b;
+    };
+    const body = box(L, W, sh.body, 0, z0, paint);
+    const cabL = L * sh.cabin;
+    const cabX = L * sh.cabinAt;
+    const zc = z0 + sh.body;
+    box(cabL, W * 0.9, sh.roof, cabX, zc, sh.roofPaint ? paint : accent);
+    box(0.05, W * 0.82, sh.roof * 0.75, cabX + cabL / 2 + 0.02, zc + sh.roof * 0.1, dark);
+    box(0.05, W * 0.82, sh.roof * 0.7, cabX - cabL / 2 - 0.02, zc + sh.roof * 0.12, dark);
+    if (sh.bed) box(L * sh.bed, W * 0.92, 0.12, -L / 2 + (L * sh.bed) / 2, zc, accent);
+    if (sh.stack) {
+      const st = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.1, 6), dark);
+      st.rotation.x = Math.PI / 2;
+      st.position.set(L * 0.3, W * 0.3, zc + 0.55);
+      group.add(st);
+    }
+    if (sh.blade) {
+      const bl = box(0.18, def.width * 1.15, 0.6, L / 2 + 0.25, z0 - 0.05, accent);
+      bl.rotation.z = 0.25;
+    }
     const lamp = new THREE.MeshBasicMaterial({ color: '#b02018' });
-    const tail = [-1, 1].map((side) => {
+    for (const side of [-1, 1]) {
       const l = new THREE.Mesh(new THREE.BoxGeometry(0.05, W * 0.18, 0.12), lamp);
-      l.position.set(-def.length / 2 - 0.01, side * W * 0.36, zBody + 0.42);
-      return l;
-    });
-    body.castShadow = cabin.castShadow = true;
-    group.add(body, cabin, glass, rearGlass, ...tail);
+      l.position.set(-L / 2 - 0.01, side * W * 0.36, z0 + sh.body * 0.65);
+      group.add(l);
+    }
     const tyre = new THREE.MeshLambertMaterial({ color: '#1b1915' });
     const hub = new THREE.MeshLambertMaterial({ color: '#8a8478' });
-    const wheels = pose.wheels.map((w) => {
+    // a vehicle that stands tall wears bigger wheels (CarDef.wheel): drawn bigger, centred where the physics has the wheel
+    const wk = def.wheel ?? 1;
+    const wheels = pose.wheels.map((w, k) => {
       const pivot = new THREE.Group();
       const spin = new THREE.Group();
-      const tread = new THREE.Mesh(new THREE.CylinderGeometry(w.radius, w.radius, 0.22, 14), tyre);
-      // a cylinder stands on y: that is already the axle
-      const cap = new THREE.Mesh(new THREE.BoxGeometry(w.radius * 1.1, 0.24, w.radius * 0.3), hub);
+      const r = w.radius * wk * (sh.bigRear && k >= 2 ? 1.6 : 1);
+      const tread = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.22 * Math.max(1, wk), 14), tyre);
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(r * 1.1, 0.24 * Math.max(1, wk), r * 0.3), hub);
       spin.add(tread, cap);
       tread.castShadow = true;
+      spin.position.z = r - w.radius;
       pivot.add(spin);
       group.add(pivot);
       return pivot;
@@ -448,7 +510,8 @@ export class Renderer3D {
     });
     // damage darkens the paint; a wreck is burnt black
     const dmg = c.wreck > 0 ? 1 : Math.min(1, c.damage / 100);
-    m.paint.color.copy(m.base).lerp(new THREE.Color('#1a1712'), dmg * 0.7);
+    m.paint.color.copy(m.base).lerp(BURNT, dmg * 0.7);
+    if (i === 0) this.playerPose = pose;
   }
 
   // ---- what lies on and flies over the road ----
@@ -476,11 +539,21 @@ export class Renderer3D {
     return s.track.terrainAt(x, y);
   }
 
+  /** the ground under a thing that does not move (a pickup, a slick, a mine, a puff), read once */
+  private groundOnce(s: SimState, o: { x: number; y: number }): number {
+    let z = this.zOf.get(o);
+    if (z === undefined) {
+      z = this.ground(s, o.x, o.y);
+      this.zOf.set(o, z);
+    }
+    return z;
+  }
+
   private drawThings(s: SimState): void {
     const pick = s.pickups.filter((p) => p.gone <= 0);
     this.take(this.pool('pickup', () => new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), new THREE.MeshLambertMaterial({ emissive: '#000' }))), pick.length).forEach((it, i) => {
       const p = pick[i];
-      it.position.set(p.x, p.y, this.ground(s, p.x, p.y) + 0.9 + Math.sin(s.time * 3 + i) * 0.15);
+      it.position.set(p.x, p.y, this.groundOnce(s, p) + 0.9 + Math.sin(s.time * 3 + i) * 0.15);
       it.rotation.set(0.5, 0.3, s.time * 2 + i);
       (it.material as THREE.MeshLambertMaterial).color.set(PICKUPS[p.kind].colour);
       (it.material as THREE.MeshLambertMaterial).emissive.set(PICKUPS[p.kind].colour).multiplyScalar(0.35);
@@ -490,11 +563,11 @@ export class Renderer3D {
       return m;
     }), s.oils.length).forEach((it, i) => {
       const o = s.oils[i];
-      it.position.set(o.x, o.y, this.ground(s, o.x, o.y) + 0.03);
+      it.position.set(o.x, o.y, this.groundOnce(s, o) + 0.03);
     });
     this.take(this.pool('mine', () => new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.4, 0.15, 10), new THREE.MeshLambertMaterial({ color: '#2b2a24', emissive: '#300' }))), s.mines.length).forEach((it, i) => {
       const o = s.mines[i];
-      it.position.set(o.x, o.y, this.ground(s, o.x, o.y) + 0.08);
+      it.position.set(o.x, o.y, this.groundOnce(s, o) + 0.08);
       it.rotation.x = Math.PI / 2;
     });
     this.take(this.pool('bullet', () => new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.08), new THREE.MeshBasicMaterial({ color: '#ffd870' }))), s.bullets.length).forEach((it, i) => {
@@ -507,16 +580,49 @@ export class Renderer3D {
       it.position.set(m.x, m.y, this.ground(s, m.x, m.y) + 1);
       it.rotation.set(0, 0, m.heading);
     });
+    this.drawDust(s);
     const fxColour: Record<string, string> = { boom: '#ff8a3a', puff: '#8a8478', spark: '#ffd870', flash: '#ffffff', cash: '#e8c040', splash: '#c8cbbc' };
     this.take(this.pool('fx', () => new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }))), s.fx.length).forEach((it, i) => {
       const f = s.fx[i];
       const big = f.kind === 'boom' ? 3.2 : f.kind === 'splash' ? 1.2 : f.kind === 'flash' ? 2 : 0.5;
       const k = big * (0.3 + f.age * 1.4);
       it.scale.set(k, k, k);
-      it.position.set(f.x, f.y, this.ground(s, f.x, f.y) + 0.6 + f.age);
+      it.position.set(f.x, f.y, this.groundOnce(s, f) + 0.6 + f.age);
       const mat = it.material as THREE.MeshBasicMaterial;
       mat.color.set(f.colour ?? fxColour[f.kind]);
       mat.opacity = Math.max(0, 0.85 * (1 - f.age));
+    });
+  }
+
+  /**
+   * Dust: thrown up behind every car on gravel or grass at speed, more when the tyres slide, a puff
+   * that rises, spreads and fades in a second. A ring of puffs, reused; cosmetic, never in the sim.
+   */
+  private dust: { x: number; y: number; z: number; age: number; size: number }[] = [];
+  private dustAt = 0;
+  private drawDust(s: SimState): void {
+    const dt = Math.max(0, s.time - this.dustAt);
+    this.dustAt = s.time;
+    for (const c of s.cars) {
+      const v = Math.hypot(c.vx, c.vy);
+      if (c.air || c.wreck > 0 || v < 6 || c.surface === 'water') continue;
+      const rate = (v / 10) * (c.sliding ? 3 : 1) * (c.surface === 'grass' ? 1.5 : 1);
+      if (Math.random() > rate * dt * 20) continue;
+      const fx = Math.cos(c.heading);
+      const fy = Math.sin(c.heading);
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const x = c.x - fx * c.def.length * 0.5 - fy * side * c.def.width * 0.4;
+      const y = c.y - fy * c.def.length * 0.5 + fx * side * c.def.width * 0.4;
+      this.dust.push({ x, y, z: this.ground(s, x, y), age: 0, size: 0.35 + Math.random() * 0.3 + (c.sliding ? 0.3 : 0) });
+    }
+    for (const d of this.dust) d.age += dt;
+    this.dust = this.dust.filter((d) => d.age < 1.1).slice(-140);
+    this.take(this.pool('dust', () => new THREE.Mesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshLambertMaterial({ color: PAL.gravelPale, transparent: true, depthWrite: false }))), this.dust.length).forEach((it, i) => {
+      const d = this.dust[i];
+      const k = d.size * (0.6 + d.age * 1.6);
+      it.scale.set(k, k, k * 0.7);
+      it.position.set(d.x, d.y, d.z + 0.3 + d.age * 0.8);
+      (it.material as THREE.MeshLambertMaterial).opacity = 0.3 * (1 - d.age / 1.1);
     });
   }
 
@@ -543,13 +649,24 @@ export class Renderer3D {
     this.camYaw += (want - this.camYaw) * (1 - Math.exp(-dt * CAM_EASE));
     const fx = Math.cos(this.camYaw);
     const fy = Math.sin(this.camYaw);
-    const pose = carPose(s, 0);
-    const gz = this.ground(s, c.x - fx * CHASE.back, c.y - fy * CHASE.back);
-    const camZ = Math.max(pose.z, gz) + CHASE.up;
+    const pose = this.playerPose ?? carPose(s, 0);
+    // faster, the camera sits further back and a little higher, looks further ahead and opens its
+    // lens: the bend coming is on screen sooner, and the ground streams past at the edges
+    const k = Math.min(1, v / SPEED_FULL);
+    const back = CHASE.back + k * 2.2;
+    const up = CHASE.up + k * 0.6;
+    const lookAhead = CHASE.ahead + k * 10;
+    const fov = FOV + k * 10;
+    if (Math.abs(this.camera.fov - fov) > 0.05) {
+      this.camera.fov += (fov - this.camera.fov) * (1 - Math.exp(-dt * 3));
+      this.camera.updateProjectionMatrix();
+    }
+    const gz = this.ground(s, c.x - fx * back, c.y - fy * back);
+    const camZ = Math.max(pose.z, gz) + up;
     const shake = s.shake > 0 ? s.shake * 0.25 : 0;
     // the sim's y is the scene's -y
-    this.camera.position.set(c.x - fx * CHASE.back + (Math.random() - 0.5) * shake, -(c.y - fy * CHASE.back) + (Math.random() - 0.5) * shake, camZ);
-    this.camera.lookAt(c.x + fx * CHASE.ahead, -(c.y + fy * CHASE.ahead), pose.z + CHASE.lookUp);
+    this.camera.position.set(c.x - fx * back + (Math.random() - 0.5) * shake, -(c.y - fy * back) + (Math.random() - 0.5) * shake, camZ);
+    this.camera.lookAt(c.x + fx * lookAhead, -(c.y + fy * lookAhead), pose.z + CHASE.lookUp);
     // the sun's shadow box follows the car
     this.sun.position.set(c.x - 30, -(c.y - 30), 45);
     this.sun.target.position.set(c.x + fx * 8, -(c.y + fy * 8), 0);

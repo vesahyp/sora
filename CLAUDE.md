@@ -169,6 +169,8 @@ scripts/
                         into shots/cars/ and one sheet: four wheels on each, the front pair turned
   pwa-check.mjs       the install check: manifest, every icon at its size, the service worker, offline
   gpu.mjs             the Chromium launch options every phone script uses: the Mac's GPU, or WebGL crawls
+  frame-check.mjs     the chase view's frame rate on the phone layout, CPU slowed 2x: 60 a second, the
+                        game's own work a frame and the drawing's share
   playthrough.mjs     the first hour by thumb: every folk race on an emulated iPhone in landscape, every
                         input a touch through input.ts, tools/hand.ts built and injected into the page
                         at the wheel (not the bot), parts bought between races; a video, a result sheet
@@ -227,6 +229,9 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
   (the pedal in a bend, and the hand's laps), `curve.ts` (the first
   races as a new player). Build one like the tools:
   `npx vite build --ssr tools/dbg/resp.ts --outDir .sim-check-dbg && node .sim-check-dbg/resp.js`.
+- **The 3D view is checked for speed.** `make frame-check` after touching
+  `render3d.ts` or adding to the scene: the median frame at 60 a second
+  and the 95th percentile under 33 ms with the CPU at half speed.
 - **The physics readout** (title screen: Physics readout) shows the
   speed, the yaw rate, the wheel's angle against the lock and each
   tyre's slip angle live in the race; `make playthrough` records with it
