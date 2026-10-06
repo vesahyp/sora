@@ -102,7 +102,7 @@ export function buildWorld(track: Track, cars: Car[]): World {
   for (const box of wallBoxes(track)) {
     const c = world.createCollider(
       RAPIER.ColliderDesc.cuboid(box.hl, 0.5, 2.5)
-        .setTranslation(box.x, box.y, 1.5)
+        .setTranslation(box.x, box.y, track.terrainAt(box.x, box.y) + 1.5)
         .setRotation(yawQuat(box.a))
         .setFriction(TREE_FRICTION)
         .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
@@ -112,7 +112,7 @@ export function buildWorld(track: Track, cars: Car[]): World {
     walls.add(c.handle);
   }
   // under everything, so a car that finds a gap in the trees falls a little way and is towed
-  world.createCollider(RAPIER.ColliderDesc.cuboid(5000, 5000, 0.5).setTranslation(0, 0, -3).setCollisionGroups(groups(GROUND, CAR | WRECK)));
+  world.createCollider(RAPIER.ColliderDesc.cuboid(5000, 5000, 0.5).setTranslation(0, 0, -10).setCollisionGroups(groups(GROUND, CAR | WRECK)));
   const bodies = cars.map((c) => carBody(world, track, c));
   // let the springs take the weight before the lights
   for (let k = 0; k < 40; k++) {
@@ -144,22 +144,16 @@ function headingOf(q: RAPIER.Rotation): number {
 
 /**
  * The ground: a strip of triangles along the lap, the road and the verge and a little past the
- * trees, every metre and at each river's lip, at the height groundAt gives; and a flat strip
- * along every shortcut lane.
+ * trees, on the track's ground grid (every metre, a quarter metre across the road for the ruts)
+ * at the height groundAt gives; and a strip along every shortcut lane on the land under it.
  */
 function buildGround(world: RAPIER.World, t: Track): void {
-  const half = t.width / 2 + t.verge + 2;
-  const ss: number[] = [];
-  for (let s = 0; s < t.length; s += 1) ss.push(s);
-  for (const r of t.def.rivers ?? []) ss.push(r.s - 0.02, r.s + 0.02);
-  const sorted = [...new Set(ss.map((s) => ((s % t.length) + t.length) % t.length))].sort((a, b) => a - b);
-  const across = [-half, -half / 2, 0, half / 2, half];
+  const { ss, across } = t.groundGrid();
   strip(
     world,
-    sorted.map((s) => {
+    ss.map((s) => {
       const p = t.at(s);
-      const z = t.groundAt(s, 0);
-      return across.map((d) => [p.x - p.ty * d, p.y + p.tx * d, z] as [number, number, number]);
+      return across.map((d) => [p.x - p.ty * d, p.y + p.tx * d, t.groundAt(s, d)] as [number, number, number]);
     }),
     true,
   );
@@ -168,7 +162,8 @@ function buildGround(world: RAPIER.World, t: Track): void {
     const rows: [number, number, number][][] = [];
     for (let u = 0; u <= lane.length; u += 1) {
       const p = lane.at(u);
-      rows.push([-w, 0, w].map((d) => [p.x - p.ty * d, p.y + p.tx * d, 0] as [number, number, number]));
+      const z = t.laneGround(lane, u);
+      rows.push([-w, 0, w].map((d) => [p.x - p.ty * d, p.y + p.tx * d, z] as [number, number, number]));
     }
     strip(world, rows, false);
   }
@@ -191,7 +186,10 @@ function strip(world: RAPIER.World, rows: [number, number, number][][], closed: 
   // sideways caught an edge with its body and rolled onto its roof at 28 km/h (tools/dbg/crawl1.ts)
   world.createCollider(
     RAPIER.ColliderDesc.trimesh(verts, new Uint32Array(idx), RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES)
-      .setFriction(0.8)
+      // the tyres are rays with their own friction (the vehicle controller); this is only what the
+      // body itself meets when it touches down, and it slides: a car shoved sideways in a T-bone
+      // caught the ground with its sill and was tipped onto its side (tools/dbg/tbone.ts)
+      .setFriction(0)
       .setCollisionGroups(groups(GROUND, CAR | WRECK)),
   );
 }

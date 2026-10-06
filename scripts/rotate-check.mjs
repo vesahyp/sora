@@ -30,7 +30,7 @@ const check = (ok, what) => {
 // canvas keeps reporting its old size for 300 ms after the screen has changed
 const stale = () =>
   page.evaluate(() => {
-    const c = document.querySelector('.game canvas');
+    const c = document.querySelector('.game canvas.view');
     if (!c) return;
     const r = c.getBoundingClientRect();
     const old = { width: r.width, height: r.height, left: r.left, top: r.top, right: r.right, bottom: r.bottom, x: r.x, y: r.y, toJSON() {} };
@@ -54,7 +54,7 @@ const turn = async (to, label) => {
 };
 const raceState = () =>
   page.evaluate(() => {
-    const c = document.querySelector('.game canvas');
+    const c = document.querySelector('.game canvas.view');
     const r = c.getBoundingClientRect();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const view = window.__sim.view;

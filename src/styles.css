@@ -160,7 +160,8 @@ table.laps .total td { border-bottom: 0; color: var(--straw); font-weight: 800; 
 /* --- race: the canvas and the dash over it --- */
 .game { position: absolute; inset: 0; background: var(--soot); }
 .game canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
-/* the chase view: the car is where the steering-wheel icon sits, so the icon goes */
+/* the chase view: the top view's canvas stands idle; the car is where the steering-wheel icon sits, so the icon goes */
+.game canvas.idle { display: none; }
 .game.chase .steerwheel { display: none; }
 /* the minimap over the 3D view: the 2D renderer draws only it here */
 .game canvas.mapcanvas { pointer-events: none; }

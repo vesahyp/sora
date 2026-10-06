@@ -125,8 +125,23 @@ export class Renderer3D {
     this.stats.frames++;
   }
 
+  /**
+   * Free the race's GPU memory: every geometry, material and texture, then the context itself. A
+   * phone keeps a handful of WebGL contexts; a race that left its own behind would, some races
+   * later, take the page's down (the playthrough's browser gave out in the fifth race).
+   */
   dispose(): void {
+    this.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      m.geometry?.dispose();
+      const mats = Array.isArray(m.material) ? m.material : m.material ? [m.material] : [];
+      for (const mat of mats) {
+        (mat as THREE.MeshLambertMaterial).map?.dispose();
+        mat.dispose();
+      }
+    });
     this.gl.dispose();
+    this.gl.forceContextLoss();
   }
 
   // ---- the track ----
@@ -136,19 +151,21 @@ export class Renderer3D {
     this.trackFor = t;
     this.trackGroup.clear();
     const sc = buildScenery(t);
-    this.trackGroup.add(this.groundMesh(t), this.floorMesh(t), ...this.waterMeshes(t), this.startLine(t));
-    this.trackGroup.add(...this.treeMeshes(sc), ...this.propMeshes(t, sc));
+    this.trackGroup.add(this.groundMesh(t), this.floorMesh(t), ...this.waterMeshes(t), this.startLine(t), ...this.laneMeshes(t));
+    this.trackGroup.add(...this.treeMeshes(t, sc), ...this.propMeshes(t, sc));
   }
 
-  /** The road, the verge and the ground to the trees and a little past, at the track's heights, coloured by surface. */
+  /**
+   * The road, the verge and the forest floor, on the physics' own ground grid (Track.groundGrid:
+   * a quarter metre across the road, so the ruts and the bumps are the ones the wheels ride),
+   * widened into the forest on the hills' height, coloured by what it is.
+   */
   private groundMesh(t: Track): THREE.Mesh {
     const half = t.width / 2;
     const edge = half + t.verge;
-    const across = [-(edge + 14), -(edge + 5), -edge, -(edge - 2), -(half + 1.5), -half, -half * 0.55, -half * 0.25, 0, half * 0.25, half * 0.55, half, half + 1.5, edge - 2, edge, edge + 5, edge + 14];
-    const ss: number[] = [];
-    for (let s = 0; s < t.length; s += 1.5) ss.push(s);
-    for (const r of t.def.rivers ?? []) ss.push(r.s - 0.02, r.s + 0.02);
-    ss.sort((a, b) => a - b);
+    const grid = t.groundGrid();
+    const across = [-(edge + 45), -(edge + 12), ...grid.across, edge + 12, edge + 45];
+    const ss = grid.ss;
     const n = ss.length;
     const m = across.length;
     const pos = new Float32Array(n * m * 3);
@@ -156,30 +173,29 @@ export class Renderer3D {
     const c = new THREE.Color();
     const gravel = new THREE.Color(PAL.gravel);
     const gravelPale = new THREE.Color(PAL.gravelPale);
+    const rut = new THREE.Color(PAL.rut);
     const verge = new THREE.Color(PAL.verge);
-    const straw = new THREE.Color(PAL.straw);
+    const straw = new THREE.Color(PAL.straw).lerp(new THREE.Color(PAL.strawPale), 0.4);
     const floor = new THREE.Color(PAL.forestFloor);
     const wet = new THREE.Color(PAL.wetBank);
     ss.forEach((s, i) => {
       const p = t.at(s);
       const water = t.surfaceAt(s, 0) === 'water';
+      const hill = t.hillAt(s);
       across.forEach((d, j) => {
         const k = (i * m + j) * 3;
-        // past the trees the ground eases back to the forest floor's level
-        const z = Math.abs(d) <= edge + 1 ? t.groundAt(s, d) : Math.abs(d) <= edge + 5 ? t.groundAt(s, d) * 0.5 : 0;
+        const a = Math.abs(d);
         pos[k] = p.x - p.ty * d;
         pos[k + 1] = p.y + p.tx * d;
-        pos[k + 2] = z;
-        const a = Math.abs(d);
-        // the road pale and grey, the verge's berm darker, the straw yellow: the road's edge reads from behind the car
-        if (water) c.copy(wet);
-        else if (a < half * 0.4) c.copy(gravelPale);
-        else if (a <= half) c.copy(gravelPale).lerp(gravel, 0.5);
+        pos[k + 2] = a <= edge + 2 ? t.groundAt(s, d) : hill;
+        // the road pale and grey with darker ruts, the verge's berm darker, the straw yellow: the road's edge reads from behind the car
+        if (water && a <= edge + 2) c.copy(wet);
+        else if (a <= half) c.copy(gravelPale).lerp(gravel, a / half).lerp(rut, Math.min(1, -t.roughAt(s, d) / 0.06) * 0.6);
         else if (a <= half + 1.5) c.copy(verge).multiplyScalar(0.8);
-        else if (a <= edge) c.copy(straw).lerp(new THREE.Color(PAL.strawPale), 0.4);
+        else if (a <= edge) c.copy(straw);
         else c.copy(floor);
         // a little grain along the lap, so the eye reads speed off the ground
-        const grain = 0.94 + 0.12 * (((Math.sin(s * 1.7 + d * 3.1) + Math.sin(s * 0.37 - d * 1.3)) / 4) + 0.5);
+        const grain = 0.94 + 0.12 * ((Math.sin(s * 1.7 + d * 3.1) + Math.sin(s * 0.37 - d * 1.3)) / 4 + 0.5);
         col[k] = c.r * grain;
         col[k + 1] = c.g * grain;
         col[k + 2] = c.b * grain;
@@ -201,12 +217,52 @@ export class Renderer3D {
     return mesh;
   }
 
+  /** Each shortcut lane: a worn two-track on grass through the gap in the forest, at the lane's own ground. */
+  private laneMeshes(t: Track): THREE.Mesh[] {
+    const grass = new THREE.Color(PAL.strawGreen);
+    const track = new THREE.Color(PAL.earth);
+    return t.lanes.map((lane) => {
+      const w = lane.width / 2 + 2;
+      const across = [-w, -0.9, -0.55, 0, 0.55, 0.9, w];
+      const pos: number[] = [];
+      const col: number[] = [];
+      const rows = Math.ceil(lane.length);
+      for (let i = 0; i <= rows; i++) {
+        const u = (i / rows) * lane.length;
+        const p = lane.at(u);
+        // a hair above the road where the lane meets it, so the two never flicker through each other
+        const z = t.laneGround(lane, u) + 0.03;
+        for (const d of across) {
+          pos.push(p.x - p.ty * d, p.y + p.tx * d, z);
+          const c = Math.abs(Math.abs(d) - 0.72) < 0.2 ? track : grass;
+          col.push(c.r, c.g, c.b);
+        }
+      }
+      const m = across.length;
+      const idx: number[] = [];
+      for (let i = 0; i < rows; i++) for (let j = 0; j < m - 1; j++) {
+        const a = i * m + j;
+        idx.push(a, a + m, a + 1, a + 1, a + m, a + m + 1);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+      mesh.receiveShadow = true;
+      return mesh;
+    });
+  }
+
   /** The forest floor under everything, a hair below the road's level. */
   private floorMesh(t: Track): THREE.Mesh {
     const b = t.bounds;
     const g = new THREE.PlaneGeometry(b.maxX - b.minX + 800, b.maxY - b.minY + 800);
     const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: PAL.forestFloor }));
-    mesh.position.set((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, -0.06);
+    let low = 0;
+    for (let s = 0; s < t.length; s += 5) low = Math.min(low, t.hillAt(s));
+    mesh.position.set((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, low - 0.3);
     mesh.receiveShadow = true;
     return mesh;
   }
@@ -217,7 +273,7 @@ export class Renderer3D {
       const p = t.at(r.s + r.gap / 2);
       const g = new THREE.PlaneGeometry(r.gap + 1, (t.width / 2 + t.verge) * 2 + 40);
       const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: PAL.waterLit, transparent: true, opacity: 0.82 }));
-      mesh.position.set(p.x, p.y, RIVER.water + 0.25);
+      mesh.position.set(p.x, p.y, t.hillAt(r.s + r.gap / 2) + RIVER.water + 0.25);
       mesh.rotation.z = Math.atan2(p.ty, p.tx);
       return mesh;
     });
@@ -242,7 +298,8 @@ export class Renderer3D {
   }
 
   /** Spruce as dark cones, birch as a pale trunk under a round crown: instanced, thousands in a few draws. */
-  private treeMeshes(sc: Scenery): THREE.Object3D[] {
+  private treeMeshes(t0: Track, sc: Scenery): THREE.Object3D[] {
+    const land = (x: number, y: number) => t0.terrainAt(x, y);
     const spruce = sc.trees.filter((t) => !t.birch);
     const birch = sc.trees.filter((t) => t.birch);
     const m = new THREE.Matrix4();
@@ -251,7 +308,7 @@ export class Renderer3D {
     const cone = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 7), new THREE.MeshLambertMaterial({ color: PAL.spruce[2] }), spruce.length);
     spruce.forEach((t, i) => {
       const h = Math.max(4, t.h);
-      m.compose(new THREE.Vector3(t.x, t.y, h / 2), q, new THREE.Vector3(t.r * 0.95, h, t.r * 0.95));
+      m.compose(new THREE.Vector3(t.x, t.y, land(t.x, t.y) + h / 2), q, new THREE.Vector3(t.r * 0.95, h, t.r * 0.95));
       cone.setMatrixAt(i, m);
     });
     cone.castShadow = true;
@@ -260,9 +317,10 @@ export class Renderer3D {
     const crown = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshLambertMaterial({ color: PAL.birchLeaf[1] }), birch.length);
     birch.forEach((t, i) => {
       const h = Math.max(5, t.h);
-      m.compose(new THREE.Vector3(t.x, t.y, h * 0.35), q, new THREE.Vector3(1, h * 0.7, 1));
+      const z = land(t.x, t.y);
+      m.compose(new THREE.Vector3(t.x, t.y, z + h * 0.35), q, new THREE.Vector3(1, h * 0.7, 1));
       trunk.setMatrixAt(i, m);
-      m.compose(new THREE.Vector3(t.x, t.y, h * 0.72), new THREE.Quaternion(), new THREE.Vector3(t.r, t.r, t.r * 1.2));
+      m.compose(new THREE.Vector3(t.x, t.y, z + h * 0.72), new THREE.Quaternion(), new THREE.Vector3(t.r, t.r, t.r * 1.2));
       crown.setMatrixAt(i, m);
     });
     crown.castShadow = true;
@@ -274,10 +332,7 @@ export class Renderer3D {
   private propMeshes(t: Track, sc: Scenery): THREE.Object3D[] {
     const out: THREE.Object3D[] = [];
     const m = new THREE.Matrix4();
-    const ground = (x: number, y: number) => {
-      const l = t.locate(x, y);
-      return Math.abs(l.d) < t.width / 2 + t.verge + 1 ? t.groundAt(l.s, l.d) : 0;
-    };
+    const ground = (x: number, y: number) => t.terrainAt(x, y);
     const bales = sc.props.filter((p) => p.kind === 'bale');
     const bale = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.62, 0.62, 1.2, 12), new THREE.MeshLambertMaterial({ color: PAL.strawPale }), bales.length);
     bales.forEach((p, i) => {
@@ -297,7 +352,7 @@ export class Renderer3D {
     out.push(people);
     const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.12, 0.14, 8, 5), new THREE.MeshLambertMaterial({ color: '#3a3022' }), sc.poles.length);
     sc.poles.forEach((p, i) => {
-      m.compose(new THREE.Vector3(p.x, p.y, 4), up, new THREE.Vector3(1, 1, 1));
+      m.compose(new THREE.Vector3(p.x, p.y, ground(p.x, p.y) + 4), up, new THREE.Vector3(1, 1, 1));
       pole.setMatrixAt(i, m);
     });
     pole.castShadow = true;
@@ -311,7 +366,7 @@ export class Renderer3D {
     roof.rotation.x = Math.PI / 2;
     roof.position.z = 3.2 + b.wid * 0.18;
     barn.add(walls, roof);
-    barn.position.set(b.x, b.y, 0);
+    barn.position.set(b.x, b.y, ground(b.x, b.y));
     barn.rotation.z = b.a;
     walls.castShadow = roof.castShadow = true;
     out.push(barn);
@@ -418,8 +473,7 @@ export class Renderer3D {
   }
 
   private ground(s: SimState, x: number, y: number): number {
-    const l = s.track.locate(x, y);
-    return s.track.groundAt(l.s, l.d);
+    return s.track.terrainAt(x, y);
   }
 
   private drawThings(s: SimState): void {

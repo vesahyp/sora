@@ -51,7 +51,7 @@ export const EVENTS: EventDef[] = [
   // win from any grid; the scale climbs a race at a time to 0.85 at the final, where the field
   // also has the parts a winning Tauno has, and the final is won or lost by a lap's tenths
   { id: 'jm-kiviaho', name: L('Kiviahon jokkis', 'Kiviaho Folk Race'), cls: 'JM', trackId: 'kiviaho-lenkki', laps: 3, prizes: purse(300), fieldParts: stock, fieldSkill: 0.4 },
-  { id: 'jm-hirvisuo', name: L('Hirvisuon jokkis', 'Hirvisuo Folk Race'), cls: 'JM', trackId: 'hirvisuo-lenkki', laps: 3, prizes: purse(450), fieldParts: stock, fieldSkill: 0.5 },
+  { id: 'jm-hirvisuo', name: L('Hirvisuon jokkis', 'Hirvisuo Folk Race'), cls: 'JM', trackId: 'hirvisuo-lenkki', laps: 3, prizes: purse(450), fieldParts: stock, fieldSkill: 0.45 },
   { id: 'jm-kiviaho-4', name: L('Kiviahon kahlaus', 'Kiviaho Wade'), cls: 'JM', trackId: 'kiviaho-lenkki', laps: 4, prizes: purse(600), fieldParts: stock, fieldSkill: 0.6 },
   { id: 'jm-hirvisuo-4', name: L('Hirvisuon pitkä jokkis', 'Hirvisuo Long Folk Race'), cls: 'JM', trackId: 'hirvisuo-lenkki', laps: 4, prizes: purse(800), fieldParts: stock, fieldSkill: 0.75 },
   { id: 'jm-final', name: L('Jokkisfinaali', 'Folk Race Final'), cls: 'JM', trackId: 'kiviaho-lenkki', laps: 6, prizes: purse(1200), fieldParts: jmFinal, fieldSkill: 0.85 },

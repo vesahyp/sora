@@ -72,8 +72,12 @@ export interface Rig {
 export const G = 9.81;
 /** m/s: above this the pedal also locks the rear wheels (the handbrake); below it it brakes, at a standstill reverses */
 export const HANDBRAKE_FROM = 6;
-/** m over the ground: the bottom of the body's box */
-export const CLEARANCE = 0.25;
+/**
+ * m over the ground: the bottom of the body's box. 0.25 until the terrain (ADR 0006): a nose that
+ * dipped a few centimetres then slid under another car's sill in a T-bone and lifted it onto its side
+ * (tools/dbg/tbone.ts); at 0.15 the two bodies meet face to face
+ */
+export const CLEARANCE = 0.15;
 /** share of the top speed up to which the engine gives its full force; above it its power is the limit */
 const FULL_FORCE_TO = 0.3;
 /** a spring rate and damping per kg of car keep every car's ride alike, whatever it weighs */

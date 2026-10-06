@@ -3,6 +3,9 @@ import type { TrackDef } from '../types';
 
 /**
  * The tracks. A track is its centreline in metres, a width and a surface,
+ * the land under it (hills along the lap, bends banked toward their inside,
+ * bumps and two ruts on the gravel: ADR 0006; the hills kept 30 m clear of
+ * every river's banks so a jump's take-off and landing stay as checked),
  * with its ground by arc length (rivers jumped from a bank, crests),
  * patches of another surface (mud, ice) and shortcuts as lanes through the forest in world metres;
  * track.ts smooths the line and the renderer draws the road from it, so a
@@ -26,6 +29,10 @@ export const TRACKS: TrackDef[] = [
     // for 30 m past the lip.
     crests: [{ s: 18, len: 20, h: 0.9 }],
     rivers: [{ s: 171, gap: 8, bank: 0.45 }],
+    hills: [{ s: 80, len: 90, h: 2.5 }, { s: 300, len: 100, h: -2 }],
+    bank: 0.14,
+    bumps: 0.06,
+    ruts: 0.05,
     shortcuts: [{ points: [[34, 88], [14, 90], [-6, 86], [-22, 74]], width: 4, surface: 'grass' }],
     points: [
       [0, 0],
@@ -56,6 +63,10 @@ export const TRACKS: TrackDef[] = [
     // a right-hander home up the left. About 410 m.
     crests: [{ s: 24, len: 20, h: 0.9 }],
     rivers: [{ s: 246, gap: 8, bank: 0.45 }],
+    hills: [{ s: 120, len: 110, h: 3 }, { s: 350, len: 90, h: -2 }],
+    bank: 0.14,
+    bumps: 0.06,
+    ruts: 0.05,
     points: [
       [0, 0],
       [60, 0],
@@ -92,6 +103,10 @@ export const TRACKS: TrackDef[] = [
     // came down on the verge (tools/dbg/exits.ts).
     crests: [{ s: 26, len: 24, h: 0.9 }],
     rivers: [{ s: 214, gap: 12, bank: 0.45 }],
+    hills: [{ s: 110, len: 120, h: 3 }, { s: 360, len: 160, h: -3 }, { s: 580, len: 120, h: 2.5 }],
+    bank: 0.14,
+    bumps: 0.06,
+    ruts: 0.05,
     shortcuts: [{ points: [[4, 168], [-10, 182], [-28, 190], [-46, 192], [-60, 184], [-65, 174], [-66, 164]], width: 4, surface: 'grass' }],
     points: [
       [0, 0],
@@ -128,6 +143,10 @@ export const TRACKS: TrackDef[] = [
     // same reason as on Kiviaho.
     crests: [{ s: 50, len: 24, h: 0.9 }],
     rivers: [{ s: 560, gap: 12, bank: 0.45 }],
+    hills: [{ s: 200, len: 180, h: 4 }, { s: 400, len: 120, h: -3 }, { s: 800, len: 200, h: 3.5 }],
+    bank: 0.14,
+    bumps: 0.06,
+    ruts: 0.05,
     points: [
       [0, 0],
       [74, 0],

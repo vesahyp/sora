@@ -61,7 +61,9 @@ for (let i = 0; ; i++) {
   if (i > 120) throw new Error(`no preview server on port ${port} after 60 s`);
   await new Promise((r) => setTimeout(r, 500));
 }
-const browser = await chromium.launch(GPU);
+// a fresh browser per attempt: in one browser the GPU process gave out in the fifth race of the 3D
+// view, closing the page mid-race (2026-10-06)
+let browser = null;
 const phone = devices['iPhone 15 landscape'];
 let failed = false;
 const check = (ok, what) => {
@@ -75,6 +77,7 @@ const summary = [];
 
 /** One attempt at an event: a fresh page carrying the save, the garage, the race, the result. */
 async function attempt(eventId, index, tries, skill) {
+  browser = await chromium.launch(GPU);
   const context = await browser.newContext({ ...phone, hasTouch: true, recordVideo: { dir: join(OUT, 'tmp'), size: phone.viewport } });
   await context.addInitScript((kv) => {
     for (const [k, v] of Object.entries(kv)) if (v) localStorage.setItem(k, v);
@@ -116,6 +119,8 @@ async function attempt(eventId, index, tries, skill) {
   const video = page.video();
   await context.close();
   const path = await video.path();
+  await browser?.close();
+  browser = null;
   renameSync(path, join(OUT, `${name}.webm`));
   result.video = `${name}.webm`;
   return result;
@@ -174,7 +179,7 @@ async function drive(page, skill) {
   await page.evaluate(
     ({ skill, W, H, SPEED }) => {
       const root = document.querySelector('.game');
-      const canvas = root.querySelector('canvas');
+      const canvas = root.querySelector('canvas.view');
       const input = window.__input;
       const s = window.__sim;
       const hand = new window.__Hand(skill);
@@ -389,7 +394,7 @@ try {
     }
   }
 } finally {
-  await browser.close();
+  await browser?.close();
   server.kill();
 }
 rmSync(join(OUT, 'tmp'), { recursive: true, force: true });

@@ -127,7 +127,15 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
     (window as unknown as { __sim: SimState }).__sim = s;
     // the chase view in 3D, or the top view (settings: the camera); ?view=top for the scripts that read the 2D sprites
     const view = new URLSearchParams(location.search).get('view') ?? cameraView();
-    const renderer: Renderer | Renderer3D = view === 'top' ? new Renderer(canvas) : new Renderer3D(canvas, mapRef.current!);
+    // the 3D view draws on a canvas of its own, made and removed with the race: its WebGL context is
+    // released at the end (Renderer3D.dispose), and a released context cannot be had again on the same canvas
+    let glCanvas: HTMLCanvasElement | null = null;
+    if (view !== 'top') {
+      glCanvas = document.createElement('canvas');
+      glCanvas.className = 'view';
+      canvas.after(glCanvas);
+    }
+    const renderer: Renderer | Renderer3D = view === 'top' ? new Renderer(canvas) : new Renderer3D(glCanvas!, mapRef.current!);
     (window as unknown as { __view: string }).__view = view;
     s.view = renderer.view();
     // for the scripts that crop a car out of the race (scripts/car-shots.mjs): toScreen()
@@ -325,6 +333,7 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
     return () => {
       cancelAnimationFrame(raf);
       if (renderer instanceof Renderer3D) renderer.dispose();
+      glCanvas?.remove();
       dispose(s);
       input.detach();
       audio.stopEngine();
@@ -364,7 +373,8 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
   const count = hud && hud.hold > 0 ? Math.ceil(hud.hold) : 0;
   return (
     <div className={`game${chase ? ' chase' : ''}`} ref={rootRef}>
-      <canvas ref={canvasRef} />
+      {/* the top view draws here; in the chase view it stands idle and the 3D view adds its own canvas */}
+      <canvas ref={canvasRef} className={chase ? 'idle' : 'view'} />
       <canvas ref={mapRef} className="mapcanvas" />
       <div className="wheel" ref={wheelRef}>
         <div />

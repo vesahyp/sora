@@ -73,8 +73,9 @@ src/
     notes.ts          the co-driver: every bend on the lap as a pace note (direction, grade 1 hairpin
                         to 6 flat), and the next one for a car; the game loop shows it on the HUD
     track.ts          Track: smoothing, locate(x, y) -> (s, d), at(s), the forest,
-                        surfaceAt(s, d) from the patches and the rivers, groundAt(s, d) from the
-                        rivers' banks and the crests (RIVER, riverHeight);
+                        surfaceAt(s, d) from the patches and the rivers, groundAt(s, d): the hills,
+                        the bends' bank, the rivers' banks and the crests, the gravel's bumps and ruts
+                        (RIVER, riverHeight, hillAt, groundGrid for the meshes, laneGround);
                         Lane: a shortcut as the sim drives it, its own arc length u
     rng.ts            seeded RNG and hashes
     content/

@@ -112,6 +112,15 @@ the track features below need. All of it is data in `tracks.ts`:
   bank. Cars are boxes a metre tall, so one high enough passes over
   another. The renderer lifts a car in the air, sinks it
   in the river and throws its shadow by its height over the ground.
+- **The land** (ADR 0006, `TrackDef.hills`, `bank`, `bumps`, `ruts`):
+  long hills and dips along the lap under the road and the forest,
+  bends banked toward their inside as steep as the bend is tight (full
+  at a 20 m radius), and on the gravel bumps a few metres long and two
+  ruts a car's track apart. `groundAt(s, d)` carries all of it, and the
+  physics' ground mesh lays it a quarter metre apart across the road so
+  the wheels ride the ruts. Every track has them; the hills stay 30 m
+  clear of the rivers. A shortcut lane's ground runs smoothly from its
+  mouth's height to its exit's (`laneGround`).
 - **Shortcuts** (`TrackDef.shortcuts`): a lane through the forest along
   an open polyline, with a width and a surface. `Track.lanes` drives
   it: the walls are the union of the road's verge and the lanes'
@@ -158,10 +167,6 @@ the track features below need. All of it is data in `tracks.ts`:
 - **Drawing for the other surfaces.** Mud, ice and a tarmac patch work
   in the sim but `bakeFeatures` draws only water, river banks and
   crests. A patch with `d` (part of the road) is not drawn at all.
-- **Ground across the road.** `groundAt` ignores `d`: a bank or a crest
-  spans the road and the verge alike. A camber, a ditch with depth or a
-  bridge deck over the river (where the car's height decides deck or
-  water) need it.
 - **Walls that are not the tree line.** The only walls are the forest
   at `width / 2 + verge` and a lane's trees. Gates, bridge rails, log
   piles need obstacles in the sim: boxes or circles that `treeContacts`

@@ -211,6 +211,7 @@ export class Track {
       const last = this.tiles[Math.floor((((p.to - 0.01) % this.length) + this.length) % this.length / TILE)];
       if (!last.includes(p)) last.push(p);
     }
+    this.profiles();
     for (const sc of def.shortcuts ?? []) {
       const lane = new Lane(sc);
       lane.entryS = this.locate(sc.points[0][0], sc.points[0][1]).s;
@@ -263,23 +264,141 @@ export class Track {
   }
 
   /**
-   * The ground's height at (s, d), metres over the road: a river's banks and water, a crest's
-   * brow, zero elsewhere. Both span the road and the verge, so `d` does not matter; it is kept
-   * for a feature that will not.
+   * The ground's height at (s, d), metres (ADR 0006): the land's hills along the lap, the bend's
+   * bank across the road and the verge, a river's banks and water and a crest's brow on top, and on
+   * the gravel road its bumps and the two ruts worn where the wheels run.
    */
-  groundAt(s: number, _d: number): number {
+  groundAt(s: number, d: number): number {
     const L = this.length;
+    s = ((s % L) + L) % L;
+    let h = this.hillAt(s);
+    const edge = this.width / 2 + this.verge;
+    // the bank: the outside of a bend higher, linear across the road and the verge
+    h -= this.bankTan(s) * Math.max(-edge, Math.min(edge, d));
     for (const r of this.def.rivers ?? []) {
       const x = ((((s - (r.s - RIVER.ramp)) % L) + L) % L);
       if (x >= RIVER.ramp + r.gap + RIVER.out) continue;
-      return riverHeight(r, x);
+      return h + riverHeight(r, x);
     }
     for (const c of this.def.crests ?? []) {
       const x = ((((s - (c.s - c.len / 2)) % L) + L) % L);
-      if (x < c.len) return (c.h * (1 - Math.cos((2 * Math.PI * x) / c.len))) / 2;
+      if (x < c.len) h += (c.h * (1 - Math.cos((2 * Math.PI * x) / c.len))) / 2;
     }
-    return 0;
+    if (Math.abs(d) < this.width / 2 + 1) h += this.roughAt(s, d);
+    return h;
   }
+
+  /** The land's height along the lap, m: the hills, read off a profile laid down once a metre. */
+  hillAt(s: number): number {
+    const p = this.hills;
+    const L = this.length;
+    const x = ((((s % L) + L) % L) / L) * p.length;
+    const i = Math.floor(x);
+    const f = x - i;
+    return p[i % p.length] * (1 - f) + p[(i + 1) % p.length] * f;
+  }
+
+  /** The bank's slope across the road at s: positive banks the right side of travel down. */
+  bankTan(s: number): number {
+    const p = this.banks;
+    if (!p.length) return 0;
+    const L = this.length;
+    const x = ((((s % L) + L) % L) / L) * p.length;
+    const i = Math.floor(x);
+    const f = x - i;
+    return p[i % p.length] * (1 - f) + p[(i + 1) % p.length] * f;
+  }
+
+  /** The gravel's own surface: bumps a few metres long and the two ruts, m. Only on the road. */
+  roughAt(s: number, d: number): number {
+    const b = this.def.bumps ?? 0;
+    const r = this.def.ruts ?? 0;
+    let h = 0;
+    if (b) h += (b / 2) * (0.6 * Math.sin(s * 1.9 + Math.sin(d * 1.7) * 2) * Math.cos(d * 1.3 + s * 0.7) + 0.4 * Math.sin(s * 0.83 + d * 2.3));
+    // two ruts a car's track apart, where every wheel has run since spring
+    if (r) for (const at of [-RUT_AT, RUT_AT]) h -= r * Math.exp(-(((d - at) / RUT_WIDTH) ** 2));
+    return h;
+  }
+
+  /**
+   * Where the land is, anywhere: the ground on the road and the verge, a shortcut lane's own ground
+   * inside one, the hills' height in the forest.
+   */
+  terrainAt(x: number, y: number): number {
+    const l = this.locate(x, y);
+    if (Math.abs(l.d) <= this.width / 2 + this.verge + 1) return this.groundAt(l.s, l.d);
+    const lane = this.laneAt(x, y);
+    if (lane && lane.dist <= lane.lane.width / 2 + LANE_VERGE + 2) return this.laneGround(lane.lane, lane.u);
+    return this.hillAt(l.s);
+  }
+
+  /**
+   * A shortcut lane's ground at u: from the ground where it leaves the road to the ground where it
+   * comes back, eased at both ends. The land's own height under a lane jumped where the nearest
+   * stretch of road changed from one leg of a hairpin to the other.
+   */
+  laneGround(lane: Lane, u: number): number {
+    const a = lane.at(0);
+    const b = lane.at(lane.length);
+    const la = this.locate(a.x, a.y);
+    const lb = this.locate(b.x, b.y);
+    const ha = this.groundAt(la.s, la.d);
+    const hb = this.groundAt(lb.s, lb.d);
+    const k = Math.max(0, Math.min(1, u / lane.length));
+    return ha + (hb - ha) * k * k * (3 - 2 * k);
+  }
+
+  /** The grid the ground is laid on, by both the physics and the 3D view: s every metre and at the rivers' lips, d finer on the road. */
+  groundGrid(): { ss: number[]; across: number[] } {
+    if (this.grid0) return this.grid0;
+    const ss: number[] = [];
+    for (let s = 0; s < this.length; s += 1) ss.push(s);
+    for (const r of this.def.rivers ?? []) ss.push(r.s - 0.02, r.s + 0.02);
+    const sorted = [...new Set(ss.map((s) => ((s % this.length) + this.length) % this.length))].sort((a, b) => a - b);
+    const half = this.width / 2;
+    const edge = half + this.verge;
+    const across: number[] = [-(edge + 2), -edge, -(edge + half + 1.5) / 2, -(half + 1.5)];
+    // the road and a metre either side at a quarter metre where it has ruts and bumps (half a metre
+    // wide), else in eight steps: a test oval 160 m wide at a quarter metre crashed Rapier's mesh builder
+    const fine = this.def.bumps || this.def.ruts ? 0.25 : (half + 1.5) / 4;
+    for (let d = -(half + 1.5) + fine; d < half + 1.5 - 1e-6; d += fine) across.push(Math.round(d * 100) / 100);
+    across.push(half + 1.5, (edge + half + 1.5) / 2, edge, edge + 2);
+    this.grid0 = { ss: sorted, across };
+    return this.grid0;
+  }
+  private grid0: { ss: number[]; across: number[] } | null = null;
+
+  /** The hills, once a metre, and the bank, once a metre: laid down when the track is built. */
+  private profiles(): void {
+    const L = this.length;
+    const n = Math.max(1, Math.round(L));
+    this.hills = new Float32Array(n);
+    for (const hl of this.def.hills ?? []) {
+      for (let i = 0; i < n; i++) {
+        const s = (i / n) * L;
+        const x = ((((s - (hl.s - hl.len / 2)) % L) + L) % L);
+        if (x < hl.len) this.hills[i] += (hl.h * (1 - Math.cos((2 * Math.PI * x) / hl.len))) / 2;
+      }
+    }
+    const bank = this.def.bank ?? 0;
+    this.banks = new Float32Array(bank ? n : 0);
+    if (bank) {
+      // the bend's curvature over 12 m, signed, eased over 20 m so the bank rolls in and out
+      const raw = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        const s = (i / n) * L;
+        const k = this.curvatureAhead(s - 6, 12) / 12;
+        raw[i] = Math.tan(Math.max(-1, Math.min(1, k / BANK_FULL_AT)) * bank);
+      }
+      for (let i = 0; i < n; i++) {
+        let sum = 0;
+        for (let j = -10; j <= 10; j++) sum += raw[(i + j + n) % n];
+        this.banks[i] = sum / 21;
+      }
+    }
+  }
+  private hills = new Float32Array(1);
+  private banks = new Float32Array(0);
 
   private key(cx: number, cy: number): number {
     return (cx + 4096) * 8192 + (cy + 4096);
@@ -444,6 +563,12 @@ export function riverHeight(r: RiverDef, x: number): number {
   const k = (x - RIVER.ramp - r.gap) / RIVER.out;
   return k < 1 ? RIVER.water * (1 - k) ** 2 : 0;
 }
+
+/** m off the centreline where the two ruts run, and their half width */
+const RUT_AT = 0.75;
+const RUT_WIDTH = 0.28;
+/** curvature, rad/m, at which a bend is banked fully: a 20 m radius */
+const BANK_FULL_AT = 1 / 20;
 
 /** metres of lap per tile of the surface lookup */
 const TILE = 4;

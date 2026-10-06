@@ -77,6 +77,13 @@ export interface ShortcutDef {
   surface: Surface;
 }
 
+/** A long rise or dip of the land along the lap: `h` metres at `s`, over `len` metres, smooth at both ends. */
+export interface HillDef {
+  s: number;
+  len: number;
+  h: number;
+}
+
 export interface TrackDef {
   id: string;
   name: Text;
@@ -90,6 +97,17 @@ export interface TrackDef {
   rivers?: RiverDef[];
   crests?: CrestDef[];
   shortcuts?: ShortcutDef[];
+  /**
+   * The land under the lap (ADR 0006): long rises and dips, `h` metres at `s` (negative a dip),
+   * smooth over `len` metres, under the road, the verge and the forest alike. The rivers and the
+   * crests sit on top of them
+   */
+  hills?: HillDef[];
+  /** rad: the steepest a bend is banked toward its inside, reached at a 20 m radius; tighter is no steeper. 0 when absent */
+  bank?: number;
+  /** m: the gravel's bumps, crest to trough, and the depth of the two ruts worn where the wheels run. 0 when absent */
+  bumps?: number;
+  ruts?: number;
   /** the centreline, metres, closed: the last point joins the first. Driven in index order. */
   points: [number, number][];
 }
