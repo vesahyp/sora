@@ -17,7 +17,8 @@
 #   make drive-log     # set pieces by touch on a phone, the physics logged (PHYSICS=old for the old model)
 #   make stuck-check   # a wedged car frees itself, on the phone layout (PORT=5187 if 5197 is taken)
 #   make rotate-check  # turning the phone must not break the view (PORT=5187 if 5197 is taken)
-#   make playthrough   # the first hour by thumb on a phone, a video per race (RACES=jm-kiviaho,... for a subset)
+#   make playthrough   # the first hour by thumb on a phone, a video per race (RACES=jm-kiviaho,... for a subset,
+#                      #   SPEED=0.5 on a loaded machine: the sim in slow motion so the thumb keeps its rate)
 #   make pwa-check     # manifest, icons, service worker, offline (URL ?= the live site)
 #   make plan          # terraform plan for the pixel infra (no changes)
 #   make apply         # terraform apply (creates AWS resources), then make env
@@ -91,8 +92,9 @@ rotate-check:
 # bot at the wheel: a video, a result sheet and frame sheets per race into shots/playthrough/,
 # summary.md with the places and laps. The proof a handling or balance change is read against
 RACES ?=
+SPEED ?= 1
 playthrough:
-	RACES=$(RACES) node scripts/playthrough.mjs
+	RACES=$(RACES) SPEED=$(SPEED) node scripts/playthrough.mjs
 
 URL ?= https://vesahyp.github.io/sora/
 pwa-check:

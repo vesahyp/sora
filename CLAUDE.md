@@ -208,7 +208,10 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
   the bot left the game playing badly (2026-10-04). `RACES=jm-kiviaho` for one race.
   The same hand drives headless in `tools/hand.ts` (`sim-check`'s folk checks,
   `make balance`'s folk rows), so a folk-class number is tuned in seconds and
-  the video is the proof, not the search. A steady-state sweep (a held thumb at a
+  the video is the proof, not the search. On a loaded machine (the nightly
+  cron sweep ran the page at 10 frames a second, 2026-10-06) run it with
+  `SPEED=0.5`: the sim in slow motion, the hand's clock in sim time, so
+  the thumb keeps its rate; the video is then slow motion. A steady-state sweep (a held thumb at a
   held speed, the yaw asked against the yaw delivered) found the understeer the
   owner felt on 2026-10-05 in one table; build one in `tools/dbg/` before
   touching a handling constant.

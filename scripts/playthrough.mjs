@@ -38,6 +38,10 @@ const HAND_JS = readFileSync('.hand-check/hand.js', 'utf8').replace(/export\s*\{
 const OUT = 'shots/playthrough';
 const JM = ['jm-kiviaho', 'jm-hirvisuo', 'jm-kiviaho-4', 'jm-hirvisuo-4', 'jm-final'];
 const RACES = process.env.RACES ? process.env.RACES.split(',') : JM;
+/** the sim's speed, ?speed=: under 1 is slow motion, for a loaded machine (the nightly sweep ran the page at
+ *  10 frames a second, 2026-10-06, and a thumb that lands a touch a frame is drunk at that rate). The hand's
+ *  clock runs in sim time, so its thumb and reactions are the same thumb; the video is slow motion */
+const SPEED = Number(process.env.SPEED || 1);
 /** the hand's skill per race of the hour, 0..1: the first race is a stranger to the car, the final has learnt it (sim-check's first-races check uses the same ladder) */
 const SKILL = [0.5, 0.6, 0.7, 0.8, 0.85];
 /** tries at a race before the hour moves on: a human retries the one that pays the next part */
@@ -79,7 +83,7 @@ async function attempt(eventId, index, tries, skill) {
   const name = `${String(index + 1).padStart(2, '0')}-${eventId}${tries > 1 ? `-try${tries}` : ''}`;
   let result = null;
   try {
-    await page.goto(`http://localhost:${port}/sora/?lang=en`);
+    await page.goto(`http://localhost:${port}/sora/?lang=en${SPEED !== 1 ? `&speed=${SPEED}` : ''}`);
     if (!/sora/i.test(await page.title())) throw new Error(`not Sora on port ${port}: ${await page.title()}`);
     await page.addScriptTag({ content: HAND_JS });
     await page.locator('[data-track="title-drive"]').tap();
@@ -166,7 +170,7 @@ async function drive(page, skill) {
   const W = phone.viewport.width;
   const H = phone.viewport.height;
   await page.evaluate(
-    ({ skill, W, H }) => {
+    ({ skill, W, H, SPEED }) => {
       const root = document.querySelector('.game');
       const canvas = root.querySelector('canvas');
       const input = window.__input;
@@ -198,7 +202,7 @@ async function drive(page, skill) {
       };
       const tick = (now) => {
         requestAnimationFrame(tick);
-        const dt = Math.min(0.1, (now - last) / 1000);
+        const dt = Math.min(0.1, (now - last) / 1000) * SPEED;
         last = now;
         stats.frames++;
         const c = s.cars[0];
@@ -284,17 +288,17 @@ async function drive(page, skill) {
       };
       requestAnimationFrame(tick);
     },
-    { skill, W, H },
+    { skill, W, H, SPEED },
   );
   const t0 = Date.now();
   let stats = null;
-  while (Date.now() - t0 < 480000) {
+  while (Date.now() - t0 < 480000 / SPEED) {
     stats = await page.evaluate(() => window.__drive);
     if (stats.finished) break;
     if (Date.now() - t0 > 4000 && stats.frames === 0) throw new Error('the driver never ran a frame');
     await page.waitForTimeout(500);
   }
-  stats.seconds = (Date.now() - t0) / 1000;
+  stats.seconds = ((Date.now() - t0) / 1000) * SPEED;
   stats.meanTick = stats.ticks ? (1000 * stats.seconds) / Math.max(1, stats.frames) : 0;
   return stats;
 }
