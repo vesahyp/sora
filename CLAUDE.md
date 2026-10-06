@@ -143,6 +143,8 @@ scripts/
   lineup.mjs          every vehicle in the game on one canvas to shots/lineup.png, a row per class,
                         the race's own sprites, the Tauno at five levels of damage, then a row per part
                         at levels 0-3, the armoury's load and the paints
+  car-shots.mjs       every player car cropped out of the race on the phone layout, the bot driving,
+                        into shots/cars/ and one sheet: four wheels on each, the front pair turned
   pwa-check.mjs       the install check: manifest, every icon at its size, the service worker, offline
   playthrough.mjs     the first hour by thumb: every folk race on an emulated iPhone in landscape, every
                         input a touch through input.ts, tools/hand.ts built and injected into the page
@@ -241,6 +243,12 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
   after touching `sprites.ts`, `cars.ts` or `rivals.ts`: two vehicles
   that could be confused at a glance are a bug. `sim-check` laps every
   rival's vehicle alone, so a new footprint is checked on the road.
+  `make car-shots` crops every player car out of the race itself
+  (`shots/cars/sheet.png`): the lineup draws the garage's picture, which
+  lays its own front wheels, while the race draws the front pair in the
+  renderer so they steer, and that pair ran with a wheel under the body
+  until someone cropped the race (2026-10-06). Run it after touching
+  `renderer.ts`'s car drawing.
 - **The game installs as an app.** `public/manifest.webmanifest` and the
   icons are hand-written; `vite.config.ts` writes `sw.js` into the build
   with the list of that build's files, so the game opens offline and a new

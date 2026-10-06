@@ -721,7 +721,12 @@ export class Renderer {
     const k = 1 / SPRITE_PPM;
     const fx = wh.frontX * k + (wh.fwl * k) / 2 - L / 2;
     const ang = car.steer * 0.55;
-    for (const [y, side] of [[-wh.fout * k + (wh.fww * k) / 2 - W / 2, -1], [(W - wh.fww + wh.fout) * k + (wh.fww * k) / 2 - W / 2, 1]] as const) {
+    // each front wheel's centre off the car's centreline: the sprite lays the tread `fout` sprite
+    // units out of the body on either side (the body is W * SPRITE_PPM across in those units). The
+    // right one was placed with W in metres, so it sat under the body beside the left one, and every
+    // vehicle in the race ran on three wheels (2026-10-06)
+    const fy = W / 2 + (wh.fout - wh.fww / 2) * k;
+    for (const [y, side] of [[-fy, -1], [fy, 1]] as const) {
       g.save();
       g.translate(fx, y);
       g.rotate(ang);

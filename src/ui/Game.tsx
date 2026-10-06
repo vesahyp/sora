@@ -92,6 +92,8 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
     (window as unknown as { __sim: SimState }).__sim = s;
     const renderer = new Renderer(canvas);
     s.view = renderer.view();
+    // for the scripts that crop a car out of the race (scripts/car-shots.mjs): toScreen()
+    (window as unknown as { __renderer: Renderer }).__renderer = renderer;
     const input = new InputController();
     input.attach(root);
     (window as unknown as { __input: InputController }).__input = input;
