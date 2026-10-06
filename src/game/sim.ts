@@ -6,21 +6,13 @@ import { CLASS_RANK } from './types';
 import { GRUDGE, hostility, leaderOf } from './content/drivers';
 import { anger, boom, clamp, hurt, spin, wrap } from './harm';
 import { LANE_VERGE } from './track';
-import { advanceOld } from './physics-old';
 import { advance } from './physics';
 
 export const DT = 1 / 60;
 
-/** steering lock at rest, radians per unit of turnRate, and the speed that halves it: 50 until the
- * cars got a fifth faster (2026-10-04), raised with them so a car still turns at its new speeds */
-const LOCK = 0.17;
-const LOCK_FADE = 60;
-/** how much more yaw than the grip can hold a hand may ask for at speed: room to provoke a slide */
-const YAW_ROOM = 1.35;
 /**
- * One fixed step. The car model moves the cars (physics.ts: the tyres,
- * the contacts between cars and with the trees, height; physics-old.ts
- * at ?physics=old). Around it the race runs: the countdown, a tap of
+ * One fixed step. The car model moves the cars (physics.ts: Rapier's
+ * bodies, wheels and contacts, ADR 0005). Around it the race runs: the countdown, a tap of
  * nitro from a tank that drifting, ramming and wrecking fill, guns that
  * fire themselves, bullets, missiles, mines, oil slicks and pickups,
  * and the laps.
@@ -43,8 +35,7 @@ export function step(s: SimState, inputs: CarInput[], dt: number): void {
   // grudges fade, slowly
   for (const c of s.cars) for (let k = 0; k < c.grudge.length; k++) if (c.grudge[k] > 0) c.grudge[k] = Math.max(0, c.grudge[k] - GRUDGE.decay * dt);
   const held = s.cars.map((c, i) => rescue(s, c, inputs[i] ?? { steer: 0, throttle: 0, brake: 1, boost: false }, dt));
-  if (s.physics === 'old') advanceOld(s, held, dt);
-  else advance(s, held, dt);
+  advance(s, held, dt);
   for (let i = 0; i < s.cars.length; i++) {
     const c = s.cars[i];
     if (c.wreck > 0) burn(s, c, dt);
@@ -348,8 +339,7 @@ function pickups(s: SimState, dt: number): void {
 function wreck(s: SimState, c: Car): void {
   c.wreck = WRECK_TIME;
   c.wrecked++;
-  // the old model stops a wreck dead; the new one lets it slide to a stop on locked wheels
-  if (s.physics === 'old') c.vx = c.vy = c.yaw = 0;
+  // it slides to a stop on locked wheels
   c.spin = 0;
   c.boosting = 0;
   boom(s, c.x, c.y, c === s.cars[0] ? 1 : 0.5);
@@ -457,6 +447,9 @@ function settle(s: SimState, c: Car, player: boolean): void {
     c.stuckS = c.s;
   }
   if (c.stuck > TOW_AFTER && c.wreck <= 0) tow(s, c);
+  // going nowhere anywhere, on the road too: a car beached on a river's lip with its wheels over the
+  // water (2026-10-06, Rapier's bodies can rest on an edge), or one pinned in a pile
+  else if (c.stall > STALL_TOW && c.wreck <= 0) tow(s, c);
 }
 
 /**
@@ -467,6 +460,8 @@ function settle(s: SimState, c: Car, player: boolean): void {
  */
 export const TOW_AFTER = 4;
 const TOW_ALONG = 8;
+/** seconds going nowhere, anywhere, before the marshals tow a car: longer than the back-out takes */
+const STALL_TOW = 6;
 /** stalled this long, seconds, with the nose in the trees, a car reverses on its own for BACK_OUT seconds */
 const BACK_AFTER = 1.5;
 const BACK_OUT = 1.1;
@@ -533,30 +528,4 @@ function backOutSteer(s: SimState, c: Car): number {
   const ang = Math.atan2(fx * dir.ty - fy * dir.tx, fx * dir.tx + fy * dir.ty);
   if (Math.abs(ang) < 0.4) return 0;
   return ang > 0 ? -1 : 1;
-}
-
-export function wheelbase(def: Car['def']): number {
-  return def.length * 0.62;
-}
-
-/** Radians of wheel angle at full lock, at this speed: the lock shrinks as the car goes faster. */
-/** The rack's lock at this speed: full at rest, fading with speed, as on a real wheel. */
-export function steeringLock(def: Car['def'], v: number): number {
-  return (def.turnRate * LOCK) / (1 + Math.abs(v) / LOCK_FADE);
-}
-
-/**
- * The most yaw a car can ask for at this speed, rad/s. The input's steer is a share of this,
- * not of the rack: a hand asks the car to turn, and the car turns the wheel as far as the
- * tyres can use. At rest the rack is the limit; at speed the grip is, with YAW_ROOM over
- * it so a slide can still be provoked. Before this, at 100 km/h the rack offered four times
- * the angle the front could turn into force: a thumb at full stretch saturated the front,
- * then the rear, and the car slid like ice, while the bot, which already asked for yaw
- * rates, stayed on rails (tools/dbg/slip.ts, 2026-10-04). Every car, every hand.
- */
-export function yawMax(def: Car['def'], v: number): number {
-  const vv = Math.max(Math.abs(v), 3);
-  const rack = (vv * Math.tan(steeringLock(def, v))) / wheelbase(def);
-  const grip = (YAW_ROOM * def.grip) / vv;
-  return Math.min(rack, grip);
 }

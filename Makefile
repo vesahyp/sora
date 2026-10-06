@@ -13,9 +13,10 @@
 #   make icon          # render public/icon.svg to the PNG icons
 #   make lineup        # every vehicle in the game on one canvas -> shots/lineup.png
 #   make car-shots     # every player car from the race camera, a crop each -> shots/cars/
+#   make readout-shot  # the physics readout on the phone in a race -> shots/readout/
 #   make touch-check   # drives the race by touch on an emulated phone
 #   make newcareer-check # New career on the title: confirm defaults to No, Yes wipes only the career (iPhone landscape)
-#   make drive-log     # set pieces by touch on a phone, the physics logged (PHYSICS=old for the old model)
+#   make drive-log     # set pieces by touch on a phone, the physics logged
 #   make stuck-check   # a wedged car frees itself, on the phone layout (PORT=5187 if 5197 is taken)
 #   make rotate-check  # turning the phone must not break the view (PORT=5187 if 5197 is taken)
 #   make playthrough   # the first hour by thumb on a phone, a video per race (RACES=jm-kiviaho,... for a subset,
@@ -33,7 +34,7 @@ PROFILE ?= personal
 AWS      = AWS_PROFILE=$(PROFILE) aws
 TF       = AWS_PROFILE=$(PROFILE) terraform -chdir=infra
 
-.PHONY: dev build preview check balance shots-setup shots shots-en icon lineup car-shots touch-check newcareer-check drive-log stuck-check rotate-check playthrough pwa-check plan apply outputs env deploy-pixel
+.PHONY: dev build preview check balance shots-setup shots shots-en readout-shot icon lineup car-shots touch-check newcareer-check drive-log stuck-check rotate-check playthrough pwa-check plan apply outputs env deploy-pixel
 
 dev:
 	npm run dev
@@ -74,15 +75,18 @@ lineup:
 car-shots:
 	node scripts/car-shots.mjs
 
+# the physics readout switched on in the title screen and shown in the first folk race, the bot driving
+readout-shot:
+	node scripts/readout-shot.mjs
+
 touch-check:
 	node scripts/touch-check.mjs
 
 newcareer-check:
 	node scripts/newcareer-check.mjs
 
-PHYSICS ?= new
 drive-log:
-	node scripts/drive-log.mjs $(PHYSICS)
+	node scripts/drive-log.mjs
 
 # the owner's stuck spot, driven on the phone layout: a wedged car must free itself
 stuck-check:

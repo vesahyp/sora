@@ -25,8 +25,9 @@ import type { CarDef } from '../types';
  * (tools/dbg/gripsweep.ts); the drag was not the lever, a third of it moved the lap half a second.
  *
  * The Tauno is slow on purpose (2026-10-05, after the owner played it: "the speed now is like a
- * really upgraded car"). Stock it pulls 10 m/s² and runs out at about 80 km/h on a straight
- * (the engine's push fades toward topSpeed and the drag takes the rest), with 1.3 g of grip;
+ * really upgraded car"). Stock it pulls 10 m/s² and runs out at about 83 km/h on a straight
+ * (`topSpeed` is that speed since ADR 0005: rig.ts sets the engine's power and the air's drag
+ * to meet there), with 1.3 g of grip;
  * before, 15 m/s², 105 km/h and 1.9 g, and a thumb at that speed got 60 to 80% of the yaw it
  * asked for and ran wide, while a first engine upgrade made the thumb's lap slower, not faster
  * (tools/dbg/jmlaps.ts). The folk class races its own short loops (tracks.ts, the lenkki
@@ -44,7 +45,7 @@ export const CARS: CarDef[] = [
     price: 1200,
     blurb: L('Pieni kulmikas jokkisauto: takaveto, pehmeä ja väsynyt. Vuotaa öljyä, ja se on ainoa aseesi.', 'A tiny boxy folk-racing saloon: rear drive, soft and tired. It leaks oil, and that is your only weapon.'),
     accel: 10,
-    topSpeed: 32,
+    topSpeed: 23.1,
     brake: 10,
     turnRate: 2.6,
     grip: 13,
@@ -67,7 +68,7 @@ export const CARS: CarDef[] = [
     price: 2500,
     blurb: L('Väsynyt kaupunkiauto soranastoilla. Kaikki alkaa tästä.', 'A tired town car on gravel tyres. Everyone starts here.'),
     accel: 18,
-    topSpeed: 50.5,
+    topSpeed: 37.8,
     brake: 16,
     turnRate: 2.8,
     grip: 22.5,
@@ -90,7 +91,7 @@ export const CARS: CarDef[] = [
     price: 9000,
     blurb: L('Kevyt ja terävä. Ei anna anteeksi, mutta kääntyy.', 'Light and sharp. Unforgiving, but it turns.'),
     accel: 24.5,
-    topSpeed: 60,
+    topSpeed: 46.4,
     brake: 19,
     turnRate: 3.0,
     grip: 26,
@@ -113,7 +114,7 @@ export const CARS: CarDef[] = [
     price: 28000,
     blurb: L('Neliveto ja turbo. Metsän kuningas.', 'Four-wheel drive and a turbo. King of the forest.'),
     accel: 28.5,
-    topSpeed: 69.5,
+    topSpeed: 53.8,
     brake: 22,
     turnRate: 3.1,
     grip: 29,
@@ -137,7 +138,7 @@ export const CARS: CarDef[] = [
     price: 3800,
     blurb: L('Korkea lyhyt laatikko, neliveto ja vararengas takaovessa. Pientare on sille tietä.', 'A tall short box, four-wheel drive and a spare on the back door. The verge is road to it.'),
     accel: 17,
-    topSpeed: 47,
+    topSpeed: 35.3,
     brake: 15,
     turnRate: 2.9,
     grip: 21.5,
@@ -162,7 +163,7 @@ export const CARS: CarDef[] = [
     price: 3200,
     blurb: L('Traktori. Suoralla kaikki menevät ohi, mutkassa se kääntyy paikallaan, ja kolarissa se jyrää kenet tahansa.', 'A tractor. Everyone passes it on a straight; it turns on the spot, and in a shunt it flattens anyone.'),
     accel: 21,
-    topSpeed: 30.5,
+    topSpeed: 26.0,
     brake: 17,
     turnRate: 3.7,
     grip: 23.5,
@@ -186,7 +187,7 @@ export const CARS: CarDef[] = [
     price: 13500,
     blurb: L('Lava-auto renkailla, jotka ovat isompia kuin hytti. Pomppii, ja kenen päälle se tulee, se pyörähtää.', 'A pickup on tyres bigger than its cab. It bounces, and whoever it lands on spins.'),
     accel: 23.5,
-    topSpeed: 56.5,
+    topSpeed: 43.8,
     brake: 16,
     turnRate: 2.8,
     grip: 23.5,
@@ -212,7 +213,7 @@ export const CARS: CarDef[] = [
     price: 31000,
     blurb: L('Pitkä farmari lasiperällä, arkku ja seppele kyydissä. Nopea ja hiljainen, eikä kukaan halua sen eteen.', 'A long estate with a glass back, a coffin and a wreath aboard. Fast and quiet, and nobody wants to be in front of it.'),
     accel: 27.5,
-    topSpeed: 73,
+    topSpeed: 55.4,
     brake: 21,
     turnRate: 2.9,
     grip: 28,

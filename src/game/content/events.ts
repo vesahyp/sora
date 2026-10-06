@@ -70,11 +70,14 @@ export const EVENTS: EventDef[] = [
  * driving at under 0.75 of its skill brings one can of oil each, not two (2026-10-05): on a 400 m
  * folk loop six cans had the road in slicks by lap two, and a thumb that sat behind a rival for
  * the seconds it takes a weekend driver to fumble the can out was oiled twice a lap and towed.
+ * Under 0.55, the first two folk races, it brings none (2026-10-06): on Rapier a slick spins a
+ * new thumb with no spin guard to catch it, and the first races are where the car is learnt.
  */
 export function fieldAmmo(e: EventDef): { oil: number; mines: number; missiles: number } {
   const built = Object.values(e.fieldParts).reduce((a, b) => a + b, 0);
-  const weekend = (e.fieldSkill ?? 1) < 0.75;
-  return carried(e.cls, { oil: (weekend ? 1 : 2) + Math.round(built / 4), mines: 1 + Math.round(built / 4), missiles: 1 + Math.round(built / 3) });
+  const skill = e.fieldSkill ?? 1;
+  const cans = skill < 0.55 ? 0 : skill < 0.75 ? 1 : 2;
+  return carried(e.cls, { oil: cans + Math.round(built / 4), mines: 1 + Math.round(built / 4), missiles: 1 + Math.round(built / 3) });
 }
 
 export const EVENT_BY_ID: Record<string, EventDef> = Object.fromEntries(EVENTS.map((e) => [e.id, e]));

@@ -68,7 +68,8 @@ const check = (ok, what) => {
   if (!ok) failed = true;
 };
 /** the career between races: the save and the records, carried from one page to the next */
-let stored = { 'sora.career': null, 'sora.records': null, 'sora.lang': 'en' };
+// the physics readout on: the video shows the speed, the yaw rate, the wheel and each tyre's slip
+let stored = { 'sora.career': null, 'sora.records': null, 'sora.lang': 'en', 'sora.physics-readout': '1' };
 const summary = [];
 
 /** One attempt at an event: a fresh page carrying the save, the garage, the race, the result. */
@@ -104,7 +105,7 @@ async function attempt(eventId, index, tries, skill) {
       order: [...document.querySelectorAll('.order tbody tr')].map((r) => r.textContent.trim().replace(/\s+/g, ' ')),
       credits: document.querySelector('.top .credits')?.textContent,
     }));
-    stored = await page.evaluate(() => ({ 'sora.career': localStorage.getItem('sora.career'), 'sora.records': localStorage.getItem('sora.records'), 'sora.lang': 'en' }));
+    stored = await page.evaluate(() => ({ 'sora.career': localStorage.getItem('sora.career'), 'sora.records': localStorage.getItem('sora.records'), 'sora.lang': 'en', 'sora.physics-readout': '1' }));
     const save = JSON.parse(stored['sora.career']);
     result = { event: eventId, name, tries, skill, bought, ...race, sheet, credits: save.credits, parts: save.cars[0].parts, errors };
   } catch (e) {
@@ -185,6 +186,9 @@ async function drive(page, skill) {
       const fire = (type, changed, all) => canvas.dispatchEvent(new TouchEvent(type, { touches: all, changedTouches: changed, targetTouches: all, bubbles: true, cancelable: true }));
       const stats = { ticks: 0, offRoad: 0, sliding: 0, air: 0, slow: 0, tows: 0, backOuts: 0, wrecks: 0, rams: 0, rammed: 0, nitro: 0, fullLock: 0, steerSum: 0, brakeTicks: 0, place: 0, laps: [], finished: false, frames: 0, trace: [], lapDamage: [], fieldDamage: [], oiled: 0, oilPaid: 0 };
       window.__drive = stats;
+      // kept apart from the stats the script polls twice a second: serialising a growing series
+      // with them took the page to 7 frames a second by the final (2026-10-06)
+      const series = (window.__series = []);
       let thumb = null; // { x } while down
       let pedal = null; // { x, y } while down
       let tap = null; // a nitro tap in progress: { phase, at }
@@ -245,6 +249,8 @@ async function drive(page, skill) {
           row.boost += c.boosting > 0 ? 1 : 0;
           row.throttle += window.__lastInput?.throttle ?? -1;
           row.n++;
+          // the thumb as the game read it, the yaw rate and the body's slip, in sim time: thumbFollow() reads the lag
+          series.push([s.time, window.__lastInput?.steer ?? 0, c.yaw, c.slipAngle, c.slick > 0 || c.hit ? 1 : 0, c.speed, window.__lastInput?.brake ?? 0]);
           stats.steerSum += Math.abs(c.steer);
           if (Math.abs(c.steer) > 0.95) stats.fullLock++;
           if (pedal) stats.brakeTicks++;
@@ -298,9 +304,71 @@ async function drive(page, skill) {
     if (Date.now() - t0 > 4000 && stats.frames === 0) throw new Error('the driver never ran a frame');
     await page.waitForTimeout(500);
   }
+  stats.series = await page.evaluate(() => window.__series);
   stats.seconds = ((Date.now() - t0) / 1000) * SPEED;
   stats.meanTick = stats.ticks ? (1000 * stats.seconds) / Math.max(1, stats.frames) : 0;
   return stats;
+}
+
+/**
+ * How the car follows the thumb over a race, from the series the page kept: the delay, in sim
+ * seconds, at which the yaw rate best matches the thumb's steer (the peak of their correlation,
+ * 0 to 0.6 s), read only where the tyres grip (the body under 0.15 rad of slip, no slick, no
+ * contact, over 5 m/s): a slide turns the car whatever the thumb does. And the moments the body
+ * went more than 0.5 rad sideways above 5 m/s and not just out of a reverse, each counted once
+ * however long it lasts: `spins` all of them, `pedalSpins` those that began within a second of
+ * the pedal (it locks the rear at speed and swings the tail, by design), `snaps` those that began
+ * with no pedal, no slick under the car and no contact in the second before: the steering alone.
+ * ADR 0005: the yaw rate follows the wheel within a fifth of a second.
+ */
+function thumbFollow(series) {
+  if (!series?.length) return { lag: NaN, corr: NaN, spins: 0, pedalSpins: 0, snaps: 0 };
+  const t0 = series[0][0];
+  const n = Math.floor((series[series.length - 1][0] - t0) * 60);
+  const steer = new Float64Array(n);
+  const yaw = new Float64Array(n);
+  const grip = new Uint8Array(n);
+  let k = 0;
+  for (let i = 0; i < n; i++) {
+    while (k < series.length - 1 && series[k + 1][0] - t0 <= i / 60) k++;
+    const [, st, y, slip, touched, v] = series[k];
+    steer[i] = st;
+    yaw[i] = y;
+    grip[i] = Math.abs(slip) < 0.15 && !touched && v > 5 ? 1 : 0;
+  }
+  let best = { lag: NaN, corr: -Infinity };
+  for (let d = 0; d <= 36; d++) {
+    let sxy = 0, sxx = 0, syy = 0;
+    for (let i = 0; i + d < n; i++) {
+      if (!grip[i] || !grip[i + d]) continue;
+      sxy += steer[i] * yaw[i + d];
+      sxx += steer[i] * steer[i];
+      syy += yaw[i + d] * yaw[i + d];
+    }
+    const corr = sxy / Math.sqrt(sxx * syy || 1);
+    if (corr > best.corr) best = { lag: d / 60, corr };
+  }
+  let spins = 0;
+  let pedalSpins = 0;
+  let snaps = 0;
+  let out = false;
+  let lastTouch = -9;
+  let lastReverse = -9;
+  let lastPedal = -9;
+  for (const [t, , , slip, touched, v, pedal] of series) {
+    if (touched) lastTouch = t;
+    if (v < 0) lastReverse = t;
+    if (pedal) lastPedal = t;
+    const a = Math.abs(slip);
+    // a car turning out of a back-out is sideways to its path for a moment, not spinning
+    if (!out && a > 0.5 && v > 5 && t - lastReverse > 1.5) {
+      spins++;
+      if (t - lastPedal < 1) pedalSpins++;
+      else if (t - lastTouch > 1) snaps++;
+      out = true;
+    } else if (out && a < 0.35) out = false;
+  }
+  return { ...best, spins, pedalSpins, snaps };
 }
 
 // the hour
@@ -310,9 +378,11 @@ try {
     const skill = SKILL[Math.min(SKILL.length - 1, i)];
     for (let tries = 1; tries <= TRIES; tries++) {
       const r = await attempt(id, i, tries, skill);
+      Object.assign(r, { follow: thumbFollow(r.series) });
+      delete r.series;
       summary.push(r);
       const best = r.laps?.length ? Math.min(...r.laps) : null;
-      console.log(`${r.name}: ${r.error ? `ERROR ${r.error}` : `P${r.place} laps ${r.laps.map((l) => l.toFixed(1)).join(' ')} best ${best?.toFixed(1)} off road ${((100 * r.offRoad) / Math.max(1, r.ticks)).toFixed(0)}% sliding ${((100 * r.sliding) / Math.max(1, r.ticks)).toFixed(0)}% tows ${r.tows} back-outs ${r.backOuts} wrecked ${r.wrecks} nitro ${r.nitro} credits ${r.credits} bought ${r.bought.join(', ') || '-'} damage/lap ${r.lapDamage.join('/')} field ${r.fieldDamage.join('/')} oiled ${r.oiled} oiled them ${r.oilPaid} brake ${((100 * r.brakeTicks) / Math.max(1, r.ticks)).toFixed(0)}% full lock ${((100 * r.fullLock) / Math.max(1, r.ticks)).toFixed(0)}% frame ${r.meanTick.toFixed(0)} ms`}`);
+      console.log(`${r.name}: ${r.error ? `ERROR ${r.error}` : `P${r.place} laps ${r.laps.map((l) => l.toFixed(1)).join(' ')} best ${best?.toFixed(1)} off road ${((100 * r.offRoad) / Math.max(1, r.ticks)).toFixed(0)}% sliding ${((100 * r.sliding) / Math.max(1, r.ticks)).toFixed(0)}% tows ${r.tows} back-outs ${r.backOuts} wrecked ${r.wrecks} nitro ${r.nitro} credits ${r.credits} bought ${r.bought.join(', ') || '-'} damage/lap ${r.lapDamage.join('/')} field ${r.fieldDamage.join('/')} oiled ${r.oiled} oiled them ${r.oilPaid} brake ${((100 * r.brakeTicks) / Math.max(1, r.ticks)).toFixed(0)}% full lock ${((100 * r.fullLock) / Math.max(1, r.ticks)).toFixed(0)}% yaw follows the thumb ${r.follow.lag.toFixed(2)} s late (r ${r.follow.corr.toFixed(2)}) spins ${r.follow.spins}: the pedal ${r.follow.pedalSpins}, the steering alone ${r.follow.snaps} frame ${r.meanTick.toFixed(0)} ms`}`);
       if (r.error || r.place === 1 || (i >= 2 && r.place <= 2)) break;
     }
   }
@@ -356,9 +426,9 @@ if (ffmpeg && existsSync(ffmpeg)) {
 writeFileSync(join(OUT, 'summary.json'), JSON.stringify(summary, null, 2));
 const rows = summary.map((r) => {
   const best = r.laps?.length ? Math.min(...r.laps) : null;
-  return `| ${r.name} | ${r.error ? 'error' : `P${r.place}`} | ${r.laps?.map((l) => l.toFixed(1)).join(' ') ?? ''} | ${best?.toFixed(1) ?? ''} | ${r.ticks ? ((100 * r.offRoad) / r.ticks).toFixed(0) : ''}% | ${r.tows ?? ''} | ${r.wrecks ?? ''} | ${r.credits ?? ''} | ${r.bought?.join(', ') ?? ''} |`;
+  return `| ${r.name} | ${r.error ? 'error' : `P${r.place}`} | ${r.laps?.map((l) => l.toFixed(1)).join(' ') ?? ''} | ${best?.toFixed(1) ?? ''} | ${r.ticks ? ((100 * r.offRoad) / r.ticks).toFixed(0) : ''}% | ${r.tows ?? ''} | ${r.wrecks ?? ''} | ${r.credits ?? ''} | ${r.bought?.join(', ') ?? ''} | ${r.follow ? `${r.follow.lag.toFixed(2)} s` : ''} | ${r.follow ? `${r.follow.spins}: pedal ${r.follow.pedalSpins}, steering ${r.follow.snaps}` : ''} |`;
 });
-writeFileSync(join(OUT, 'summary.md'), `| race | place | laps | best | off road | tows | wrecked | credits after | bought before |\n|---|---|---|---|---|---|---|---|---|\n${rows.join('\n')}\n`);
+writeFileSync(join(OUT, 'summary.md'), `| race | place | laps | best | off road | tows | wrecked | credits after | bought before | yaw follows thumb | past 0.5 rad sideways |\n|---|---|---|---|---|---|---|---|---|---|---|\n${rows.join('\n')}\n`);
 
 // the rules of a fun hour
 const byEvent = (id) => summary.filter((r) => r.event === id);
@@ -373,6 +443,8 @@ if (laps.length) check(Math.min(...laps) < 27, `a thumb lap of Kiviahon lenkki i
 // a built Tauno in the final runs 110 km/h on nitro and this hand overshoots an ess now and then: the final may run a third off
 check(summary.every((r) => !r.ticks || r.offRoad / r.ticks < (r.event === 'jm-final' ? 0.33 : 0.2)), `the thumb keeps the car mostly on the road (under 20% off, a third in the final: ${summary.map((r) => (r.ticks ? ((100 * r.offRoad) / r.ticks).toFixed(0) + '%' : '-')).join(' ')})`);
 check(summary.every((r) => (r.tows ?? 0) <= 2), 'no race needs more than two tows');
+check(summary.every((r) => !r.follow || r.follow.lag <= 0.2), `the yaw rate follows the thumb within a fifth of a second (${summary.map((r) => r.follow?.lag.toFixed(2) ?? '-').join(' ')} s)`);
+check(summary.every((r) => !r.follow || r.follow.snaps <= 1), `the steering alone puts the car past 0.5 rad sideways at most once a race: no snap (${summary.map((r) => r.follow?.snaps ?? '-').join(' ')}; the pedal's slides ${summary.map((r) => r.follow?.pedalSpins ?? '-').join(' ')})`);
 const final = byEvent('jm-final');
 if (final.length) check(final.some((r) => r.place <= 2), `the final is a fight: top two within ${TRIES} tries (${final.map((r) => `P${r.place ?? '-'}`).join(' ')})`);
 console.log(failed ? 'playthrough failed' : 'playthrough ok');

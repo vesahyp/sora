@@ -4,10 +4,10 @@ import { CLASS_RANK } from './types';
 import { GRUDGE } from './content/drivers';
 
 /**
- * What a hit does to the race, whichever car model moved the cars: damage
+ * What a hit does to the race, as the car model (physics.ts) reports the contacts: damage
  * with armour, the grudge it leaves, a spin, an explosion, and the
- * consequences of a ram. The car models in physics.ts and physics-old.ts
- * decide when two cars or a car and a tree meet; this decides what it costs.
+ * consequences of a ram. The car model in physics.ts decides when two cars
+ * or a car and a tree meet; this decides what it costs.
  */
 
 /** Damage with armour, and who did it. */
@@ -23,15 +23,15 @@ export function anger(s: SimState, c: Car, by: number, amount: number): void {
   c.grudge[by] = Math.min(GRUDGE.max, c.grudge[by] + amount * c.driver.aggression);
 }
 
+/** rad/s on the yaw from a blast */
+const SPIN_KICK = 3;
+
 /** A blast: the car loses speed, takes a kick on the yaw, and its tyres have little grip for a moment. */
 export function spin(s: SimState, c: Car, k: number): void {
   c.spin = SPIN_TIME;
   c.vx *= k;
   c.vy *= k;
-  // the new model carries a spin on saturated tyres where the old one stopped it dead, so it is kicked
-  // less: a blast costs about the same ground in both (tools/dbg/spin.ts measures it)
-  const kick = s.physics === 'old' ? 5 : 3;
-  c.yaw += (Math.sin(s.time * 13 + c.x) >= 0 ? 1 : -1) * kick;
+  c.yaw += (Math.sin(s.time * 13 + c.x) >= 0 ? 1 : -1) * SPIN_KICK;
   if (c === s.cars[0]) s.sounds.push('spin');
 }
 
@@ -47,9 +47,8 @@ export function boom(s: SimState, x: number, y: number, shake: number): void {
  * whose nose points along the contact rammed the other: damage both ways,
  * the heavier doing more and a ram bar more still, a grudge, nitro for the
  * rammer, and past RAM.spinClosing the victim is thrown and the rammer
- * paid. `throwVictim` is how the car model throws a car: the old one
- * kicks the yaw; in the new one the impulse has turned it already, and
- * the throw only loosens its tyres for a moment.
+ * paid. `throwVictim` is how the car model throws a car: the contact has
+ * turned it already, and the throw only loosens its tyres for a moment.
  */
 export function ram(s: SimState, i: number, j: number, closing: number, nx: number, ny: number, x: number, y: number, throwVictim: (victim: Car) => void): void {
   const a = s.cars[i];

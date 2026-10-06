@@ -53,8 +53,12 @@ export const GUN = { cone: 0.3, range: 22, rate: 9, heat: 2.0, cool: 1.6, holdOf
 /**
  * Oil: a can leaks a slick when a car is this close behind on this line, at most one every
  * `every` seconds; the slick is `r` metres across, lies for `life` seconds, and a tyre that
- * crosses it keeps `grip` of its hold for `slick` seconds, the rear least (physics.ts),
- * and takes `kick` rad/s on the yaw as it goes in, so the tail comes round.
+ * crosses it keeps `grip` of its friction for `slick` seconds, the rear least (physics.ts),
+ * and takes `kick` rad/s on the yaw as it goes in, so the tail comes round. It is the folk
+ * class's one weapon: milder oil (half and 30%, no kick) left the player unable to spin the slow
+ * field out of the way and lost the first races, and the fight in C stopped paying
+ * (tools/dbg/curve.ts, 2026-10-06). What keeps a new thumb from spinning on it on Rapier, with no
+ * spin guard under the car, is that the first fields bring none (events.ts, fieldAmmo).
  */
 export const OIL = { behind: 12, every: 4, r: 1.5, life: 30, slick: 0.9, grip: 0.3, rearGrip: 0.12, kick: 1.6 };
 /** credits for a slick that spins a car, per class rank + 1: in JM it is the only weapon, so it pays more than a ram */
@@ -80,9 +84,11 @@ export const RESPAWN_DAMAGE = 55;
  * rank + 1, paid on the spot with a toast. Death Rally pays for the
  * fight in the race, and a race driven at the field has to pay more
  * than one driven round it picking up cash (sim-check measures it).
+ * The ram credit went from 25 to 30 with Rapier (ADR 0005): a C race on
+ * Hirvisuo paid 237 to 268 cr for the fight against 270 cr of cash.
  */
 export const WRECK_BOUNTY = 200;
-export const RAM_CREDIT = 25;
+export const RAM_CREDIT = 30;
 /** the repair after a race: this share of the car's price at 100 damage */
 export const REPAIR_SHARE = 0.1;
 /** boost: full meter seconds of nitro, the pull and top speed it adds, what fills it */

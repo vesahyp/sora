@@ -5,33 +5,31 @@ The design is in `docs/design.md`.
 
 ## Next
 
-- **Vesa's own phone playtest of the first hour, on the slow folk car and
-  the short loops** (rebuilt 2026-10-05 after he played the first cut:
-  "the basic car really just understeers", "the first tracks should be
-  shorter and the cars slower"). What the scripted thumb has answered
-  (`make playthrough`, `tools/hand.ts`): a held thumb now gets 96 to 98%
-  of the yaw it asks for at every speed (the caster was steering against
-  it), a new thumb laps Kiviahon lenkki in about 25 s stock and 23 with
-  the engine and tyres, the stock Tauno runs out at 80 km/h, the first
-  two folk races are won from every grid, the final is won or lost by
-  tenths, both rivers are cleared and landed on the road. What only a
-  hand can answer: does the Tauno feel slow and light or merely slow,
-  does a light thumb turn in willingly, does a careless full swing at
-  speed slide the rear the right amount, is the first engine part felt
-  at once, is 25 s a lap the right length, is the shortcut worth it by
-  hand, and does the scrub (2026-10-06: a tyre past its peak drags the
-  car's speed, `SCRUB` in `physics.ts`) read as the car slowing until it
-  bites, or as a brake nobody pressed. Knobs: the Tauno's `accel`,
-  `topSpeed` and `grip` in `cars.ts`, `CURVE` in `input.ts`, `SCRUB`,
-  `CASTER_FROM` and `REAR_GRIP` in `physics.ts`,
-  `YAW_ROOM` in `sim.ts`, `fieldSkill` in `events.ts`, the loops'
-  points in `tracks.ts`.
-- **C, B and A are at their old speeds** and the caster fix made every
-  car answer the thumb honestly at 100 km/h and more: the Kortteli at
-  130 km/h may now feel twitchy where the Tauno feels right. Playtest
-  the first C race in the stock Kortteli before touching anything;
-  the knob is the same `CURVE`, or a `lock` on the thumb that widens
-  with speed. The step from JM to C is also now a car half again as
+- **Vesa's phone playtest of the Rapier car** (ADR 0005, 2026-10-06,
+  after "the steering is limp and then suddenly reacts. This is not
+  physics"). The scripted thumb says: the yaw rate reaches 63% of its
+  turn 0.07 s after the thumb moves, at any swing; the hand laps
+  Kiviahon lenkki in 25 to 26 s stock as before. What only a hand can
+  answer, in the readout's terms: is the lock at speed right (0.22 rad at
+  70 km/h, `lockHalf`), does the turn-in at a full swing (the yaw peaks a
+  third over what the car then holds) read as bite or as a twitch, is the
+  pedal's tail swing enough (`handbrakeForce`, 0.8 of what locks the
+  rear: a stab at 80 km/h turns the Tauno 0.5 rad, held with the thumb
+  1.2; at the full lock it was a snap the thumb made more than once a
+  race),
+  does the car feel heavy enough (`mass`,
+  `comHeight`, `yawInertia`). Every knob is in `src/game/rig.ts`.
+  The scripted thumb's open problem: it brakes mid-hairpin without
+  knowing the pedal swings the tail, so one attempt in about seven
+  spins into the inside trees and fails the playthrough's off-road and
+  tow rules (2026-10-06, Hirvisuon lenkki's hairpin at 43 km/h). Teach
+  `tools/hand.ts` to brake before the bend, not in it, before reading
+  the hour's off-road numbers as the car's.
+- **C, B and A lap within 0.3 s of the old model** on Rapier (`make
+  balance`), and every car answers the thumb the same way: the Kortteli
+  at 130 km/h may feel twitchy where the Tauno feels right. Playtest
+  the first C race in the stock Kortteli before touching anything; the
+  knobs are `lockHalf` in `rig.ts` and `CURVE` in `input.ts`. The step from JM to C is also now a car half again as
   fast on tracks twice as long: if that is too much at once, slow the
   Kortteli a tenth (`cars.ts`) and the licence targets follow
   (`make balance`, `licences.ts`).
@@ -47,16 +45,6 @@ The design is in `docs/design.md`.
   a river, and never brakes to rotate the car; a real thumb uses the
   pedal to swing the tail into the hairpin and would lap quicker. Teach
   it the pedal stab, then the shortcut, then read the hour again.
-- **Delete the old car model in the next release.** Vesa played the
-  new one (2026-10-03) and it is better, so `?physics=old` has done its
-  job. Remove `src/game/physics-old.ts`, `SimState.physics` and the
-  `physics` argument of `createState`, the `?physics=old` read in
-  `Game.tsx`, the branches on `s.physics` in `sim.ts` (`advanceOld`,
-  the wreck that stops dead) and `harm.ts` (the 5 rad/s kick in
-  `spin`, the yaw kick passed to `ram`), case 9 in
-  `tools/physics-check.ts`, `PHYSICS=` in the Makefile and
-  `scripts/drive-log.mjs`, and the `?physics=old` lines in `README.md`
-  and `CLAUDE.md`. ADR 0003 already says so.
 - **C is a coin toss for the bot player.** Over 48 C races (the six
   grids with a hair of skill changed, `tools/dbg/grid2.ts`) the default
   bot finishes top two 62% of the time with the wild cast, 52% with the
@@ -108,12 +96,13 @@ the track features below need. All of it is data in `tracks.ts`:
   for `gap` metres, and the far bank climbs back over `RIVER.out`
   metres, steep at the water and flattening toward the road; its water
   is a patch. A crest (`TrackDef.crests`: `s`, `len`, `h`): a smooth
-  brow. A car carries `z`, `vz` and `air`; it leaves the ground when
-  the ground falls away faster than gravity can follow, has no grip and
-  no steering in the air, and lands with a bounce that scrubs the
-  sideways speed; a rising bank catches it without a bounce, and water
-  swallows the landing in spray. Cars more than 0.9 m apart in height
-  pass over each other. The renderer lifts a car in the air, sinks it
+  brow. Since ADR 0005 the heights are Rapier's ground mesh: a car on
+  its springs leaves the ground when it falls away faster than gravity
+  can follow, has no grip in the air (no wheel touches), pitches nose
+  down off a lip it leaves slowly, and lands on its springs; its body's
+  edges are rounded so a nose dropped into a river rides up the far
+  bank. Cars are boxes a metre tall, so one high enough passes over
+  another. The renderer lifts a car in the air, sinks it
   in the river and throws its shadow by its height over the ground.
 - **Shortcuts** (`TrackDef.shortcuts`): a lane through the forest along
   an open polyline, with a width and a surface. `Track.lanes` drives

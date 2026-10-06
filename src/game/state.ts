@@ -1,5 +1,6 @@
 import type { CarDef, Surface, TrackDef } from './types';
 import { Track } from './track';
+import { buildWorld, disposeWorld, type World } from './physics';
 import type { Text } from '../i18n';
 import { PICKUP_OFFSET, PICKUP_OFFSET_CASH, PICKUP_SPACING, pickupOrder, type PickupKind } from './content/pickups';
 
@@ -34,8 +35,12 @@ export interface Car {
   air: boolean;
   /** what the tyres are on, under the middle of the car */
   surface: Surface;
-  /** the wheel, smoothed from the input */
+  /** the thumb's share of the lock, -1..1, the wheel's angle in radians as it turns toward it, and that angle as a share of the lock at rest */
+  steerWant: number;
+  steerAngle: number;
   steer: number;
+  /** each tyre's slip angle, rad, signed (positive slides to the car's right): front left, front right, rear left, rear right */
+  wheelSlip: number[];
   /** forward speed, m/s */
   speed: number;
   /** sideways speed, m/s: the slide */
@@ -44,10 +49,11 @@ export interface Car {
   slipAngle: number;
   /** the tyres have let go this step */
   sliding: boolean;
-  /** each axle's slip angle over its surface's peak, signed: past 1 the tyre scrubs. For the tools and the HUD */
+  /** each axle's mean slip angle over its tyres' peak slip angle, signed: past 1 the tyre is at its friction limit */
   slipF: number;
   slipR: number;
-  handbrake: boolean;
+  /** the pedal is braking the car at speed */
+  braking: boolean;
   onRoad: boolean;
   /** 1 while scraping the trees or another car this step */
   hit: number;
@@ -185,12 +191,10 @@ export interface Toast {
   age: number;
 }
 
-/** The car model: `new` is physics.ts, `old` the one before it, kept for one release (?physics=old). */
-export type Physics = 'new' | 'old';
-
 export interface SimState {
   time: number;
-  physics: Physics;
+  /** the cars' bodies and the track's ground and trees in Rapier (physics.ts) */
+  world: World;
   track: Track;
   /** index 0 is the player */
   cars: Car[];
@@ -234,7 +238,7 @@ export interface Ammo {
 
 export const NO_AMMO: Ammo = { missiles: 0, mines: 0, oil: 0 };
 
-export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: number, opponents: Entry[] = [], ammo: Partial<Ammo> = NO_AMMO, physics: Physics = 'new'): SimState {
+export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: number, opponents: Entry[] = [], ammo: Partial<Ammo> = NO_AMMO): SimState {
   const track = new Track(trackDef);
   const entries: Entry[] = [{ driver: PLAYER, car: playerCar, ...NO_AMMO, ...ammo }, ...opponents];
   // the grid: two abreast behind the line, the player in the last slot. Death Rally starts
@@ -261,14 +265,17 @@ export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: nu
       vz: 0,
       air: false,
       surface: trackDef.surface as Surface,
+      steerWant: 0,
+      steerAngle: 0,
       steer: 0,
+      wheelSlip: [0, 0, 0, 0],
       speed: 0,
       slip: 0,
       slipAngle: 0,
       sliding: false,
       slipF: 0,
       slipR: 0,
-      handbrake: false,
+      braking: false,
       onRoad: true,
       hit: 0,
       s,
@@ -330,7 +337,13 @@ export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: nu
     const d = (i % 2 ? 1 : -1) * (trackDef.width / 2) * (kind === 'cash' ? PICKUP_OFFSET_CASH : PICKUP_OFFSET);
     pickups.push({ kind, x: p.x - p.ty * d, y: p.y + p.tx * d, gone: 0 });
   }
-  return { time: 0, physics, track, cars, totalLaps, finished: false, hold: 2.5, bullets: [], missiles: [], mines: [], oils: [], pickups, fx: [], toasts: [], shake: 0, sounds: [], view: { w: 40, h: 70 } };
+  const world = buildWorld(track, cars);
+  return { time: 0, world, track, cars, totalLaps, finished: false, hold: 2.5, bullets: [], missiles: [], mines: [], oils: [], pickups, fx: [], toasts: [], shake: 0, sounds: [], view: { w: 40, h: 70 } };
+}
+
+/** Free the race's physics world. Call once a race is over; the state cannot be stepped after. */
+export function dispose(s: SimState): void {
+  disposeWorld(s.world);
 }
 
 /** The running order: finishers by flag time, then everyone by distance covered. */

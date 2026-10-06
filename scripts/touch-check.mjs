@@ -18,12 +18,14 @@ const check = (ok, what) => {
 };
 const sim = (expr) => page.evaluate(expr);
 // put the car on the start straight at speed, pointing down the road, so a
-// drag is measured from the same place every time
+// drag is measured from the same place every time: 45 m along, past the
+// crest, where the front wheels are on the ground (on the brow at 50 km/h they
+// are light and steer nothing since the cars run on Rapier, ADR 0005)
 const place = () =>
   page.evaluate(() => {
     const s = window.__sim;
     const c = s.cars[0];
-    const p = s.track.at(20);
+    const p = s.track.at(45);
     c.x = p.x;
     c.y = p.y;
     c.heading = Math.atan2(p.ty, p.tx);

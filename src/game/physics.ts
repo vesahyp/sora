@@ -1,110 +1,306 @@
+import RAPIER from '@dimforge/rapier3d-compat';
 import type { Car, SimState } from './state';
 import type { CarInput, Surface } from './types';
 import { BOOST, DAMAGE, DAMAGE_PACE, OIL, SPIN_TIME, nitroFill, nitroTank } from './content/weapons';
 import { enginePace } from './content/drivers';
 import { SURFACES, type SurfaceDef } from './content/surfaces';
 import { clamp, hurt, ram } from './harm';
-import { steeringLock, wheelbase, yawMax } from './sim';
-import { LANE_VERGE } from './track';
+import { CLEARANCE, G, HANDBRAKE_FROM, engineAt, lockAt, rigOf, type Rig } from './rig';
+import { LANE_VERGE, type Track } from './track';
 
 /**
- * The car model. docs/adr/0003-rigid-body-cars.md has the why.
+ * The car model: Rapier's raycast vehicle (docs/adr/0005-rapier-cars.md).
  *
- * Each car is a rigid box with a mass and a yaw inertia, on two axles
- * (the bicycle model). Each frame is cut into SUB substeps; in each one
- * every car moves, then every pair of cars that overlap is pushed apart
- * with an impulse at the point they touch, then every car that has put a
- * corner into the trees is pushed back the same way. An impulse at a
- * corner turns the car as well as slowing it, so a glancing hit slides
- * the car along what it hit and a hit behind the axle swings the tail.
+ * Each car is a rigid body with a mass, a centre of mass and three
+ * moments of inertia, on four wheels. A wheel is a ray down from the
+ * body: a spring and a damper hold the body up, and a tyre at the end
+ * pushes on the ground. The tyre's side force grows with the slip
+ * angle up to the friction coefficient times the wheel's load (the peak
+ * slip angle sets the slope), and drive, braking and cornering share one
+ * friction limit per wheel. The body pitches under braking and rolls in
+ * a bend, so the loaded wheels press harder: that is the weight
+ * transfer. Nothing here is a driving aid. The numbers are in rig.ts.
  *
- * A tyre's force rises with its slip angle to a peak and falls smoothly
- * to a share of it past the peak (the surface's `slide`): grip lets go
- * progressively, into a slide that holds. Past the peak the tyre also
- * scrubs: the excess slip drags on the car's speed (SCRUB), so a corner
- * taken too fast slows the car until the front bites again. Each axle
- * has one budget for driving, braking and cornering (the friction
- * circle). Braking moves load to the front. The pedal at speed brakes and locks the rear, which
- * then skids and has little left to hold the tail: the handbrake turn.
+ * The world: the ground is a triangle mesh along the road and the
+ * shortcuts with the track's heights in it (rivers, crests), and the tree
+ * line is a row of boxes. Cars meet each other and the trees through
+ * Rapier's contacts; this file reads those contacts for the race's
+ * damage and rams (harm.ts).
  *
- * Each axle reads the surface under it, so a car with two wheels on the
- * grass has a front and a rear that grip differently. A car has a height:
- * a ramp throws it, in the air it has no grip and no steering, and it
- * lands with a bounce that costs it the speed it carried sideways.
+ * The rest of the sim reads and writes a car's plain fields (x, y,
+ * heading, vx, vy, yaw). A write between frames (a tow, a blast's kick,
+ * a check placing a car) is seen at the start of the next frame and put
+ * into the body.
  */
 
-/** substeps per frame: 180 Hz, so the tyres stay stable at walking pace and contacts stay shallow */
-const SUB = 3;
-const G = 9.81;
+/** Rapier steps per sim frame: 120 Hz */
+const SUB = 2;
 /** m/s backwards, held pedal at a standstill */
 const REVERSE_TOP = 5;
-/** the rear tyres against the front: a touch under 1 so the car rotates at the limit instead of plowing */
-const REAR_GRIP = 0.92;
-/** how quickly the drive fades as the rear slides past its peak, per peak */
-const TRACTION = 1.0;
-/**
- * The safety net under every hand: past COUNTER_FROM peaks of rear slip the wheel is turned into
- * the slide by COUNTER of the excess. A pedal slide held at an angle sits under two peaks and is
- * left alone; a tail going past that toward a spin is caught, for the thumb as for the bot.
- */
-const COUNTER_FROM = 2;
-const COUNTER = 0.8;
-/** how far a free wheel follows the front axle's direction of travel, past CASTER_FROM peaks of it */
-const CASTER = 0.8;
-const CASTER_FROM = 0.2;
-/** slip, in peaks, past which a sliding tyre bites again */
-const GUARD = 1.5;
-/** per second: how hard a sliding car's rotation is damped once the tail is well past its peak */
-const SPIN_DAMP = 2;
-/** how much a far-out tail gains back, at least: above its peak, so a slide always ends */
-const GUARD_GAIN = 0.2;
-/** the front tyres keep this much more of their grip past the peak than the surface's slide: a car past the limit rotates rather than plows */
-const FRONT_HOLD = 0.3;
-/** centre of gravity height over the wheelbase: how much braking unloads the rear */
-const CG_OVER_L = 0.16;
-/** the most load the pitch moves off an axle, as a share of the car's weight */
-const SHIFT_MAX = 0.15;
-/** seconds over which the load follows the acceleration: the body's pitch */
-const PITCH_LAG = 0.12;
-/** the pedal at speed locks the rear: this share of its side grip is gone while it is held */
-const HANDBRAKE = 0.7;
-/** below this the slip-angle formula is fed this speed, so rest is not a singularity */
+/** below this forward speed the tyre's slope is held, so rest is not a singularity */
 const V_FLOOR = 3;
-/** car against car: how much of the closing speed comes back, and the scrape between the bodies */
+/** Rapier's side impulse removes this share of a wheel's sideways speed per step at stiffness 1 */
+const SIDE_DAMPING = 0.2;
+/** car against car and car against the trees: restitution and friction */
 const CAR_BOUNCE = 0.2;
 const CAR_FRICTION = 0.25;
-/** in a hit the tyres resist the turn: the yaw inertia a contact sees, over the body's own */
-const HIT_INERTIA = 1.5;
-/** a car against the trees: the bounce and the scrape. Low friction so a glancing car slides along */
-const TREE_BOUNCE = 0.2;
 const TREE_FRICTION = 0.12;
-/** two cars further apart than this in height pass over each other */
-const CLEAR_HEIGHT = 0.9;
-/** a landing harder than this, m/s down, bounces; harder than LAND_HURT it costs damage */
-const LAND_BOUNCE = 2.5;
-/** the bounce: the share of the impact that comes back, and the most it can be, m/s. A landing on a bank's slope would otherwise throw the car into a second jump */
-const LAND_REBOUND = 0.25;
-const LAND_REBOUND_MAX = 1.5;
+/** m: the radius of the body's edges: 0.3 let a car ride up onto another in a T-bone */
+const BODY_ROUND = 0.1;
+/** a landing harder than this, m/s down, costs damage */
 const LAND_HURT = 7;
+/** a spun car's tyres keep this share of their friction at the start of the spin */
+const SPIN_GRIP = 0.35;
 
-/** the air and the rolling tyres: a pull on the forward speed, per second */
-let DRAG = 0.12;
-/** for the sweeps in tools/dbg */
-export function setDrag(d: number): void {
-  DRAG = d;
+/** collision groups: what each thing is, and what it meets */
+const GROUND = 0x1;
+const WALL = 0x2;
+const CAR = 0x4;
+const WRECK = 0x8;
+const groups = (member: number, filter: number) => (member << 16) | filter;
+const CAR_GROUPS = groups(CAR, GROUND | WALL | CAR);
+const WRECK_GROUPS = groups(WRECK, GROUND | WALL);
+/** the wheels' rays see only the ground */
+const RAY_GROUPS = groups(CAR, GROUND);
+
+let ready = false;
+/** Load Rapier's WASM. Once, before the first race; the sim cannot run without it. */
+export async function initPhysics(): Promise<void> {
+  if (ready) return;
+  await RAPIER.init();
+  ready = true;
 }
+
+/** A car's body in the world. */
+interface Body {
+  rig: Rig;
+  body: RAPIER.RigidBody;
+  collider: RAPIER.Collider;
+  vehicle: RAPIER.DynamicRayCastVehicleController;
+  /** the plain fields as this file last wrote them, to see a write from outside */
+  seen: { x: number; y: number; heading: number; vx: number; vy: number; yaw: number };
+  /** the wheels' static loads, N */
+  loadF: number;
+  loadR: number;
+  wrecked: boolean;
+}
+
+export interface World {
+  world: RAPIER.World;
+  bodies: Body[];
+  walls: Set<number>;
+}
+
+/** The track's world, then a body per car where createState put it, settled on its springs. */
+export function buildWorld(track: Track, cars: Car[]): World {
+  const world = new RAPIER.World({ x: 0, y: 0, z: -G });
+  world.timestep = 1 / 60 / SUB;
+  const walls = new Set<number>();
+  buildGround(world, track);
+  for (const box of wallBoxes(track)) {
+    const c = world.createCollider(
+      RAPIER.ColliderDesc.cuboid(box.hl, 0.5, 2.5)
+        .setTranslation(box.x, box.y, 1.5)
+        .setRotation(yawQuat(box.a))
+        .setFriction(TREE_FRICTION)
+        .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
+        .setRestitution(CAR_BOUNCE)
+        .setCollisionGroups(groups(WALL, CAR | WRECK)),
+    );
+    walls.add(c.handle);
+  }
+  // under everything, so a car that finds a gap in the trees falls a little way and is towed
+  world.createCollider(RAPIER.ColliderDesc.cuboid(5000, 5000, 0.5).setTranslation(0, 0, -3).setCollisionGroups(groups(GROUND, CAR | WRECK)));
+  const bodies = cars.map((c) => carBody(world, track, c));
+  // let the springs take the weight before the lights
+  for (let k = 0; k < 40; k++) {
+    for (const b of bodies) {
+      for (let i = 0; i < 4; i++) {
+        b.vehicle.setWheelBrake(i, b.rig.brakeForce * world.timestep);
+        b.vehicle.setWheelEngineForce(i, 0);
+      }
+      b.vehicle.updateVehicle(world.timestep, undefined, RAY_GROUPS);
+    }
+    world.step();
+  }
+  cars.forEach((c, i) => readBack(c, bodies[i], track, 0));
+  return { world, bodies, walls };
+}
+
+/** Free the race's world: Rapier lives in WASM memory, which the garbage collector does not see. */
+export function disposeWorld(w: World): void {
+  w.world.free();
+}
+
+function yawQuat(a: number): RAPIER.Rotation {
+  return { w: Math.cos(a / 2), x: 0, y: 0, z: Math.sin(a / 2) };
+}
+
+function headingOf(q: RAPIER.Rotation): number {
+  return Math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z));
+}
+
 /**
- * A tyre past its peak scrubs: the slip beyond the peak, in peaks, costs the car this share of
- * that axle's grip as a drag along its length, up to SCRUB_MAX peaks of excess. A sliding tyre
- * turns the slip into heat and drag, so an over-ambitious corner slows the car until the front
- * bites again, instead of the car ploughing on wide at full speed (the owner, 2026-10-06). Better
- * tyres carry the same corner with less excess, so they scrub less: the tyre parts are felt
- * here as much as in the peak. Every car, rivals included.
+ * The ground: a strip of triangles along the lap, the road and the verge and a little past the
+ * trees, every metre and at each river's lip, at the height groundAt gives; and a flat strip
+ * along every shortcut lane.
  */
-let SCRUB = 0.35;
-const SCRUB_MAX = 2;
-export function setScrub(k: number): void {
-  SCRUB = k;
+function buildGround(world: RAPIER.World, t: Track): void {
+  const half = t.width / 2 + t.verge + 2;
+  const ss: number[] = [];
+  for (let s = 0; s < t.length; s += 1) ss.push(s);
+  for (const r of t.def.rivers ?? []) ss.push(r.s - 0.02, r.s + 0.02);
+  const sorted = [...new Set(ss.map((s) => ((s % t.length) + t.length) % t.length))].sort((a, b) => a - b);
+  const across = [-half, -half / 2, 0, half / 2, half];
+  strip(
+    world,
+    sorted.map((s) => {
+      const p = t.at(s);
+      const z = t.groundAt(s, 0);
+      return across.map((d) => [p.x - p.ty * d, p.y + p.tx * d, z] as [number, number, number]);
+    }),
+    true,
+  );
+  for (const lane of t.lanes) {
+    const w = lane.width / 2 + LANE_VERGE + 2;
+    const rows: [number, number, number][][] = [];
+    for (let u = 0; u <= lane.length; u += 1) {
+      const p = lane.at(u);
+      rows.push([-w, 0, w].map((d) => [p.x - p.ty * d, p.y + p.tx * d, 0] as [number, number, number]));
+    }
+    strip(world, rows, false);
+  }
+}
+
+/** Triangles between consecutive rows of points, closed back to the first row on a lap. */
+function strip(world: RAPIER.World, rows: [number, number, number][][], closed: boolean): void {
+  const n = rows.length;
+  const m = rows[0].length;
+  const verts = new Float32Array(n * m * 3);
+  rows.forEach((row, i) => row.forEach((p, j) => verts.set(p, (i * m + j) * 3)));
+  const idx: number[] = [];
+  const last = closed ? n : n - 1;
+  for (let i = 0; i < last; i++) {
+    const a = i * m;
+    const b = ((i + 1) % n) * m;
+    for (let j = 0; j < m - 1; j++) idx.push(a + j, b + j, a + j + 1, a + j + 1, b + j, b + j + 1);
+  }
+  // the triangles face up, and their shared edges are smoothed over: without it a car sliding
+  // sideways caught an edge with its body and rolled onto its roof at 28 km/h (tools/dbg/crawl1.ts)
+  world.createCollider(
+    RAPIER.ColliderDesc.trimesh(verts, new Uint32Array(idx), RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES)
+      .setFriction(0.8)
+      .setCollisionGroups(groups(GROUND, CAR | WRECK)),
+  );
+}
+
+/**
+ * The tree line as boxes a metre thick: along both sides of the road at the verge's edge, and along
+ * both sides of each shortcut lane at its own verge. A box is left out where it would stand in a
+ * lane's mouth, or where the road comes back on itself closer than the verge.
+ */
+export function wallBoxes(t: Track): { x: number; y: number; a: number; hl: number }[] {
+  const out: { x: number; y: number; a: number; hl: number }[] = [];
+  const edge = t.width / 2 + t.verge;
+  const STEP = 2;
+  const inLaneMouth = (x: number, y: number) => {
+    const l = t.laneAt(x, y);
+    return !!l && l.dist < l.lane.width / 2 + LANE_VERGE + 0.5;
+  };
+  const push = (x0: number, y0: number, x1: number, y1: number) => {
+    out.push({ x: (x0 + x1) / 2, y: (y0 + y1) / 2, a: Math.atan2(y1 - y0, x1 - x0), hl: Math.hypot(x1 - x0, y1 - y0) / 2 + 0.35 });
+  };
+  for (let s = 0; s < t.length; s += STEP) {
+    const p = t.at(s);
+    const q = t.at(s + STEP);
+    for (const side of [-1, 1]) {
+      const d = side * (edge + 0.5);
+      const x0 = p.x - p.ty * d, y0 = p.y + p.tx * d;
+      const x1 = q.x - q.ty * d, y1 = q.y + q.tx * d;
+      const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+      if (inLaneMouth(mx, my)) continue;
+      if (Math.abs(t.locate(mx, my).d) < edge) continue;
+      push(x0, y0, x1, y1);
+    }
+  }
+  for (const lane of t.lanes) {
+    const edgeL = lane.width / 2 + LANE_VERGE + 0.5;
+    for (let u = 0; u < lane.length; u += STEP) {
+      const p = lane.at(u);
+      const q = lane.at(Math.min(lane.length, u + STEP));
+      for (const side of [-1, 1]) {
+        const d = side * edgeL;
+        const x0 = p.x - p.ty * d, y0 = p.y + p.tx * d;
+        const x1 = q.x - q.ty * d, y1 = q.y + q.tx * d;
+        const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+        if (Math.abs(t.locate(mx, my).d) < edge + 0.5) continue;
+        const other = t.laneAt(mx, my);
+        if (other && other.lane !== lane && other.dist < other.lane.width / 2 + LANE_VERGE) continue;
+        push(x0, y0, x1, y1);
+      }
+    }
+  }
+  return out;
+}
+
+/** The car's body: a box with its mass at the centre of mass, four wheels, the rig's springs. */
+function carBody(world: RAPIER.World, t: Track, c: Car): Body {
+  const r = rigOf(c.def);
+  const L = r.wheelbase;
+  const front = L * (1 - r.frontWeight);
+  const rear = L * r.frontWeight;
+  const loc = t.locate(c.x, c.y);
+  // the springs' static sag: each wheel carries a quarter of the weight
+  const stiff = r.springRate / r.mass;
+  const sag = G / (4 * stiff);
+  const mount = r.wheelRadius + r.restLength - sag - r.comHeight;
+  const body = world.createRigidBody(
+    RAPIER.RigidBodyDesc.dynamic()
+      .setTranslation(c.x, c.y, t.groundAt(loc.s, loc.d) + r.comHeight + 0.02)
+      .setRotation(yawQuat(c.heading))
+      .setAdditionalMassProperties(r.mass, { x: 0, y: 0, z: 0 }, { x: r.rollInertia, y: r.pitchInertia, z: r.yawInertia }, { w: 1, x: 0, y: 0, z: 0 })
+      .setCanSleep(false)
+      .setCcdEnabled(true),
+  );
+  const collider = world.createCollider(
+    // rounded at every edge, as a car's bumpers and sills are: a square edge dug into a river's far
+    // bank and stopped a car dead from 57 km/h (tools/dbg/splash.ts, 2026-10-06)
+    RAPIER.ColliderDesc.roundCuboid(r.length / 2 - BODY_ROUND, r.width / 2 - BODY_ROUND, r.height / 2 - BODY_ROUND, BODY_ROUND)
+      .setTranslation((front - rear) / 2, 0, CLEARANCE + r.height / 2 - r.comHeight)
+      .setDensity(0)
+      .setFriction(CAR_FRICTION)
+      .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
+      .setRestitution(CAR_BOUNCE)
+      // the ground gives nothing back: a body that bottoms out on landing stops there
+      .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Min)
+      .setCollisionGroups(CAR_GROUPS),
+    body,
+  );
+  const vehicle = world.createVehicleController(body);
+  vehicle.indexUpAxis = 2;
+  vehicle.setIndexForwardAxis = 0;
+  // front left, front right, rear left, rear right; +y is the car's right on the screen
+  for (const [x, y] of [[front, -r.track / 2], [front, r.track / 2], [-rear, -r.track / 2], [-rear, r.track / 2]]) {
+    vehicle.addWheel({ x, y, z: mount }, { x: 0, y: 0, z: -1 }, { x: 0, y: -1, z: 0 }, r.restLength, r.wheelRadius);
+  }
+  for (let i = 0; i < 4; i++) {
+    vehicle.setWheelSuspensionStiffness(i, stiff);
+    vehicle.setWheelSuspensionCompression(i, r.damperCompression / r.mass);
+    vehicle.setWheelSuspensionRelaxation(i, r.damperRebound / r.mass);
+    vehicle.setWheelMaxSuspensionTravel(i, r.travel);
+    vehicle.setWheelMaxSuspensionForce(i, r.maxSpringForce);
+    vehicle.setWheelFrictionSlip(i, r.mu);
+  }
+  return {
+    rig: r,
+    body,
+    collider,
+    vehicle,
+    seen: { x: NaN, y: NaN, heading: NaN, vx: NaN, vy: NaN, yaw: NaN },
+    loadF: (r.mass * G * r.frontWeight) / 2,
+    loadR: (r.mass * G * (1 - r.frontWeight)) / 2,
+    wrecked: false,
+  };
 }
 
 const bitten = new Map<string, SurfaceDef>();
@@ -112,7 +308,7 @@ const bitten = new Map<string, SurfaceDef>();
 /**
  * A surface under tyres that bite off the road (CarDef.offroad): grass, mud and water give back
  * that share of the grip, the top speed and the drag they take. Gravel, tarmac and ice are as
- * they are: a lug does nothing on ice. Memoised, since it is asked three times a substep.
+ * they are: a lug does nothing on ice.
  */
 function bite(surface: Surface, offroad = 0): SurfaceDef {
   const sd = SURFACES[surface];
@@ -127,41 +323,80 @@ function bite(surface: Surface, offroad = 0): SurfaceDef {
   return out;
 }
 
-/** What the driver and the race ask of a car this frame, read once and held through the substeps. */
+/** What the driver and the race ask of a car this frame. */
 interface Ask {
   throttle: number;
   pedal: number;
+  /** multipliers on the engine's top speed and its pull: damage, the pacing, the nitro */
   top: number;
   pull: number;
-  spinning: boolean;
+  /** share of the tyres' friction left after a hit spun the car */
+  loose: number;
 }
 
 export function advance(s: SimState, inputs: CarInput[], dt: number): void {
-  const asks = s.cars.map((c, i) => ask(s, c, inputs[i], dt));
+  const w = s.world;
   const h = dt / SUB;
+  s.cars.forEach((c, i) => takeWrites(c, w.bodies[i], s.track));
+  const asks = s.cars.map((c, i) => ask(s, c, inputs[i], dt));
+  // the surface under each axle, once a frame
+  const under = s.cars.map((c) => surfaces(s.track, c));
   for (const c of s.cars) c.hit = 0;
+  const air = s.cars.map((c) => c.air);
+  const vzBefore = s.cars.map((c) => c.vz);
   for (let k = 0; k < SUB; k++) {
-    for (let i = 0; i < s.cars.length; i++) integrate(s, s.cars[i], asks[i], h, k === SUB - 1);
-    for (let it = 0; it < 2; it++) carContacts(s, it === 0);
-    for (const c of s.cars) treeContacts(s, c);
+    s.cars.forEach((c, i) => drive(c, w.bodies[i], asks[i], under[i], h));
+    const before = w.bodies.map((b) => ({ v: b.body.linvel(), w: b.body.angvel() }));
+    w.world.step();
+    contacts(s, before);
   }
-  for (const c of s.cars) {
-    if (c.wreck > 0) continue;
+  s.cars.forEach((c, i) => {
+    readBack(c, w.bodies[i], s.track, dt, under[i]);
+    if (air[i] && !c.air) land(s, c, vzBefore[i], under[i].here.splash === true);
+    // water thrown up behind a car driving through it
+    const v = Math.hypot(c.vx, c.vy);
+    if (under[i].here.splash && !c.air && v > 4 && s.time * 20 - Math.floor(s.time * 20) < 0.34) {
+      s.fx.push({ kind: 'splash', x: c.x - Math.cos(c.heading) * c.def.length * 0.4, y: c.y - Math.sin(c.heading) * c.def.length * 0.4, age: 0 });
+      if (c === s.cars[0] && v > 8 && Math.random() < 0.15) s.sounds.push('splash');
+    }
+    if (c.wreck > 0) return;
     // drifting fills the tank
-    const fwd = c.vx * Math.cos(c.heading) + c.vy * Math.sin(c.heading);
-    if (Math.abs(c.slipAngle) > 0.2 && Math.abs(fwd) > 9 && c.spin <= 0 && !c.air) c.boost = Math.min(1, c.boost + BOOST.perDriftSecond * nitroFill(c.def) * dt);
+    if (Math.abs(c.slipAngle) > 0.2 && Math.abs(c.speed) > 9 && c.spin <= 0 && !c.air) c.boost = Math.min(1, c.boost + BOOST.perDriftSecond * nitroFill(c.def) * dt);
+  });
+}
+
+/** A write from outside since the last frame goes into the body: a teleport, or a kick to the velocity. */
+function takeWrites(c: Car, b: Body, t: Track): void {
+  const seen = b.seen;
+  if (c.x !== seen.x || c.y !== seen.y || c.heading !== seen.heading) {
+    const loc = t.locate(c.x, c.y);
+    b.body.setTranslation({ x: c.x, y: c.y, z: t.groundAt(loc.s, loc.d) + b.rig.comHeight + 0.02 }, true);
+    b.body.setRotation(yawQuat(c.heading), true);
+    b.body.setLinvel({ x: c.vx, y: c.vy, z: 0 }, true);
+    b.body.setAngvel({ x: 0, y: 0, z: c.yaw }, true);
+  } else if (c.vx !== seen.vx || c.vy !== seen.vy || c.yaw !== seen.yaw) {
+    const v = b.body.linvel();
+    const a = b.body.angvel();
+    b.body.setLinvel({ x: c.vx, y: c.vy, z: v.z }, true);
+    b.body.setAngvel({ x: a.x, y: a.y, z: c.yaw }, true);
+  }
+  // a wreck burns where it stopped and the others drive through its smoke
+  const wrecked = c.wreck > 0;
+  if (wrecked !== b.wrecked) {
+    b.wrecked = wrecked;
+    b.collider.setCollisionGroups(wrecked ? WRECK_GROUPS : CAR_GROUPS);
   }
 }
 
-/** The once-a-frame part: the wheel, the nitro, the engine's pace, the countdown of a spin. */
+/** The once-a-frame part: the wheel's target, the nitro, the engine's pace, the countdown of a spin. */
 function ask(s: SimState, c: Car, input: CarInput, dt: number): Ask {
-  if (c.wreck > 0) return { throttle: 0, pedal: 1, top: 0, pull: 0, spinning: false };
+  if (c.wreck > 0) {
+    c.steerWant = 0;
+    return { throttle: 0, pedal: 1, top: 0, pull: 0, loose: 1 };
+  }
   const def = c.def;
   const done = c.finishedAt >= 0;
-  // the wheel follows the thumb, quickly; in the air it turns but steers nothing
-  const want = clamp(input.steer, -1, 1);
-  const rate = 9 * dt;
-  c.steer += clamp(want - c.steer, -rate, rate);
+  c.steerWant = clamp(input.steer, -1, 1);
   // damage costs pull and top speed; an opponent's engine is also paced to the player (PACING)
   const pace = (1 - DAMAGE_PACE * (c.damage / 100)) * enginePace(s, c);
   if (c.spin > 0) c.spin -= dt;
@@ -180,261 +415,210 @@ function ask(s: SimState, c: Car, input: CarInput, dt: number): Ask {
   return {
     throttle: done || spinning ? 0 : clamp(input.throttle, 0, 1),
     pedal: done ? 1 : spinning ? 0 : clamp(input.brake, 0, 1),
-    top: def.topSpeed * pace * (boosting ? BOOST.top : 1),
-    pull: def.accel * pace * (boosting ? BOOST.accel : 1),
-    spinning,
+    top: pace * (boosting ? BOOST.top : 1),
+    pull: pace * (boosting ? BOOST.accel : 1),
+    loose: spinning ? 1 - (1 - SPIN_GRIP) * clamp(c.spin / SPIN_TIME, 0, 1) : 1,
   };
 }
 
-/**
- * The tyre's lateral force as a share of its grip, for a slip of x peaks:
- * up to 1 at x = 1, then down smoothly to `slide`. On the rear, past
- * `guard` peaks it climbs back toward 1: a tail far out bites again,
- * which is what holds a slide at an angle instead of letting it become
- * a spin (the arcade spin guard).
- */
-function tyre(x: number, slide: number, guard: number): number {
-  const a = Math.abs(x);
-  let f = a <= 1 ? (2 * a) / (1 + a * a) : slide + (1 - slide) / (1 + 0.6 * (a - 1) * (a - 1));
-  if (a > guard) f += Math.max(1 - slide, GUARD_GAIN) * Math.min(1, (a - guard) / guard);
-  return Math.sign(x) * f;
+interface Under {
+  front: SurfaceDef;
+  rear: SurfaceDef;
+  here: SurfaceDef;
+  name: Surface;
 }
 
-/** One axle's force in its own frame (x along the wheel), capped together by the friction circle. */
-function axle(demandX: number, alpha: number, surf: SurfaceDef, cap: number, vAxleY: number, h: number, guard = Infinity): [number, number] {
-  let fy = -cap * tyre(alpha / surf.peak, surf.slide, guard);
-  // the tyre cannot more than stop its own sideways motion in a substep: no chatter at rest
-  const stop = Math.abs(vAxleY) / h;
-  if (Math.abs(fy) > stop) fy = Math.sign(fy) * stop;
-  let fx = demandX;
-  const total = Math.hypot(fx, fy);
-  if (total > cap) {
-    fx *= cap / total;
-    fy *= cap / total;
-  }
-  return [fx, fy];
-}
-
-function integrate(s: SimState, c: Car, a: Ask, h: number, last: boolean): void {
-  const def = c.def;
-  const t = s.track;
+/** What each axle stands on, and the middle of the car. */
+function surfaces(t: Track, c: Car): Under {
   const loc = t.locate(c.x, c.y);
   const road = t.at(loc.s);
   const fx = Math.cos(c.heading);
   const fy = Math.sin(c.heading);
-  // velocity in the car's frame: x forward, y to the right
-  let vx = c.vx * fx + c.vy * fy;
-  let vy = c.vx * -fy + c.vy * fx;
-  let w = c.yaw;
-
-  const L = wheelbase(def);
-  const b = L * 0.5; // CG to the front axle
-  const cc = L - b; // CG to the rear axle
-  const k2 = inertia(def);
-
-  // the surface under each axle: the road's frame tells how far along and across each one sits
+  const L = c.def.length * 0.31;
   const along = fx * road.tx + fy * road.ty;
   const across = fx * -road.ty + fy * road.tx;
-  const sf = bite(t.surfaceAt(loc.s + b * along, loc.d + b * across, c.x + fx * b, c.y + fy * b), def.offroad);
-  const sr = bite(t.surfaceAt(loc.s - cc * along, loc.d - cc * across, c.x - fx * cc, c.y - fy * cc), def.offroad);
-  const here = t.surfaceAt(loc.s, loc.d, c.x, c.y);
-  const sc = bite(here, def.offroad);
-
-  // height: on the ground the car follows it; when the ground falls away faster than gravity can pull, it flies
-  const ground = t.groundAt(loc.s, loc.d);
-  const vAlong = c.vx * road.tx + c.vy * road.ty;
-  const ahead = t.groundAt(loc.s + vAlong * h, loc.d);
-  const vzGround = (ahead - ground) / h;
-  if (!c.air) {
-    if (vzGround < c.vz - G * h * 2 && c.vz > 0.5) {
-      c.air = true;
-      c.z = ground;
-    } else {
-      c.z = ground;
-      c.vz = vzGround;
-    }
-  }
-  if (c.air) {
-    c.vz -= G * h;
-    c.z += c.vz * h;
-    if (c.z <= ground && c.vz < vzGround) land(s, c, vx, vy, ground, vzGround, sc.splash === true);
-    vx = c.vx * fx + c.vy * fy;
-    vy = c.vx * -fy + c.vy * fx;
-  }
-
-  let ax = 0;
-  let ay = 0;
-  let wdot = 0;
-  if (!c.air) {
-    // grip per axle: the car's tyres, the surface, the load moved by the pitch, and a spin that wears off
-    const loose = a.spinning ? 1 - 0.65 * clamp(c.spin / SPIN_TIME, 0, 1) : 1;
-    // braking loads the nose fully; the engine squats the tail only half as much, or the pedal-less
-    // throttle the thumb gives would make every car push
-    const shift = clamp((CG_OVER_L * (c.ax < 0 ? c.ax : c.ax * 0.5)) / G, -SHIFT_MAX, SHIFT_MAX);
-    // oil under the tyres: little hold on the front, less on the rear, so the tail goes first
-    const oiled = c.slick > 0;
-    const capF = def.grip * sf.grip * (0.5 - shift) * loose * (oiled ? OIL.grip : 1);
-    const capR = def.grip * sr.grip * REAR_GRIP * (0.5 + shift) * loose * (oiled ? OIL.rearGrip : 1);
-
-    // drive: the engine's push fades toward the top speed the surface allows
-    const top = a.top * Math.min(sf.top, sr.top);
-    const front = def.frontDrive ?? 0;
-    let drive = 0;
-    if (a.throttle > 0 && vx < top) drive = a.pull * a.throttle * Math.max(0, 1 - vx / top);
-    let brakeF = 0;
-    let brakeR = 0;
-    let handbrake = false;
-    if (a.pedal > 0) {
-      if (vx > 0.4) {
-        // the brakes are biased to the nose; at speed the pedal also drags the rear to a share of its
-        // grip, the handbrake: a dragged tyre has that much less to hold sideways, and the tail comes round
-        brakeF = def.brake * a.pedal * 0.75;
-        brakeR = def.brake * a.pedal * 0.25;
-        if (vx > 6) {
-          handbrake = true;
-          brakeR = capR * 0.5 * a.pedal;
-        }
-      } else if (vx > -REVERSE_TOP) drive = -def.accel * 0.5 * a.pedal;
-    } else if (vx < 0) {
-      brakeF = brakeR = def.brake * 0.25;
-    }
-    c.handbrake = handbrake;
-    // a brake never pushes the car backwards: it fades out as the wheel stops
-    const roll = clamp(Math.abs(vx) / 0.5, 0, 1) * Math.sign(vx);
-
-    const vxs = Math.max(Math.abs(vx), V_FLOOR);
-    const vyF = vy + w * b;
-    // caster: the part of the wheel the thumb leaves free swings to where the front axle is going,
-    // as a released steering wheel does, so a slide let go of straightens itself
-    const lock = steeringLock(def, vx);
-    const free = (1 - Math.abs(c.steer)) * CASTER;
-    const swing = steeringLock(def, 0);
-    const vyR = vy - w * cc;
-    const alphaR = Math.atan2(vyR, vxs);
-    // the hand asks for yaw; the wheel turns as far as the tyres can use at this speed (yawMax).
-    // A tail well past its peak is caught for the hand (COUNTER): the same car answers every hand
-    // the same way
-    const asked = Math.atan((c.steer * yawMax(def, vx) * L) / vxs);
-    const past = Math.abs(alphaR) - sr.peak * COUNTER_FROM;
-    const tailOut = past > 0 && Math.abs(vx) > 6 ? Math.sign(alphaR) * past * COUNTER : 0;
-    // only the part of the front's travel beyond CASTER_FROM of the tyre's peak: in a steady turn at
-    // speed the nose points a shade inside the path, and a caster that followed every degree of it
-    // steered against the thumb, a quarter of the wheel gone at 80 km/h (tools/dbg/thumb.ts, 2026-10-05)
-    const travelF = Math.atan2(vyF, vxs);
-    const caster = Math.sign(travelF) * Math.max(0, Math.abs(travelF) - sf.peak * CASTER_FROM);
-    const delta = clamp(asked + tailOut, -lock, lock) + free * clamp(caster, -swing, swing) * Math.sign(vx || 1);
-    const alphaF = Math.atan2(vyF, vxs) - delta * Math.sign(vx || 1);
-    // the thumb has no throttle to lift, so the car lifts for it: past the rear's peak the drive
-    // fades, the way a driver feathers a slide instead of powering it into a spin
-    if (drive > 0) drive *= clamp(1 - (Math.abs(alphaR) / sr.peak - 1) * TRACTION, 0.25, 1);
-    const demandF = drive * front - brakeF * roll;
-    const demandR = drive * (1 - front) - brakeR * roll;
-    // the front's sideways speed in the wheel's own frame, for the at-rest cap
-    const vyWheel = vyF * Math.cos(delta) - vx * Math.sin(delta);
-    const [fxF, fyF] = axle(demandF, alphaF, { ...sf, slide: sf.slide + (1 - sf.slide) * FRONT_HOLD }, capF, vyWheel, h * 2);
-    // a locked tyre slides where the car goes: the handbrake takes the rear's side grip away
-    const [fxR, fyR] = axle(demandR, alphaR, sr, handbrake ? capR * (1 - HANDBRAKE * a.pedal) : capR, vyR, h * 2, GUARD);
-    if (last) {
-      c.sliding = (Math.abs(alphaR) > sr.peak * 1.3 || Math.abs(alphaF) > sf.peak * 1.3) && Math.abs(vx) > 2;
-      c.slipF = alphaF / sf.peak;
-      c.slipR = alphaR / sr.peak;
-    }
-
-    // the front wheel's force turned into the car's frame
-    const cd = Math.cos(delta);
-    const sd = Math.sin(delta);
-    const carFx = fxF * cd - fyF * sd;
-    const carFy = fxF * sd + fyF * cd;
-    // the scrub: each axle's slip past its peak, as a drag on the car's forward speed
-    const scrub = SCRUB * (capF * clamp(Math.abs(alphaF) / sf.peak - 1, 0, SCRUB_MAX) + capR * clamp(Math.abs(alphaR) / sr.peak - 1, 0, SCRUB_MAX));
-    ax = carFx + fxR - vx * DRAG - scrub * roll;
-    ay = carFy + fyR;
-    if (vx > top) ax -= (vx - top) * 2;
-    wdot = (carFy * b - fyR * cc) / k2;
-    // a saturated tyre no longer cares how fast the car turns, so nothing slows a spin but this:
-    // the further the tail is past its peak, the more the rotation is damped (the spin guard)
-    wdot -= w * SPIN_DAMP * clamp((Math.abs(alphaR) / sr.peak - 1) / 3, 0, 1);
-    c.ax += (fxR + carFx - c.ax) * Math.min(1, h / PITCH_LAG);
-
-    // at walking pace and rolling, the car turns like a bicycle on rails; a sideways slide keeps its own yaw
-    const rolling = clamp(Math.abs(vx) / 4, 0, 1);
-    const slidingSide = clamp(Math.abs(vy) / 2, 0, 1);
-    const blend = Math.max(rolling, slidingSide);
-    w += wdot * h;
-    const wKin = (vx * Math.tan(delta)) / L;
-    w = wKin + (w - wKin) * blend;
-  } else {
-    // in the air: a little drag, the spin carries on
-    c.handbrake = false;
-    c.sliding = false;
-    c.slipF = c.slipR = 0;
-    w *= 1 - 0.3 * h;
-  }
-
-  // the surface's own drag on the whole car: water and mud pull it down
-  const drag = c.air ? 0.02 : sc.drag;
-  ax -= vx * drag;
-  ay -= vy * drag;
-
-  vx += (ax + vy * w) * h;
-  vy += (ay - vx * w) * h;
-  c.yaw = w;
-  c.heading += w * h;
-  const nfx = Math.cos(c.heading);
-  const nfy = Math.sin(c.heading);
-  c.vx = vx * nfx + vy * -nfy;
-  c.vy = vx * nfy + vy * nfx;
-  c.x += c.vx * h;
-  c.y += c.vy * h;
-  if (last) {
-    c.onRoad = Math.abs(loc.d) <= t.width / 2;
-    c.surface = here;
-    c.slipAngle = Math.abs(vx) > 1 ? Math.atan2(vy, Math.abs(vx)) : 0;
-    const v = Math.hypot(vx, vy);
-    if (sc.splash && !c.air && v > 4 && s.time * 20 - Math.floor(s.time * 20) < 0.34) {
-      s.fx.push({ kind: 'splash', x: c.x - nfx * def.length * 0.4, y: c.y - nfy * def.length * 0.4, age: 0 });
-      if (c === s.cars[0] && v > 8 && Math.random() < 0.15) s.sounds.push('splash');
-    }
-  }
+  const name = t.surfaceAt(loc.s, loc.d, c.x, c.y);
+  return {
+    front: bite(t.surfaceAt(loc.s + L * along, loc.d + L * across, c.x + fx * L, c.y + fy * L), c.def.offroad),
+    rear: bite(t.surfaceAt(loc.s - L * along, loc.d - L * across, c.x - fx * L, c.y - fy * L), c.def.offroad),
+    here: bite(name, c.def.offroad),
+    name,
+  };
 }
 
-/** Touching down: the tyres take the sideways speed the car came down with, and a hard landing bounces, but not in water. */
-function land(s: SimState, c: Car, vx: number, vy: number, ground: number, vzGround: number, wet: boolean): void {
-  const impact = c.vz - vzGround;
-  const fx = Math.cos(c.heading);
-  const fy = Math.sin(c.heading);
-  // crooked: the share of the speed that is sideways is scrubbed off, and a little of the rest
-  const v = Math.hypot(vx, vy) || 1;
-  const crooked = Math.abs(vy) / v;
-  vx *= 1 - 0.04 - 0.25 * crooked;
-  vy *= 0.35;
-  c.yaw *= 0.5;
-  c.vx = vx * fx + vy * -fy;
-  c.vy = vx * fy + vy * fx;
-  c.z = ground;
-  // a car coming down onto a rising bank is caught by it and rides it up; water swallows the
-  // landing in a sheet of spray; on the flat it bounces
+/** One Rapier step's orders to a car: the wheel, the engine, the brakes, each tyre's friction, the air. */
+function drive(c: Car, b: Body, a: Ask, u: Under, h: number): void {
+  const r = b.rig;
+  const v = b.body.linvel();
+  const heading = headingOf(b.body.rotation());
+  const fwd = v.x * Math.cos(heading) + v.y * Math.sin(heading);
+  // the wheel turns toward the thumb's share of the lock, at the steer rate
+  const target = c.steerWant * lockAt(r, fwd);
+  c.steerAngle += clamp(target - c.steerAngle, -r.steerRate * h, r.steerRate * h);
+  // the engine: full force at low speed, then its power; the surface caps the top speed
+  const topShare = a.top * Math.min(u.front.top, u.rear.top);
+  let drive = a.throttle > 0 ? engineAt(r, fwd, r.engineForce * a.pull, r.enginePower * topShare ** 3) * a.throttle : 0;
+  let brakeF = 0;
+  let brakeR = 0;
+  let handbrake = false;
+  if (a.pedal > 0) {
+    if (fwd > 0.4) {
+      brakeF = r.brakeForce * r.brakeFront * a.pedal;
+      brakeR = r.brakeForce * (1 - r.brakeFront) * a.pedal;
+      // at speed the pedal also locks the rear wheels, the handbrake: a locked tyre slides, and a
+      // sliding tyre has less friction than a rolling one (lockedGrip), so in a bend the tail swings
+      if (fwd > HANDBRAKE_FROM) {
+        handbrake = true;
+        brakeR = r.handbrakeForce * a.pedal;
+      }
+    } else if (fwd > -REVERSE_TOP) drive = -r.engineForce * 0.5 * a.pedal;
+  } else if (fwd < -0.4 && a.throttle <= 0) brakeF = brakeR = r.brakeForce * 0.25;
+  c.braking = handbrake;
+  const oiled = c.slick > 0;
+  const vs = Math.max(Math.abs(fwd), V_FLOOR);
+  for (let i = 0; i < 4; i++) {
+    const isFront = i < 2;
+    const sd = isFront ? u.front : u.rear;
+    let mu = r.mu * sd.grip * a.loose;
+    if (oiled) mu *= isFront ? OIL.grip : OIL.rearGrip;
+    if (!isFront && handbrake) mu *= 1 - (1 - r.lockedGrip) * a.pedal;
+    b.vehicle.setWheelFrictionSlip(i, mu);
+    // the side stiffness that puts the tyre's friction limit at its peak slip angle, from its static load
+    const peak = (isFront ? r.peakFront : r.peakRear) * (sd.peak / SURFACES.gravel.peak);
+    const load = isFront ? b.loadF : b.loadR;
+    b.vehicle.setWheelSideFrictionStiffness(i, Math.min(1, (mu * load * h) / (SIDE_DAMPING * r.mass * peak * vs)));
+    b.vehicle.setWheelSteering(i, isFront ? c.steerAngle : 0);
+    const share = isFront ? r.frontDrive : 1 - r.frontDrive;
+    b.vehicle.setWheelEngineForce(i, (drive * share) / 2);
+    b.vehicle.setWheelBrake(i, ((isFront ? brakeF : brakeR) / 2) * h);
+  }
+  // the air's drag on the speed, and water's and mud's on the whole car
+  const sp = Math.hypot(v.x, v.y);
+  const pull = r.drag * sp + (c.air ? 0 : u.here.drag * r.mass);
+  b.body.resetForces(false);
+  b.body.addForce({ x: -pull * v.x, y: -pull * v.y, z: 0 }, true);
+  b.vehicle.updateVehicle(h, undefined, RAY_GROUPS);
+}
+
+/** The plain fields from the body, for the race, the bot and the renderer. */
+function readBack(c: Car, b: Body, t: Track, dt: number, u?: Under): void {
+  const p = b.body.translation();
+  const v = b.body.linvel();
+  const av = b.body.angvel();
+  const heading = headingOf(b.body.rotation());
+  const fx = Math.cos(heading);
+  const fy = Math.sin(heading);
+  const fwd = v.x * fx + v.y * fy;
+  const lat = v.x * -fy + v.y * fx;
+  if (dt > 0) c.ax = (fwd - (c.vx * fx + c.vy * fy)) / dt;
+  c.x = p.x;
+  c.y = p.y;
+  c.heading = heading;
+  c.vx = v.x;
+  c.vy = v.y;
+  c.yaw = av.z;
+  c.z = p.z - b.rig.comHeight;
+  c.vz = v.z;
+  let contact = 0;
+  for (let i = 0; i < 4; i++) {
+    if (!b.vehicle.wheelIsInContact(i)) {
+      c.wheelSlip[i] = 0;
+      continue;
+    }
+    contact++;
+    // the slip angle: where the tyre's contact patch goes against where the wheel points
+    const cp = b.vehicle.wheelContactPoint(i)!;
+    const rx = cp.x - p.x;
+    const ry = cp.y - p.y;
+    const rz = cp.z - p.z;
+    const vx = v.x + av.y * rz - av.z * ry;
+    const vy = v.y + av.z * rx - av.x * rz;
+    const a = heading + (i < 2 ? c.steerAngle : 0);
+    const wf = vx * Math.cos(a) + vy * Math.sin(a);
+    const wl = vx * -Math.sin(a) + vy * Math.cos(a);
+    c.wheelSlip[i] = Math.hypot(wf, wl) > 0.5 ? Math.atan2(wl, Math.abs(wf)) : 0;
+  }
+  c.air = contact === 0;
+  c.steer = b.rig.maxSteer > 0 ? c.steerAngle / b.rig.maxSteer : 0;
+  c.slipAngle = Math.abs(fwd) > 1 ? Math.atan2(lat, Math.abs(fwd)) : 0;
+  const peakF = b.rig.peakFront * ((u?.front.peak ?? SURFACES.gravel.peak) / SURFACES.gravel.peak);
+  const peakR = b.rig.peakRear * ((u?.rear.peak ?? SURFACES.gravel.peak) / SURFACES.gravel.peak);
+  c.slipF = (c.wheelSlip[0] + c.wheelSlip[1]) / 2 / peakF;
+  c.slipR = (c.wheelSlip[2] + c.wheelSlip[3]) / 2 / peakR;
+  c.sliding = !c.air && Math.abs(fwd) > 2 && (Math.abs(c.slipF) > 1.3 || Math.abs(c.slipR) > 1.3);
+  const loc = t.locate(c.x, c.y);
+  c.onRoad = Math.abs(loc.d) <= t.width / 2;
+  if (u) c.surface = u.name;
+  b.seen = { x: c.x, y: c.y, heading: c.heading, vx: c.vx, vy: c.vy, yaw: c.yaw };
+}
+
+/** Touching down: damage on a hard landing, the sound and the shake for the player, spray in water. */
+function land(s: SimState, c: Car, vz: number, wet: boolean): void {
+  const impact = -vz;
   if (wet) {
     for (let k = 0; k < 4; k++) s.fx.push({ kind: 'splash', x: c.x + Math.cos(c.heading + k * 1.6) * 1.2, y: c.y + Math.sin(c.heading + k * 1.6) * 1.2, age: 0 });
     if (c === s.cars[0]) s.sounds.push('splash');
   }
-  if (impact < -LAND_BOUNCE && vzGround < 0.5 && !wet) {
-    c.vz = vzGround + Math.min(LAND_REBOUND_MAX, -impact * LAND_REBOUND);
-    c.z = ground + 0.01;
-  } else {
-    c.vz = vzGround;
-    c.air = false;
-  }
-  if (impact < -LAND_HURT) hurt(s, c, DAMAGE.tree * Math.min(1, (-impact - LAND_HURT) / 6), c.lastHitBy);
-  if (c === s.cars[0] && impact < -2) {
+  if (impact > LAND_HURT) hurt(s, c, DAMAGE.tree * Math.min(1, (impact - LAND_HURT) / 6), c.lastHitBy);
+  if (c === s.cars[0] && impact > 2) {
     s.sounds.push('land');
-    s.shake = Math.max(s.shake, Math.min(0.5, -impact / 18));
+    s.shake = Math.max(s.shake, Math.min(0.5, impact / 18));
   }
 }
 
-/** yaw inertia over mass, m²: a box, a little under, for turn-in */
-function inertia(def: Car['def']): number {
-  return ((def.length * def.length + def.width * def.width) / 12) * 1.0;
+/**
+ * The race reads Rapier's contacts: two cars touching is a ram (harm.ts) at the speed they closed
+ * at before the step; a car against the trees costs damage past 3 m/s into them.
+ */
+function contacts(s: SimState, before: { v: RAPIER.Vector; w: RAPIER.Vector }[]): void {
+  const w = s.world;
+  const cars = s.cars;
+  for (let i = 0; i < cars.length; i++) {
+    const a = cars[i];
+    if (a.wreck > 0) continue;
+    const ba = w.bodies[i];
+    w.world.contactPairsWith(ba.collider, (other) => {
+      if (w.walls.has(other.handle)) {
+        w.world.contactPair(ba.collider, other, (m, flipped) => {
+          if (m.numSolverContacts() === 0) return;
+          const n = m.normal();
+          const sgn = flipped ? -1 : 1;
+          const p = m.solverContactPoint(0)!;
+          // the closing speed into the trees at the contact point, before the step
+          const bv = before[i];
+          const pa = ba.body.translation();
+          const vx = bv.v.x - bv.w.z * (p.y - pa.y);
+          const vy = bv.v.y + bv.w.z * (p.x - pa.x);
+          const hit = (vx * n.x + vy * n.y) * sgn;
+          a.hit = 1;
+          if (hit > 3) {
+            hurt(s, a, DAMAGE.tree * Math.min(1, hit / 12), a.lastHitBy);
+            s.fx.push({ kind: 'spark', x: p.x, y: p.y, age: 0 });
+          }
+          if (a === cars[0] && hit > 2) {
+            s.sounds.push('hit');
+            s.shake = Math.max(s.shake, Math.min(0.5, hit / 20));
+          }
+        });
+        return;
+      }
+      const j = w.bodies.findIndex((b) => b.collider.handle === other.handle);
+      if (j <= i) return;
+      const b = cars[j];
+      if (b.wreck > 0) return;
+      w.world.contactPair(ba.collider, other, (m, flipped) => {
+        if (m.numSolverContacts() === 0) return;
+        const n = m.normal();
+        const sgn = flipped ? -1 : 1;
+        const nx = n.x * sgn;
+        const ny = n.y * sgn;
+        const p = m.solverContactPoint(0)!;
+        const closing = (before[i].v.x - before[j].v.x) * nx + (before[i].v.y - before[j].v.y) * ny;
+        if (closing > 0) ram(s, i, j, closing, nx, ny, p.x, p.y, (victim) => (victim.spin = Math.max(victim.spin, SPIN_TIME * 0.6)));
+        else a.hit = b.hit = 1;
+      });
+    });
+  }
 }
 
 /** the four corners of the car's body, front right first */
@@ -451,19 +635,12 @@ function corners(c: Car): [number, number][] {
   ];
 }
 
-/**
- * Where two boxes overlap, by separating axes: the normal from a to b,
- * the depth, and the point of contact (the deepest corner, or the middle
- * of the two deepest when a face lies flat on a face). Null when apart.
- */
-export function overlap(a: Car, b: Car): { nx: number; ny: number; depth: number; px: number; py: number } | null {
+/** How deep two cars' footprints overlap, by separating axes, or null when apart. For the checks. */
+export function overlap(a: Car, b: Car): { depth: number } | null {
   const A = corners(a);
   const B = corners(b);
   let depth = Infinity;
-  let nx = 0;
-  let ny = 0;
-  let fromA = true;
-  for (const [car, isA] of [[a, true], [b, false]] as const) {
+  for (const car of [a, b]) {
     for (const [ux, uy] of [
       [Math.cos(car.heading), Math.sin(car.heading)],
       [-Math.sin(car.heading), Math.cos(car.heading)],
@@ -471,183 +648,18 @@ export function overlap(a: Car, b: Car): { nx: number; ny: number; depth: number
       let minA = Infinity, maxA = -Infinity, minB = Infinity, maxB = -Infinity;
       for (const p of A) {
         const d = p[0] * ux + p[1] * uy;
-        if (d < minA) minA = d;
-        if (d > maxA) maxA = d;
+        minA = Math.min(minA, d);
+        maxA = Math.max(maxA, d);
       }
       for (const p of B) {
         const d = p[0] * ux + p[1] * uy;
-        if (d < minB) minB = d;
-        if (d > maxB) maxB = d;
+        minB = Math.min(minB, d);
+        maxB = Math.max(maxB, d);
       }
       const o = Math.min(maxA - minB, maxB - minA);
       if (o <= 0) return null;
-      if (o < depth) {
-        depth = o;
-        // point the normal from a to b
-        const sgn = (b.x - a.x) * ux + (b.y - a.y) * uy >= 0 ? 1 : -1;
-        nx = ux * sgn;
-        ny = uy * sgn;
-        fromA = isA;
-      }
+      depth = Math.min(depth, o);
     }
   }
-  // the contact: on a's face, b's corners that reach furthest back along n; on b's face, a's that reach furthest forward
-  const pts = fromA ? B : A;
-  const sgn = fromA ? -1 : 1;
-  let best = -Infinity;
-  for (const p of pts) best = Math.max(best, sgn * (p[0] * nx + p[1] * ny));
-  let px = 0;
-  let py = 0;
-  let n = 0;
-  for (const p of pts) {
-    if (sgn * (p[0] * nx + p[1] * ny) > best - 0.08) {
-      px += p[0];
-      py += p[1];
-      n++;
-    }
-  }
-  return { nx, ny, depth, px: px / n, py: py / n };
-}
-
-/**
- * An impulse between two bodies at a point, along n (from a to b), with
- * restitution and Coulomb friction. b may be the world (mass Infinity).
- * Returns the closing speed at the point before the impulse.
- */
-function impulse(a: Car, b: Car | null, px: number, py: number, nx: number, ny: number, bounce: number, friction: number): number {
-  const ma = a.def.mass;
-  const ia = ma * inertia(a.def) * HIT_INERTIA;
-  const rax = px - a.x;
-  const ray = py - a.y;
-  let vrx = -(a.vx - a.yaw * ray);
-  let vry = -(a.vy + a.yaw * rax);
-  let inv = 1 / ma + (rax * ny - ray * nx) ** 2 / ia;
-  let mb = Infinity;
-  let ib = Infinity;
-  let rbx = 0;
-  let rby = 0;
-  if (b) {
-    mb = b.def.mass;
-    ib = mb * inertia(b.def) * HIT_INERTIA;
-    rbx = px - b.x;
-    rby = py - b.y;
-    vrx += b.vx - b.yaw * rby;
-    vry += b.vy + b.yaw * rbx;
-    inv += 1 / mb + (rbx * ny - rby * nx) ** 2 / ib;
-  }
-  // vr is b's point velocity relative to a's; closing when it points back along n
-  const vn = vrx * nx + vry * ny;
-  if (vn >= 0) return 0;
-  const j = (-(1 + bounce) * vn) / inv;
-  // friction along the sliding direction at the point, capped by the normal impulse
-  let tx = vrx - vn * nx;
-  let ty = vry - vn * ny;
-  const vt = Math.hypot(tx, ty);
-  let jt = 0;
-  if (vt > 1e-6) {
-    tx /= vt;
-    ty /= vt;
-    let invT = 1 / ma + (rax * ty - ray * tx) ** 2 / ia;
-    if (b) invT += 1 / mb + (rbx * ty - rby * tx) ** 2 / ib;
-    jt = Math.min(vt / invT, friction * j);
-  }
-  // the impulse on b is +j n - jt t (friction opposes b's slide); a gets the opposite
-  const jx = j * nx - jt * tx;
-  const jy = j * ny - jt * ty;
-  a.vx -= jx / ma;
-  a.vy -= jy / ma;
-  a.yaw -= (rax * jy - ray * jx) / ia;
-  if (b) {
-    b.vx += jx / mb;
-    b.vy += jy / mb;
-    b.yaw += (rbx * jy - rby * jx) / ib;
-  }
-  return -vn;
-}
-
-/** Every pair of cars that overlap: push them apart by mass and trade an impulse at the contact. */
-function carContacts(s: SimState, report: boolean): void {
-  const cars = s.cars;
-  for (let i = 0; i < cars.length; i++) {
-    for (let j = i + 1; j < cars.length; j++) {
-      const a = cars[i];
-      const b = cars[j];
-      if (a.wreck > 0 || b.wreck > 0) continue;
-      if (Math.abs(a.z - b.z) > CLEAR_HEIGHT) continue;
-      const far = (a.def.length + b.def.length) / 2 + 0.5;
-      if (Math.abs(b.x - a.x) > far || Math.abs(b.y - a.y) > far) continue;
-      const o = overlap(a, b);
-      if (!o) continue;
-      // centre speeds along the normal, before: what the race calls the hit's force
-      const closing = (a.vx - b.vx) * o.nx + (a.vy - b.vy) * o.ny;
-      const ia = 1 / a.def.mass;
-      const ib = 1 / b.def.mass;
-      const push = Math.max(0, o.depth - 0.01) * 0.8;
-      a.x -= o.nx * push * (ia / (ia + ib));
-      a.y -= o.ny * push * (ia / (ia + ib));
-      b.x += o.nx * push * (ib / (ia + ib));
-      b.y += o.ny * push * (ib / (ia + ib));
-      const hit = impulse(a, b, o.px, o.py, o.nx, o.ny, CAR_BOUNCE, CAR_FRICTION);
-      if (report && hit > 0) ram(s, i, j, Math.max(0, closing), o.nx, o.ny, o.px, o.py, (victim) => (victim.spin = Math.max(victim.spin, SPIN_TIME * 0.6)));
-      else a.hit = b.hit = 1;
-    }
-  }
-}
-
-/**
- * A car that has put a corner into the trees is pushed back out with an
- * impulse at that corner. The trees are everything outside the road and
- * its verge, and outside every shortcut lane: a corner is in them when it
- * is beyond both, and is pushed back toward whichever it is nearer.
- */
-function treeContacts(s: SimState, c: Car): void {
-  const t = s.track;
-  const loc = t.locate(c.x, c.y);
-  const limit = t.width / 2 + t.verge;
-  if (Math.abs(loc.d) < limit - c.def.length) return;
-  const road = t.at(loc.s);
-  const rx = -road.ty;
-  const ry = road.tx;
-  let deepest = 0;
-  let cx = 0;
-  let cy = 0;
-  let nx = 0;
-  let ny = 0;
-  for (const p of corners(c)) {
-    const d = loc.d + (p[0] - c.x) * rx + (p[1] - c.y) * ry;
-    let pen = Math.abs(d) - limit;
-    // the normal points back to the road
-    let px = -rx * Math.sign(d);
-    let py = -ry * Math.sign(d);
-    if (pen > 0 && t.lanes.length) {
-      const l = t.laneAt(p[0], p[1]);
-      if (l && l.dist - (l.lane.width / 2 + LANE_VERGE) < pen) {
-        pen = l.dist - (l.lane.width / 2 + LANE_VERGE);
-        const len = l.dist || 1;
-        px = (l.px - p[0]) / len;
-        py = (l.py - p[1]) / len;
-      }
-    }
-    if (pen > deepest) {
-      deepest = pen;
-      cx = p[0];
-      cy = p[1];
-      nx = px;
-      ny = py;
-    }
-  }
-  if (deepest <= 0) return;
-  c.x += nx * deepest;
-  c.y += ny * deepest;
-  // the world is b: n must point from the car into the world
-  const hit = impulse(c, null, cx, cy, -nx, -ny, TREE_BOUNCE, TREE_FRICTION);
-  c.hit = 1;
-  if (hit > 3) {
-    hurt(s, c, DAMAGE.tree * Math.min(1, hit / 12), c.lastHitBy);
-    s.fx.push({ kind: 'spark', x: cx, y: cy, age: 0 });
-  }
-  if (c === s.cars[0] && hit > 2) {
-    s.sounds.push('hit');
-    s.shake = Math.max(s.shake, Math.min(0.5, hit / 20));
-  }
+  return { depth };
 }

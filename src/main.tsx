@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import './styles.css';
 import { initLang } from './i18n';
+import { initPhysics } from './game/physics';
 
 initLang();
 
@@ -15,8 +16,11 @@ if (import.meta.env.PROD && import.meta.env.BASE_URL.startsWith('/') && 'service
   });
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
+// the car model is Rapier's, in WASM: load it before the first screen (docs/adr/0005-rapier-cars.md)
+void initPhysics().then(() =>
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  ),
 );

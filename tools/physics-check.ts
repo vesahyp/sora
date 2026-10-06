@@ -4,17 +4,18 @@
  * pieces are the ones `make drive-log` drives by touch on a phone; this
  * is the same thing headless, fast, and asserted.
  *
- * Every piece runs on the new model. The old one (?physics=old) is only
- * checked to still drive, for the one release it is kept.
+ * The model is Rapier's raycast vehicle (ADR 0005); the promises are in
+ * its terms: yaw rate, slip angle, speed kept.
  */
 import { createState, type Car, type SimState } from '../src/game/state';
-import { step, DT, yawMax } from '../src/game/sim';
-import { overlap } from '../src/game/physics';
+import { step, DT } from '../src/game/sim';
+import { initPhysics, overlap } from '../src/game/physics';
 import { CARS, CAR_BY_ID } from '../src/game/content/cars';
-import { STOCK, tuned } from '../src/game/content/parts';
 import type { CarInput, TrackDef } from '../src/game/types';
 
 declare const process: { exitCode?: number };
+
+await initPhysics();
 
 let failed = false;
 const assert = (ok: boolean, what: string) => {
@@ -52,6 +53,7 @@ function place(s: SimState, c: Car, at: { s: number; v: number; d?: number; off?
   Object.assign(c, { x: p.x - p.ty * d, y: p.y + p.tx * d, heading: h, vx: Math.cos(h) * at.v, vy: Math.sin(h) * at.v, yaw: 0, steer: 0, s: at.s, d });
 }
 
+const responses: number[] = [];
 const go = (steer = 0, throttle = 1, brake = 0): CarInput => ({ steer, throttle, brake, boost: false });
 const speed = (c: Car) => Math.hypot(c.vx, c.vy);
 const run = (s: SimState, seconds: number, inputs: (t: number) => CarInput[], each?: (t: number) => void) => {
@@ -75,9 +77,8 @@ const run = (s: SimState, seconds: number, inputs: (t: number) => CarInput[], ea
   assert(maxYaw < 0.005 && Math.abs(c.heading - h0) < 0.005 && Math.abs(drift) < 0.05, `hands off at 90 km/h the car holds a straight line (yaw ${f(maxYaw, 4)} rad/s, heading ${f(c.heading - h0, 4)} rad, drift ${f(drift, 3)} m over ${f(Math.hypot(c.x - x0, c.y - y0), 0)} m)`);
 }
 
-// 2. full lock at speed: a held turn, not a spin, and let go it recovers. The hand asks for yaw and
-// the car turns the wheel as far as the tyres can use (sim.ts, yawMax), so a thumb at full stretch at
-// 90 km/h is a corner, with a little slide in the cars whose grip the yaw room exceeds
+// 2. full lock at speed: a held turn, not a spin, and let go it recovers: the lock falls with speed
+// (rig.ts, lockAt) and the rear tyres are stiffer than the front, so the car is stable at the limit
 for (const car of CARS) {
   const s = setup(oval(160), { s: 20, v: 25, d: -15 }, car);
   const c = s.cars[0];
@@ -95,33 +96,31 @@ for (const car of CARS) {
   assert(Math.abs(c.heading - h0) < Math.PI / 2, `${car.id}: and it does not spin (${f(c.heading - h0, 2)} rad after letting go)`);
 }
 
-// 2b. the scrub: a tyre past its peak turns the slip into drag (SCRUB in physics.ts). A thumb at
-// full stretch at 80 km/h in the stock Tauno is a four-wheel slide, and it slows the car hard
-// instead of ploughing on wide; the same bend asked of better tyres is carried under their peak,
-// so the tyre parts are felt as speed kept through a corner, not only as a tighter line
-{
-  const tauno = CAR_BY_ID.tauno;
-  const v0 = 80 / 3.6;
-  const s = setup(oval(160), { s: 20, v: v0, d: -15 }, tauno);
+// 2b. the wheel answers the thumb: a swing of the thumb at 70 km/h, and the yaw rate follows the
+// wheel within a fifth of a second, and a bigger swing turns harder. At the tyres' limit (a big
+// swing) the turn-in peaks a third over what the car then holds as the front saturates, with the
+// body barely sliding: a turn-in, not a snap. The owner's complaint of 2026-10-06 was a car that
+// did nothing, then snapped
+for (const share of [0.15, 0.3, 0.6]) {
+  const s = setup(oval(160), { s: 20, v: 70 / 3.6, d: -15 }, CAR_BY_ID.tauno);
   const c = s.cars[0];
-  let maxF = 0;
-  run(s, 2, () => [go(1)], () => (maxF = Math.max(maxF, Math.abs(c.slipF))));
-  assert(maxF > 2 && speed(c) * 3.6 < 48, `the Tauno at full swing from 80 km/h scrubs down to ${f(speed(c) * 3.6, 0)} km/h in 2 s (front slip up to ${f(maxF, 1)} peaks; it ran on at 58 without the scrub)`);
-  // the same 1.3 g bend at 80 km/h, held 2.5 s: the thumb asks for yaw, so the steer that asks it is read off yawMax per tyre
-  const bend = (car: typeof tauno) => Math.min(1, (1.3 * 9.81) / (yawMax(car, v0) * v0));
-  const kept: number[] = [];
-  for (const t of [0, 1, 3]) {
-    const car = tuned(tauno, { ...STOCK, tyres: t });
-    const s2 = setup(oval(160), { s: 20, v: v0, d: -15 }, car);
-    run(s2, 2.5, () => [go(bend(car))]);
-    kept.push(speed(s2.cars[0]) * 3.6);
-  }
-  assert(kept[0] < 55 && kept[1] > 70 && kept[2] > 70, `a 1.3 g bend at 80 km/h: the stock tyres scrub to ${f(kept[0], 0)} km/h, the first tyre part carries it at ${f(kept[1], 0)}, the works tyres at ${f(kept[2], 0)}`);
+  const yaws: number[] = [];
+  let body = 0;
+  run(s, 1.2, () => [go(share)], () => {
+    yaws.push(Math.abs(c.yaw));
+    body = Math.max(body, Math.abs(c.slipAngle));
+  });
+  const settled = yaws[yaws.length - 1];
+  const reach = yaws.findIndex((y) => y >= settled * 0.63) * DT;
+  const peak = Math.max(...yaws);
+  responses.push(settled);
+  assert(reach <= 0.2 && peak <= settled * 1.35 && body < 0.1, `the Tauno at 70 km/h, a ${share * 100}% swing: the yaw rate reaches 63% of its ${f(settled, 2)} rad/s in ${f(reach, 2)} s, peaks at ${f(peak / settled, 2)} of it, the body slides ${f(body, 2)} rad`);
 }
+assert(responses[0] < responses[1] && responses[1] < responses[2], `a bigger swing turns harder (${responses.map((y) => f(y, 2)).join(', ')} rad/s)`);
 
-// 3. a pedal stab at half lock swings the tail, and let go the car comes back
+// 3. a pedal stab at half lock in the Tauno at 80 km/h swings the tail, and let go the car comes back
 {
-  const s = setup(oval(160), { s: 20, v: 22, d: -15 });
+  const s = setup(oval(160), { s: 20, v: 22, d: -15 }, CAR_BY_ID.tauno);
   const c = s.cars[0];
   let maxSlip = 0;
   const h0 = c.heading;
@@ -132,26 +131,26 @@ for (const car of CARS) {
     if (settled < 0 && Math.abs(c.yaw) < 0.1 && Math.abs(c.slipAngle) < 0.05) settled = t;
   });
   const turned = c.heading - h0;
-  assert(maxSlip > 0.3, `the pedal at half lock throws the tail out (body slip up to ${f(maxSlip, 2)} rad)`);
-  // let go, the car catches the tail itself (COUNTER in physics.ts): a stab turns a kink's worth and
-  // comes back; the hairpin's worth is the thumb held through the slide, 3b below
+  assert(maxSlip > 0.1, `the pedal at half lock brakes the rear hard and swings the tail (body slip up to ${f(maxSlip, 2)} rad)`);
+  // let go, the rear tyres bring the tail back: a stab turns a kink's worth and comes back; the
+  // hairpin's worth is the thumb held through the slide, 3b below
   assert(turned > 0.3 && turned < 2.4, `and turns the car, not a spin (${f(turned, 2)} rad)`);
   assert(settled >= 0 && settled < 2.5 && speed(c) > 8, `and let go it straightens itself (in ${f(settled, 2)} s, at ${f(speed(c) * 3.6, 0)} km/h)`);
 }
 
 // 3b. the same stab with the thumb still held through the slide: a handbrake corner, not a spin
 {
-  const s = setup(oval(160), { s: 20, v: 22, d: -15 });
+  const s = setup(oval(160), { s: 20, v: 22, d: -15 }, CAR_BY_ID.tauno);
   const c = s.cars[0];
   const h0 = c.heading;
-  run(s, 0.35, () => [go(0.35, 0, 1)]);
-  run(s, 0.6, () => [go(0.35)]);
+  run(s, 0.35, () => [go(0.5, 0, 1)]);
+  run(s, 0.6, () => [go(0.5)]);
   let settled = -1;
   run(s, 3, () => [go(0)], (t) => {
     if (settled < 0 && Math.abs(c.yaw) < 0.1 && Math.abs(c.slipAngle) < 0.05) settled = t;
   });
   const turned = c.heading - h0;
-  assert(turned > 0.9 && turned < 2.2 && settled >= 0 && settled < 2, `the pedal with the thumb held through the slide turns a hairpin's worth and stops there (${f(turned, 2)} rad, straight ${f(settled, 2)} s after letting go, at ${f(speed(c) * 3.6, 0)} km/h)`);
+  assert(turned > 0.6 && turned < 2.2 && settled >= 0 && settled < 2, `the pedal with the thumb held through the slide turns a sharp bend's worth and stops there (${f(turned, 2)} rad, straight ${f(settled, 2)} s after letting go, at ${f(speed(c) * 3.6, 0)} km/h)`);
 }
 
 // 4. walls: a glancing hit slides along; a steep one bounces off; neither stops the car dead
@@ -269,14 +268,19 @@ for (const p of pieces) {
     let air = 0;
     let top = 0;
     let steered = 0;
+    let yaw0 = 0;
     run(s, 0.6, () => [go(0, throttle)]);
     const vBefore = speed(c);
     run(s, 2.5, () => [go(c.air ? 1 : 0, throttle)], () => {
       top = Math.max(top, c.z);
       if (c.air) {
-        if (air === 0 && yaw) c.yaw = yaw;
+        if (air === 0) {
+          if (yaw) c.yaw = yaw;
+          yaw0 = c.yaw;
+        }
+        // a whole step in the air: what the wheel turned of the yaw it took off with
+        else steered = Math.max(steered, Math.abs(c.yaw - yaw0));
         air += DT;
-        steered = Math.max(steered, Math.abs(c.yaw - yaw * Math.pow(1 - 0.3 / 180, (air / DT) * 3)));
       }
     });
     return { air, top, vBefore, v: speed(c), steered };
@@ -313,7 +317,7 @@ for (const p of pieces) {
       if (wasAir && !down && c.air && c.vz <= 0 && c.z <= s.track.groundAt(c.s, c.d) + 0.02) down = { s: c.s - river.s, d: c.d, wet: c.surface === 'water' };
       if (wasAir && !c.air && !down) down = { s: c.s - river.s, d: c.d, wet: c.surface === 'water' };
       wasAir = wasAir || c.air;
-      if (!c.air && c.surface === 'water' && wetAt < 0) wetAt = t;
+      if (!c.air && c.surface === 'water' && c.z < -0.2 && wetAt < 0) wetAt = t;
       if (wetAt >= 0 && outAt < 0 && !c.air && c.surface !== 'water') outAt = t;
       splashes += s.fx.filter((x) => x.kind === 'splash' && x.age <= DT + 1e-9).length;
     });
@@ -350,14 +354,6 @@ for (const p of pieces) {
   run(gravel, 1, () => [go(0.6)], () => (slipGravel = Math.max(slipGravel, Math.abs(gravel.cars[0].slipAngle))));
   const [ti, tg] = [ice.cars[0].heading - hi, gravel.cars[0].heading - hg];
   assert(slipIce > slipGravel && ti < tg * 0.8, `ice slides where gravel grips (body slip ${f(slipIce, 2)} against ${f(slipGravel, 2)} rad, turned ${f(ti, 2)} against ${f(tg, 2)} rad)`);
-}
-
-// 9. the old model still drives, for its one release
-{
-  const s = createState(oval(10), kortteli, 1, [], undefined, 'old');
-  s.hold = -10;
-  run(s, 2, () => [go()]);
-  assert(speed(s.cars[0]) > 10, `?physics=old still drives (${f(speed(s.cars[0]) * 3.6, 0)} km/h after 2 s)`);
 }
 
 console.log('');

@@ -4,7 +4,7 @@ import type { Text } from '../i18n';
 export interface CarInput {
   steer: number;
   throttle: number;
-  /** the pedal: a brake, a handbrake at speed, reverse at a standstill */
+  /** the pedal: a brake, reverse at a standstill */
   brake: number;
   /** an edge: light the nitro for a burst */
   boost: boolean;
@@ -138,19 +138,19 @@ export interface CarDef {
   price: number;
   /** one line at the dealer */
   blurb: Text;
-  /** m/s² at standstill; the push fades as the car nears its top speed */
+  /** m/s² at standstill: the engine's force over the mass, until its power runs out (rig.ts) */
   accel: number;
-  /** m/s */
+  /** m/s: the speed the car reaches on gravel, where its engine's power meets the air's drag */
   topSpeed: number;
-  /** m/s² */
+  /** m/s²: the brakes' force over the mass */
   brake: number;
-  /** the steering lock: 0.17 rad per unit at rest, less at speed */
+  /** the steering lock: 0.17 rad of wheel per unit at rest, less at speed (rig.ts, lockAt) */
   turnRate: number;
-  /** the tyres' grip as an acceleration, m/s²: what a loaded axle can pull sideways before it slides */
+  /** the tyres' grip as an acceleration, m/s²: over g it is the tyres' friction coefficient on gravel */
   grip: number;
   /** share of the drive on the front axle: 0 is rear drive, 0.5 four-wheel drive. Rear when absent */
   frontDrive?: number;
-  /** tonnes-ish: who wins a shunt */
+  /** tonnes: the body's mass, and who wins a shunt */
   mass: number;
   /**
    * Lugs and balloon tyres: the share of what grass, mud and water take from the grip and the

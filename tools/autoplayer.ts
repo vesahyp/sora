@@ -1,6 +1,6 @@
 import type { Car, SimState } from '../src/game/state';
 import type { CarInput } from '../src/game/types';
-import { wheelbase, yawMax } from '../src/game/sim';
+import { lockAt, rigOf } from '../src/game/rig';
 import { GRUDGE, PACING, catchUp, enginePace, hostility, leaderOf, paceToPlayer } from '../src/game/content/drivers';
 import { SURFACES } from '../src/game/content/surfaces';
 import { MINE, OIL } from '../src/game/content/weapons';
@@ -176,19 +176,19 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
   while (err < -Math.PI) err += 2 * Math.PI;
   // the yaw rate that closes the heading error, turned into a wheel angle through the
   // wheelbase, so the bot asks the tyres for what they can give instead of full lock
-  // the input is a share of the yaw the car can give at this speed (sim.ts, yawMax): the bot asks
-  // for the yaw rate that closes the heading error, and the car turns the wheel; the car also
-  // counter-steers a tail that is out, for the bot as for the thumb
+  const rig = rigOf(c.def);
   let yawWant = Math.max(-2.2, Math.min(2.2, err * tune.gain));
   // the tail is out past the tyres' peak: steer into the slide, the way a hand does, as yaw
-  const alphaR = Math.atan2(c.slip - c.yaw * wheelbase(c.def) * 0.5, Math.max(Math.abs(c.speed), 3));
+  const alphaR = Math.atan2(c.slip - c.yaw * rig.wheelbase * 0.5, Math.max(Math.abs(c.speed), 3));
   const tailOut = Math.abs(alphaR) > 0.1 && speed > 6;
-  if (tailOut) yawWant += (Math.tan(alphaR * 1.1) * Math.max(speed, 3)) / wheelbase(c.def);
+  if (tailOut) yawWant += (Math.tan(alphaR * 1.1) * Math.max(speed, 3)) / rig.wheelbase;
   // the hands wander: a poor driver weaves down a straight and saws at the wheel in a bend
   const sloppy = 1 - skill;
   const who = s.cars.indexOf(c);
   const wobble = sloppy > 0 ? sloppy * WOBBLE.steer * (Math.sin(s.time * WOBBLE.w1 + who * 2.1) * 0.7 + Math.sin(s.time * WOBBLE.w2 + who * 4.3) * 0.3) : 0;
-  let steer = Math.max(-1, Math.min(1, yawWant / yawMax(c.def, speed) + ramSteer + wobble));
+  // the wheel angle that gives that yaw on rails, as a share of the lock at this speed
+  const wheel = Math.atan((yawWant * rig.wheelbase) / Math.max(speed, 3)) / lockAt(rig, speed);
+  let steer = Math.max(-1, Math.min(1, wheel + ramSteer + wobble));
 
   // how sharp is the road coming: the worst turn over the braking distance, at what the tyres can brake
   const stop = Math.min(c.def.brake, c.def.grip) * 0.7;
@@ -251,6 +251,20 @@ export function botInput(s: SimState, c: Car = s.cars[0], tune: BotTuning = DEFA
   if (!lane && Math.abs(c.d) > t.width * tune.wide && outward > 1.5 && speed > 8) {
     brake = 1;
     throttle = 0;
+  }
+  // a river ahead: keep the throttle on up the bank and over the water, whatever bend follows, the
+  // way the hand does (hand.ts). Since the cars fly by Rapier's physics (ADR 0005) a car that
+  // brakes for the bend after the river comes off the lip slow and lands in the water
+  if (!lane) {
+    for (const r of t.def.rivers ?? []) {
+      let to = r.s - c.s;
+      if (to < -t.length / 2) to += t.length;
+      if (to > t.length / 2) to -= t.length;
+      if (to > -(r.gap + 6) && to < 24) {
+        brake = 0;
+        throttle = foot;
+      }
+    }
   }
   // with the tail out, braking would unload the rear further: hold a little throttle instead
   if (tailOut) {

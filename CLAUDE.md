@@ -36,13 +36,15 @@ The Räkkä architecture, copied from `hoyry`:
 - **Canvas 2D** for the game view. No engine. Sprites are drawn once with
   canvas paths and cached (`src/render/sprites.ts`). The road is one
   stroked path at road width. See `docs/adr/0001-canvas-2d.md`.
-- **No physics library.** A car is a rigid box on two axles (the
-  bicycle model) with a tyre that lets go smoothly, weight transfer and
-  a friction circle; cars and the tree line meet through impulses at the
-  contact point (`src/game/physics.ts`, `docs/adr/0003-rigid-body-cars.md`).
-  Each axle reads the surface under it, and a car has a height: the
-  ground rises and falls along the lap (river banks, crests) and a car
-  fast enough leaves it. The track is a smoothed closed polyline with a width
+- **Rapier for the cars** (`@dimforge/rapier3d-compat`, WASM): a car is a
+  3D rigid body on Rapier's raycast vehicle, four wheels on springs, and
+  every number is a named physical quantity with a unit in
+  `src/game/rig.ts` (`docs/adr/0005-rapier-cars.md` has the table). The
+  ground is a triangle mesh along the road and the shortcuts with the
+  rivers and crests in it, the tree line a row of boxes; cars meet each
+  other and the trees as Rapier contacts (`src/game/physics.ts`). Each
+  axle reads the surface under it. No driving aids: a handling problem
+  is a change to a named parameter. The track is a smoothed closed polyline with a width
   (`src/game/track.ts`), queried by arc length.
 
 ## Where things live
@@ -56,10 +58,13 @@ src/
                         wrecks and respawns, the back-out for any car wedged nose first in the
                         trees and the tow for one stuck off the road (TOW_AFTER), lap counting;
                         hands the cars to the car model
-    physics.ts        the car model: the tyres, the aids, height and landing, box-against-box
-                        and tree contacts by impulse, in SUB substeps a frame
-    physics-old.ts    the model before 2026-10-03, at ?physics=old for one release. Delete after
-    harm.ts           what a hit costs, for both models: damage, grudge, a blast's spin, a ram
+    physics.ts        the car model on Rapier: the world (ground mesh, tree boxes), a body and four
+                        raycast wheels per car, the engine, brakes, handbrake and each tyre's friction
+                        per step, the contacts read for rams and tree hits, the plain fields written
+                        back; a write to a car's fields from outside is put into its body next frame
+    rig.ts            every car parameter as a physical quantity (kg, N, rad, m/s), derived from its
+                        CarDef; lockAt (the lock at a speed), engineAt (force, then power)
+    harm.ts           what a hit costs: damage, grudge, a blast's spin, a ram
     notes.ts          the co-driver: every bend on the lap as a pace note (direction, grade 1 hairpin
                         to 6 flat), and the next one for a car; the game loop shows it on the HUD
     track.ts          Track: smoothing, locate(x, y) -> (s, d), at(s), the forest,
@@ -114,13 +119,14 @@ src/
   audio.ts            Web Audio synth: the engine note and the event beeps
   version.ts          build id and the newer-build check behind the update banner
   i18n.ts             the language: fi or en, tr() and t(), picked from the browser
+  settings.ts         the physics readout switch (title screen); Game.tsx draws the readout
 tools/
   hand.ts             the thumb driver: a hand on a phone, headless. Heading error to thumb px through
                         input.ts's own curve, a reaction delay, a thumb's speed, tremor, brakes when a bend
                         looks too fast and now and then too late, goes round a car ahead, jumps a river;
                         skill 0..1. The playthrough injects this same class into the page; sim-check
                         and balance read the folk laps off it. It does not know the tyres' limit
-  autoplayer.ts       the bot driver: yaw-rate steering through the wheelbase, braking to
+  autoplayer.ts       the bot driver: a yaw rate turned into a wheel angle through the wheelbase, braking to
                         the speed a bend allows, a running-wide reflex, leaning on neighbours,
                         blocking, punting and waiting for whoever it holds a grudge against;
                         skill bites: a poor driver is slow, wobbles, brakes late and picks no fights
@@ -138,6 +144,7 @@ tools/
 scripts/
   shots.mjs           phone screenshots with Playwright, the bot driving
   touch-check.mjs     drives the race by touch on an emulated phone: steer, brake, pause
+  readout-shot.mjs    the physics readout switched on and shown in a race on the phone
   drive-log.mjs       set pieces by touch on an emulated phone, the physics logged frame by frame
   icon.mjs            render public/icon.svg to the PNG icons: 512, 192, the 180 iOS icon, a 32 favicon
   lineup.mjs          every vehicle in the game on one canvas to shots/lineup.png, a row per class,
@@ -162,8 +169,11 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
    in the renderer.
 2. **Fixed step.** The sim runs at `DT = 1/60`; the render loop accumulates
    real time and calls `step` a whole number of times. Never pass a frame
-   delta into `step`. The car model cuts each step into `SUB` substeps of
-   its own; that is inside `physics.ts` and nothing outside sees it.
+   delta into `step`. The car model steps Rapier `SUB` times a frame
+   (120 Hz); that is inside `physics.ts` and nothing outside sees it.
+   Rapier's WASM is loaded once (`initPhysics()`, before the first
+   screen and at the top of every tool), and a race's world is freed
+   with `dispose(s)` when the race is done.
 3. **Content is data.** A new track is a list of points in `tracks.ts`,
    its rivers, crests and shortcuts beside it. A new car is a `CarDef`,
    a rival's vehicle a `Vehicle` in `rivals.ts`, a new race an
@@ -192,13 +202,17 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
   when you touched the car, the track or the bot.
 - **Physics changes are read, then felt.** `make drive-log` drives set
   pieces by touch on an emulated phone and prints speed, yaw, slip,
-  contacts and body overlap (`PHYSICS=old` for the old model).
-  `physics-check` holds the numbers. The local tools in `tools/dbg/`
-  (gitignored) are the sweeps: `matrix.ts` (full lock, half lock, a
-  pedal stab, per car), `fight.ts` (the race's view and fight over six
-  grid orders), `spin.ts` (the ground a blast costs). Build one like
-  the tools: `npx vite build --ssr tools/dbg/matrix.ts --outDir .sim-check && node .sim-check/matrix.js`.
-- `?physics=old` plays the old car model, for one release, to compare.
+  contacts and body overlap. `physics-check` holds the numbers. A sweep
+  changes a rig parameter through `rigTweaks` (`rig.ts`) and reads the
+  result; the local tools in `tools/dbg/` (gitignored) are the sweeps:
+  `resp.ts` (a thumb step at a speed: the yaw rate over time), `pedal.ts`
+  (the pedal in a bend, and the hand's laps), `curve.ts` (the first
+  races as a new player). Build one like the tools:
+  `npx vite build --ssr tools/dbg/resp.ts --outDir .sim-check-dbg && node .sim-check-dbg/resp.js`.
+- **The physics readout** (title screen: Physics readout) shows the
+  speed, the yaw rate, the wheel's angle against the lock and each
+  tyre's slip angle live in the race; `make playthrough` records with it
+  on. Talk about the handling in its numbers.
 - **A handling or balance change is proved by thumb, on video.** `make playthrough`
   plays the first hour on an emulated phone with a hand that is not the bot
   (`scripts/playthrough.mjs`: a reaction delay, a thumb that moves at a thumb's
@@ -211,10 +225,8 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
   the video is the proof, not the search. On a loaded machine (the nightly
   cron sweep ran the page at 10 frames a second, 2026-10-06) run it with
   `SPEED=0.5`: the sim in slow motion, the hand's clock in sim time, so
-  the thumb keeps its rate; the video is then slow motion. A steady-state sweep (a held thumb at a
-  held speed, the yaw asked against the yaw delivered) found the understeer the
-  owner felt on 2026-10-05 in one table; build one in `tools/dbg/` before
-  touching a handling constant.
+  the thumb keeps its rate; the video is then slow motion. Build a sweep
+  in `tools/dbg/` before touching a rig parameter.
 - **A track feature is checked before it is driven.** `sim-check` jumps
   every river with every class car and asserts it is cleared every lap,
   lands every flight (a crest's too) on the road, drives every shortcut

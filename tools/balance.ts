@@ -6,7 +6,8 @@
  * the thumb that has not learnt the car, at 0.5, and one that has, at 0.85):
  * the folk laps and the upgrade gap are read off the thumb, not the bot.
  */
-import { createState } from '../src/game/state';
+import { createState, dispose } from '../src/game/state';
+import { initPhysics } from '../src/game/physics';
 import { step, DT } from '../src/game/sim';
 import { TRACKS } from '../src/game/content/tracks';
 import { CARS } from '../src/game/content/cars';
@@ -17,6 +18,8 @@ import { tuned, fullFor } from '../src/game/content/parts';
 import { Track } from '../src/game/track';
 
 declare const process: { argv: string[]; exitCode?: number };
+
+await initPhysics();
 
 const laps = Math.max(1, Number(process.argv[2]) || 3);
 const only = process.argv[3];
@@ -35,6 +38,7 @@ for (const track of TRACKS) {
         const me = s.cars[0];
         const best = me.laps.length ? Math.min(...me.laps) : NaN;
         const total = me.laps.reduce((a, b) => a + b, 0);
+        dispose(s);
         console.log(`  ${car.id.padEnd(10)} ${label.padEnd(5)} ${who.padEnd(9)} first ${me.laps[0]?.toFixed(2) ?? '-'}  best ${best.toFixed(2)}  total ${total.toFixed(1)}`);
       }
     }

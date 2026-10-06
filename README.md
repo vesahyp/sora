@@ -131,8 +131,10 @@ kääntyy tielle päin. Jos se ei vieläkään pääse liikkeelle, ratamiehet
 hiusneulan sisäkautta menee **oikotie**, metsään hakattu ura nurmella:
 lyhyempi, hitaampi ja puiden reunustama, ja Jorma löytää sen, kun jää
 jälkeen.
-Vanhan ajomallin voi vielä yhden version ajan kokeilla osoitteessa
-https://vesahyp.github.io/sora/?physics=old.
+Autot ajavat oikealla fysiikkamoottorilla (Rapier): massa, painonsiirto,
+renkaiden pito ja ohjauskulma ovat oikeita suureita. Alkuruudun
+**Fysiikkalukemat**-kytkin näyttää kisan aikana nopeuden, kiertonopeuden,
+ohjauskulman ja jokaisen renkaan luistokulman.
 
 - **Sivuluisu** täyttää nitrotankkia. Niin täyttää myös töytäisy ja
   erityisesti toisen auton romuttaminen, joka täyttää tankin kerralla.

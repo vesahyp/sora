@@ -720,7 +720,7 @@ export class Renderer {
     const wh = wheelLayout(car.def);
     const k = 1 / SPRITE_PPM;
     const fx = wh.frontX * k + (wh.fwl * k) / 2 - L / 2;
-    const ang = car.steer * 0.55;
+    const ang = car.steerAngle;
     // each front wheel's centre off the car's centreline: the sprite lays the tread `fout` sprite
     // units out of the body on either side (the body is W * SPRITE_PPM across in those units). The
     // right one was placed with W in metres, so it sat under the body beside the left one, and every
@@ -734,7 +734,7 @@ export class Renderer {
       tyre(g, -wh.fwl / 2, -wh.fww / 2, wh.fwl, wh.fww, tyreLevel(car.def), car.def.brakes ?? 0, side);
       g.restore();
     }
-    if ((car.def.tyres ?? 0) >= 3 && (car.sliding || car.handbrake) && Math.abs(car.speed) > 4 && car.z < 0.1) {
+    if ((car.def.tyres ?? 0) >= 3 && (car.sliding || car.braking) && Math.abs(car.speed) > 4 && car.z < 0.1) {
       // the mud tyres throw a spray of muck back off the rear wheels while the car slides
       const rx = (wh.rearX * k) - L / 2;
       g.fillStyle = 'rgba(84,62,36,0.75)';
@@ -938,7 +938,7 @@ export class Renderer {
     const b = s.track.bounds;
     s.cars.forEach((c, i) => {
       const last = (this.lastWheel[i] ??= []);
-      const marking = c.wreck <= 0 && (c.sliding || c.handbrake || !c.onRoad) && Math.hypot(c.vx, c.vy) > 3;
+      const marking = c.wreck <= 0 && (c.sliding || c.braking || !c.onRoad) && Math.hypot(c.vx, c.vy) > 3;
       const fx = Math.cos(c.heading);
       const fy = Math.sin(c.heading);
       const back = -c.def.length * 0.3;

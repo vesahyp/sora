@@ -9,7 +9,8 @@ import { chromium, devices } from 'playwright';
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
-const physics = process.argv[2] === 'old' ? 'old' : 'new';
+// the car model's name, for the log file: Rapier since 2026-10-06 (ADR 0005)
+const physics = 'rapier';
 const port = 5198;
 const server = spawn('npx', ['vite', '--port', String(port), '--strictPort'], { stdio: 'ignore', detached: true });
 await new Promise((r) => setTimeout(r, 2500));
@@ -157,7 +158,7 @@ const straight = () =>
 
 const pieces = [];
 try {
-  await page.goto(`http://localhost:${port}/?lang=en&physics=${physics}`);
+  await page.goto(`http://localhost:${port}/?lang=en`);
   await page.getByRole('button', { name: 'Drive', exact: true }).tap();
   await page.getByRole('button', { name: 'Races', exact: true }).tap();
   await page.locator('.card.event').first().tap();

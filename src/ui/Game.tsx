@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { createState, placeOf, standings, type Ammo, type Entry, type SimState } from '../game/state';
+import { createState, dispose, placeOf, standings, type Ammo, type Entry, type SimState } from '../game/state';
 import { canCarry } from '../game/content/weapons';
 import type { Text } from '../i18n';
 import type { CarDef } from '../game/types';
@@ -13,6 +13,32 @@ import { fmt, track } from '../records';
 import { t, tr } from '../i18n';
 import { Lamps, MineIcon, MissileIcon, NoteArrow, OilIcon, PauseIcon, SoundIcon, WheelIcon } from './Dash';
 import { nextNote, type PaceNote } from '../game/notes';
+import { physicsReadout } from '../settings';
+import { lockAt, rigOf } from '../game/rig';
+import type { Car } from '../game/state';
+
+/**
+ * The physics readout (settings: Physics readout): what the player's car is doing, in the
+ * engine's own terms. Speed, yaw rate, the wheel's angle against the lock at this speed, and
+ * each tyre's slip angle, amber past its peak slip angle (the tyre is at its friction limit).
+ */
+function readout(c: Car): string {
+  const r = rigOf(c.def);
+  const f = (x: number, n = 2) => (x >= 0 ? ' ' : '') + x.toFixed(n);
+  const slip = (i: number) => {
+    const a = c.wheelSlip[i];
+    const peak = i < 2 ? r.peakFront : r.peakRear;
+    return `<span class="${Math.abs(a) > peak ? 'past' : ''}">${f(a)}</span>`;
+  };
+  return [
+    `v     ${(Math.hypot(c.vx, c.vy) * 3.6).toFixed(0).padStart(4)} km/h`,
+    `yaw   ${f(c.yaw)} rad/s`,
+    `steer ${f(c.steerAngle)} / ${lockAt(r, c.speed).toFixed(2)} rad`,
+    `slip  ${slip(0)} ${slip(1)}`,
+    `      ${slip(2)} ${slip(3)} rad`,
+    `body  ${f(c.slipAngle)} rad${c.air ? '  AIR' : ''}${c.braking ? '  BRAKE' : ''}`,
+  ].join('\n');
+}
 
 export interface RaceResult {
   trackId: string;
@@ -75,6 +101,8 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
   const wheelRef = useRef<HTMLDivElement>(null);
   const pedalRef = useRef<HTMLDivElement>(null);
   const steerRef = useRef<HTMLDivElement>(null);
+  const debugRef = useRef<HTMLPreElement>(null);
+  const [showReadout] = useState(physicsReadout());
   const simRef = useRef<SimState | null>(null);
   const [hud, setHud] = useState<Hud | null>(null);
   const [paused, setPaused] = useState(false);
@@ -85,9 +113,7 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
   useEffect(() => {
     const canvas = canvasRef.current!;
     const root = rootRef.current!;
-    // ?physics=old drives the car model from before 2026-10-03, kept for one release to compare
-    const physics = new URLSearchParams(location.search).get('physics') === 'old' ? 'old' : 'new';
-    const s = createState(TRACK_BY_ID[trackId], car, laps, field, ammo, physics);
+    const s = createState(TRACK_BY_ID[trackId], car, laps, field, ammo);
     simRef.current = s;
     (window as unknown as { __sim: SimState }).__sim = s;
     const renderer = new Renderer(canvas);
@@ -264,6 +290,7 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
       if (now - hudAt > 50) {
         hudAt = now;
         publishHud();
+        if (debugRef.current) debugRef.current.innerHTML = readout(s.cars[0]);
       }
       const ms = performance.now() - t0;
       perf.frames++;
@@ -275,6 +302,7 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
 
     return () => {
       cancelAnimationFrame(raf);
+      dispose(s);
       input.detach();
       audio.stopEngine();
       window.removeEventListener('resize', onResize);
@@ -309,6 +337,7 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
       <div className="steerwheel" ref={steerRef}>
         <WheelIcon />
       </div>
+      {showReadout && <pre className="readout" ref={debugRef} />}
       <div className="nitrohint">{tr('napautus: nitro', 'tap: nitro')}</div>
       {hud && (
         <div className="hud">
