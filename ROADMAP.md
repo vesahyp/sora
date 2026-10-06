@@ -19,8 +19,11 @@ The design is in `docs/design.md`.
   does a light thumb turn in willingly, does a careless full swing at
   speed slide the rear the right amount, is the first engine part felt
   at once, is 25 s a lap the right length, is the shortcut worth it by
-  hand. Knobs: the Tauno's `accel`, `topSpeed` and `grip` in `cars.ts`,
-  `CURVE` in `input.ts`, `CASTER_FROM` and `REAR_GRIP` in `physics.ts`,
+  hand, and does the scrub (2026-10-06: a tyre past its peak drags the
+  car's speed, `SCRUB` in `physics.ts`) read as the car slowing until it
+  bites, or as a brake nobody pressed. Knobs: the Tauno's `accel`,
+  `topSpeed` and `grip` in `cars.ts`, `CURVE` in `input.ts`, `SCRUB`,
+  `CASTER_FROM` and `REAR_GRIP` in `physics.ts`,
   `YAW_ROOM` in `sim.ts`, `fieldSkill` in `events.ts`, the loops'
   points in `tracks.ts`.
 - **C, B and A are at their old speeds** and the caster fix made every
@@ -57,10 +60,18 @@ The design is in `docs/design.md`.
 - **C is a coin toss for the bot player.** Over 48 C races (the six
   grids with a hair of skill changed, `tools/dbg/grid2.ts`) the default
   bot finishes top two 62% of the time with the wild cast, 52% with the
-  field before it; a mine or a wreck on lap one costs the rest, so
-  `sim-check` holds two in three over both tracks. The bot passes poorly
-  in a pack; a better bot driver would make the career curve checkable
-  to the second.
+  field before it; a mine or a wreck on lap one costs the rest. The
+  scrub (2026-10-06) took another slice: over 36 C races the rate went
+  from 72% to 58%, and neither a slower field (0.8 to 0.9 of its skill)
+  nor a narrower corner margin on the bot bought it back, so `sim-check`
+  now runs the twelve C races three times over and holds half. The bot
+  passes poorly in a pack and is the one the field goes for; a better
+  bot driver, one that lifts when the front scrubs instead of holding
+  the ask, would make the career curve checkable to the second, and
+  would say whether a thumb that has learnt the car loses the same
+  slice. The hand's own folk curve is intact: it wins the first four
+  folk races from every grid and the final by a second, against fields
+  slowed to 0.6, 0.75 and 0.85 of their skill in the last three.
 - **Playtest the wild cast** (2026-10-04): does the tractor's shove and
   the monster truck's throw feel fair or cheap, is the bus a fun wall or
   a wall, does anyone buy the hearse. Knobs: `pace`, `massScale`,

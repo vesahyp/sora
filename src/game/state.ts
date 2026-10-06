@@ -44,6 +44,9 @@ export interface Car {
   slipAngle: number;
   /** the tyres have let go this step */
   sliding: boolean;
+  /** each axle's slip angle over its surface's peak, signed: past 1 the tyre scrubs. For the tools and the HUD */
+  slipF: number;
+  slipR: number;
   handbrake: boolean;
   onRoad: boolean;
   /** 1 while scraping the trees or another car this step */
@@ -263,6 +266,8 @@ export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: nu
       slip: 0,
       slipAngle: 0,
       sliding: false,
+      slipF: 0,
+      slipR: 0,
       handbrake: false,
       onRoad: true,
       hit: 0,

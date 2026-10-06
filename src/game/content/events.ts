@@ -48,13 +48,13 @@ export const EVENTS: EventDef[] = [
   // The folk curve (2026-10-05, tools/dbg/ladder.ts and sim-check's first-races check): the scale
   // on the JM skills in rivals.ts. At 0.4 the rivals lap Kiviahon lenkki in about 29 s against a
   // new thumb's 25, which is what a thumb that starts last and fights through the pack needs to
-  // win from any grid; the scale climbs a race at a time to 1.1 at the final, where the field
+  // win from any grid; the scale climbs a race at a time to 0.85 at the final, where the field
   // also has the parts a winning Tauno has, and the final is won or lost by a lap's tenths
   { id: 'jm-kiviaho', name: L('Kiviahon jokkis', 'Kiviaho Folk Race'), cls: 'JM', trackId: 'kiviaho-lenkki', laps: 3, prizes: purse(300), fieldParts: stock, fieldSkill: 0.4 },
   { id: 'jm-hirvisuo', name: L('Hirvisuon jokkis', 'Hirvisuo Folk Race'), cls: 'JM', trackId: 'hirvisuo-lenkki', laps: 3, prizes: purse(450), fieldParts: stock, fieldSkill: 0.5 },
-  { id: 'jm-kiviaho-4', name: L('Kiviahon kahlaus', 'Kiviaho Wade'), cls: 'JM', trackId: 'kiviaho-lenkki', laps: 4, prizes: purse(600), fieldParts: stock, fieldSkill: 0.7 },
-  { id: 'jm-hirvisuo-4', name: L('Hirvisuon pitkä jokkis', 'Hirvisuo Long Folk Race'), cls: 'JM', trackId: 'hirvisuo-lenkki', laps: 4, prizes: purse(800), fieldParts: stock, fieldSkill: 0.9 },
-  { id: 'jm-final', name: L('Jokkisfinaali', 'Folk Race Final'), cls: 'JM', trackId: 'kiviaho-lenkki', laps: 6, prizes: purse(1200), fieldParts: jmFinal, fieldSkill: 1.1 },
+  { id: 'jm-kiviaho-4', name: L('Kiviahon kahlaus', 'Kiviaho Wade'), cls: 'JM', trackId: 'kiviaho-lenkki', laps: 4, prizes: purse(600), fieldParts: stock, fieldSkill: 0.6 },
+  { id: 'jm-hirvisuo-4', name: L('Hirvisuon pitkä jokkis', 'Hirvisuo Long Folk Race'), cls: 'JM', trackId: 'hirvisuo-lenkki', laps: 4, prizes: purse(800), fieldParts: stock, fieldSkill: 0.75 },
+  { id: 'jm-final', name: L('Jokkisfinaali', 'Folk Race Final'), cls: 'JM', trackId: 'kiviaho-lenkki', laps: 6, prizes: purse(1200), fieldParts: jmFinal, fieldSkill: 0.85 },
   { id: 'c-kiviaho', name: L('Kiviahon sprintti', 'Kiviaho Sprint'), cls: 'C', trackId: 'kiviaho', laps: 3, prizes: purse(1200), fieldParts: stock, fieldSkill: 0.9 },
   { id: 'c-hirvisuo', name: L('Hirvisuon ajot', 'Hirvisuo Trophy'), cls: 'C', trackId: 'hirvisuo', laps: 3, prizes: purse(2200), fieldParts: stock },
   { id: 'c-kiviaho-5', name: L('Kiviahon kuntoajo', 'Kiviaho Endurance'), cls: 'C', trackId: 'kiviaho', laps: 5, prizes: purse(3400), fieldParts: some },

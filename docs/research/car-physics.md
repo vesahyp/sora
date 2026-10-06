@@ -174,6 +174,32 @@ to 0.98 at every thumb up to 80% of lock. A full thumb at speed still
 asks for more than the grip holds and slides the rear a little, as
 intended.
 
+## A scrubbing tyre costs speed (2026-10-06)
+
+Vesa played the slow folk car and said a corner taken too fast pushed
+the car wide at full speed. In the bicycle model a tyre's force stands
+perpendicular to the wheel, so a sliding tyre already dissipates
+`F·v·sin α`; at the slip angles the arcade curve holds a slide at (two
+to three peaks, 15 to 20 degrees on gravel) that is a quarter of the
+lateral force as drag, and with the engine pinned it showed as a loss of
+nine km/h in the first second of a full swing from 80. Real tyres past
+the peak also grind: the tread is dragged across the surface and the
+force vector swings toward opposing the slide. Sora adds that as
+`SCRUB`: each axle's slip beyond its peak, in peaks, times that axle's
+grip times 0.35, as a drag on the car's forward speed, outside the
+friction circle so the yaw the car delivers inside the grip is unchanged
+(the thumb sweep still reads 0.95 to 0.98 at every thumb up to 80%).
+
+Read off `tools/dbg/scrub.ts` (a held thumb from a held speed on a flat
+oval): a full swing from 80 km/h in the stock Tauno now drops to 36 km/h
+in 2.5 s where it ran on at 57; the same 1.3 g bend scrubs the stock
+tyres to 46 km/h while the first tyre part carries it at 78 under its
+peak, and a 1.5 g bend takes works tyres to hold. The thumb asks for
+yaw as a share of `YAW_ROOM · grip / v`, so a thumb travel is the same
+share of the grip on every tyre; the upgrade is felt where the road,
+not the thumb, sets the radius. `physics-check` case 2b holds the
+numbers.
+
 ## Measuring instead of feeling
 
 A step response at constant steer and speed tells more than a lap:

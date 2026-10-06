@@ -17,7 +17,9 @@ game follows your browser's language.*
 tahansa ja vedä sivulle: auto kääntyy sen verran kuin peukalo on siirtynyt.
 Pieni liike on pieni korjaus, puoli vetoa on tavallinen mutka, ja täysi
 veto vauhdissa pyytää autolta enemmän kuin renkaat antavat: perä lähtee
-hieman.
+hieman, ja renkaat, jotka luistavat, syövät vauhtia. Liian kovaa otettu
+mutka hidastaa auton siihen asti, että keula taas puree; paremmat renkaat
+kantavat saman mutkan luistamatta, ja se on se, minkä rengaskaupasta saa.
 Nosta peukalo, niin ratti suoristuu. Napautus sytyttää **nitron**.
 Vasemmassa alakulmassa on **poljin**, ja toinen sormi missä tahansa on
 sama poljin: se jarruttaa ja irrottaa perän, eli jarrutus mutkaan heittää

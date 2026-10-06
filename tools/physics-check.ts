@@ -8,9 +8,10 @@
  * checked to still drive, for the one release it is kept.
  */
 import { createState, type Car, type SimState } from '../src/game/state';
-import { step, DT } from '../src/game/sim';
+import { step, DT, yawMax } from '../src/game/sim';
 import { overlap } from '../src/game/physics';
 import { CARS, CAR_BY_ID } from '../src/game/content/cars';
+import { STOCK, tuned } from '../src/game/content/parts';
 import type { CarInput, TrackDef } from '../src/game/types';
 
 declare const process: { exitCode?: number };
@@ -92,6 +93,30 @@ for (const car of CARS) {
   assert(turned > 0.3 && maxSlip < 0.6, `${car.id}: a second of full lock at 90 km/h turns the car, not a spin (turned ${f(turned, 2)} rad, body slip up to ${f(maxSlip, 2)} rad)`);
   assert(settled >= 0 && settled < 2, `${car.id}: let go, the slide recovers by itself (straight in ${f(settled, 2)} s, at ${f(speed(c) * 3.6, 0)} km/h)`);
   assert(Math.abs(c.heading - h0) < Math.PI / 2, `${car.id}: and it does not spin (${f(c.heading - h0, 2)} rad after letting go)`);
+}
+
+// 2b. the scrub: a tyre past its peak turns the slip into drag (SCRUB in physics.ts). A thumb at
+// full stretch at 80 km/h in the stock Tauno is a four-wheel slide, and it slows the car hard
+// instead of ploughing on wide; the same bend asked of better tyres is carried under their peak,
+// so the tyre parts are felt as speed kept through a corner, not only as a tighter line
+{
+  const tauno = CAR_BY_ID.tauno;
+  const v0 = 80 / 3.6;
+  const s = setup(oval(160), { s: 20, v: v0, d: -15 }, tauno);
+  const c = s.cars[0];
+  let maxF = 0;
+  run(s, 2, () => [go(1)], () => (maxF = Math.max(maxF, Math.abs(c.slipF))));
+  assert(maxF > 2 && speed(c) * 3.6 < 48, `the Tauno at full swing from 80 km/h scrubs down to ${f(speed(c) * 3.6, 0)} km/h in 2 s (front slip up to ${f(maxF, 1)} peaks; it ran on at 58 without the scrub)`);
+  // the same 1.3 g bend at 80 km/h, held 2.5 s: the thumb asks for yaw, so the steer that asks it is read off yawMax per tyre
+  const bend = (car: typeof tauno) => Math.min(1, (1.3 * 9.81) / (yawMax(car, v0) * v0));
+  const kept: number[] = [];
+  for (const t of [0, 1, 3]) {
+    const car = tuned(tauno, { ...STOCK, tyres: t });
+    const s2 = setup(oval(160), { s: 20, v: v0, d: -15 }, car);
+    run(s2, 2.5, () => [go(bend(car))]);
+    kept.push(speed(s2.cars[0]) * 3.6);
+  }
+  assert(kept[0] < 55 && kept[1] > 70 && kept[2] > 70, `a 1.3 g bend at 80 km/h: the stock tyres scrub to ${f(kept[0], 0)} km/h, the first tyre part carries it at ${f(kept[1], 0)}, the works tyres at ${f(kept[2], 0)}`);
 }
 
 // 3. a pedal stab at half lock swings the tail, and let go the car comes back

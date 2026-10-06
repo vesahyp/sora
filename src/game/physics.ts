@@ -20,9 +20,11 @@ import { LANE_VERGE } from './track';
  *
  * A tyre's force rises with its slip angle to a peak and falls smoothly
  * to a share of it past the peak (the surface's `slide`): grip lets go
- * progressively, into a slide that holds. Each axle has one budget for
- * driving, braking and cornering (the friction circle). Braking moves
- * load to the front. The pedal at speed brakes and locks the rear, which
+ * progressively, into a slide that holds. Past the peak the tyre also
+ * scrubs: the excess slip drags on the car's speed (SCRUB), so a corner
+ * taken too fast slows the car until the front bites again. Each axle
+ * has one budget for driving, braking and cornering (the friction
+ * circle). Braking moves load to the front. The pedal at speed brakes and locks the rear, which
  * then skids and has little left to hold the tail: the handbrake turn.
  *
  * Each axle reads the surface under it, so a car with two wheels on the
@@ -90,6 +92,19 @@ let DRAG = 0.12;
 /** for the sweeps in tools/dbg */
 export function setDrag(d: number): void {
   DRAG = d;
+}
+/**
+ * A tyre past its peak scrubs: the slip beyond the peak, in peaks, costs the car this share of
+ * that axle's grip as a drag along its length, up to SCRUB_MAX peaks of excess. A sliding tyre
+ * turns the slip into heat and drag, so an over-ambitious corner slows the car until the front
+ * bites again, instead of the car ploughing on wide at full speed (the owner, 2026-10-06). Better
+ * tyres carry the same corner with less excess, so they scrub less: the tyre parts are felt
+ * here as much as in the peak. Every car, rivals included.
+ */
+let SCRUB = 0.35;
+const SCRUB_MAX = 2;
+export function setScrub(k: number): void {
+  SCRUB = k;
 }
 
 const bitten = new Map<string, SurfaceDef>();
@@ -319,14 +334,20 @@ function integrate(s: SimState, c: Car, a: Ask, h: number, last: boolean): void 
     const [fxF, fyF] = axle(demandF, alphaF, { ...sf, slide: sf.slide + (1 - sf.slide) * FRONT_HOLD }, capF, vyWheel, h * 2);
     // a locked tyre slides where the car goes: the handbrake takes the rear's side grip away
     const [fxR, fyR] = axle(demandR, alphaR, sr, handbrake ? capR * (1 - HANDBRAKE * a.pedal) : capR, vyR, h * 2, GUARD);
-    if (last) c.sliding = (Math.abs(alphaR) > sr.peak * 1.3 || Math.abs(alphaF) > sf.peak * 1.3) && Math.abs(vx) > 2;
+    if (last) {
+      c.sliding = (Math.abs(alphaR) > sr.peak * 1.3 || Math.abs(alphaF) > sf.peak * 1.3) && Math.abs(vx) > 2;
+      c.slipF = alphaF / sf.peak;
+      c.slipR = alphaR / sr.peak;
+    }
 
     // the front wheel's force turned into the car's frame
     const cd = Math.cos(delta);
     const sd = Math.sin(delta);
     const carFx = fxF * cd - fyF * sd;
     const carFy = fxF * sd + fyF * cd;
-    ax = carFx + fxR - vx * DRAG;
+    // the scrub: each axle's slip past its peak, as a drag on the car's forward speed
+    const scrub = SCRUB * (capF * clamp(Math.abs(alphaF) / sf.peak - 1, 0, SCRUB_MAX) + capR * clamp(Math.abs(alphaR) / sr.peak - 1, 0, SCRUB_MAX));
+    ax = carFx + fxR - vx * DRAG - scrub * roll;
     ay = carFy + fyR;
     if (vx > top) ax -= (vx - top) * 2;
     wdot = (carFy * b - fyR * cc) / k2;
@@ -346,6 +367,7 @@ function integrate(s: SimState, c: Car, a: Ask, h: number, last: boolean): void 
     // in the air: a little drag, the spin carries on
     c.handbrake = false;
     c.sliding = false;
+    c.slipF = c.slipR = 0;
     w *= 1 - 0.3 * h;
   }
 

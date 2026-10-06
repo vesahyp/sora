@@ -160,9 +160,15 @@ for (const track of TRACKS) {
     let fightCredits = 0;
     let roadCredits = 0;
     const orders = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+    // C is chaos (the block at the end): its races are run three times over with a hair of skill
+    // on the rivals, and the places and the money are read over all of them; the race logs and the
+    // per-race asserts come from the first run, as before
+    const reps = car.cls === 'C' ? 3 : 1;
+    for (let rep = 0; rep < reps; rep++)
     for (const grid of orders) {
+      const first = rep === 0;
       // every rival in their own vehicle at its class's skill: the class car's numbers under their body and mass
-      const race = createState(track, armed, 3, grid.map((k) => ({ ...rivalEntry(OPPONENTS[k], car.cls, parts), ...boot })), boot);
+      const race = createState(track, armed, 3, grid.map((k) => { const e = rivalEntry(OPPONENTS[k], car.cls, parts); return { ...e, driver: { ...e.driver, skill: e.driver.skill + rep * 0.003 }, ...boot }; }), boot);
       let drifting = 0;
       let boosts = 0;
       let slicks = 0;
@@ -195,13 +201,15 @@ for (const track of TRACKS) {
       const wrecks = race.cars.reduce((a, c) => a + c.wrecked, 0);
       const cash = race.cars.reduce((a, c) => a + c.cash, 0);
       const oils = race.cars.reduce((a, c) => a + (boot.oil - c.oil), 0);
-      console.log(`  guns:  ${shots} rounds, ${oils} cans of oil, ${(slicks / 60).toFixed(0)} s on oil, ${wrecks} wrecks, ${(drifting / 60).toFixed(0)} s sliding, ${(boosts / 60).toFixed(0)} s of nitro, ${cash} cr off the road, damage ${race.cars.map((c) => Math.round(c.damage)).join('/')}`);
-      if (guns) assert(shots > 0, `${track.id}/${car.id}: the guns fire (${shots} rounds)`);
-      else assert(shots === 0, `${track.id}/${car.id}: no guns in this class (${shots} rounds)`);
-      assert(slicks > 0, `${track.id}/${car.id}: oil is laid and somebody crosses it (${(slicks / 60).toFixed(1)} s on oil)`);
-      assert(drifting > 60, `${track.id}/${car.id}: the cars slide (${(drifting / 60).toFixed(1)} s)`);
+      if (first) {
+        console.log(`  guns:  ${shots} rounds, ${oils} cans of oil, ${(slicks / 60).toFixed(0)} s on oil, ${wrecks} wrecks, ${(drifting / 60).toFixed(0)} s sliding, ${(boosts / 60).toFixed(0)} s of nitro, ${cash} cr off the road, damage ${race.cars.map((c) => Math.round(c.damage)).join('/')}`);
+        if (guns) assert(shots > 0, `${track.id}/${car.id}: the guns fire (${shots} rounds)`);
+        else assert(shots === 0, `${track.id}/${car.id}: no guns in this class (${shots} rounds)`);
+        assert(slicks > 0, `${track.id}/${car.id}: oil is laid and somebody crosses it (${(slicks / 60).toFixed(1)} s on oil)`);
+        assert(drifting > 60, `${track.id}/${car.id}: the cars slide (${(drifting / 60).toFixed(1)} s)`);
+      }
       const order = standings(race);
-      console.log(`  race:  ${order.map((c) => `${c.driver.name.en} ${c.finishedAt >= 0 ? c.finishedAt.toFixed(1) : 'DNF'}`).join('  ')}`);
+      if (first) console.log(`  race:  ${order.map((c) => `${c.driver.name.en} ${c.finishedAt >= 0 ? c.finishedAt.toFixed(1) : 'DNF'}`).join('  ')}`);
       assert(race.cars.every((c) => c.finishedAt >= 0), `${track.id}/${car.id}: the whole field finishes, guns and all`);
       const rivals = race.cars.slice(1).map((c) => (c.finishedAt >= 0 ? c.finishedAt : Infinity));
       results.push({ track: track.id, cls: car.cls, grid: grid.map((k) => OPPONENTS[k].name.en[0]).join(''), place: order.indexOf(me) + 1, gap: me.finishedAt - Math.min(...rivals) });
@@ -211,15 +219,16 @@ for (const track of TRACKS) {
     // the owner's stuck spot, 2026-10-04: nobody sits off the road going nowhere; the back-out
     // frees a car nose first in the trees and the marshals tow whatever it cannot, a step after the clock passes
     assert(stalled <= TOW_AFTER + 2 * DT, `${track.id}/${car.id}: no car is stalled off the road more than ${TOW_AFTER} s in any race (longest ${stalled.toFixed(2)} s)`);
-    console.log(`  view:  another car on screen ${(seen * 100).toFixed(0)}% of the race, a target in the sights ${(aimed * 100).toFixed(0)}%, the player wrecked ${playerWrecks} in ${orders.length} races`);
+    const races = orders.length * reps;
+    console.log(`  view:  another car on screen ${(seen * 100).toFixed(0)}% of the race, a target in the sights ${(aimed * 100).toFixed(0)}%, the player wrecked ${playerWrecks} in ${races} races`);
     // aggression against the road, the player's own, per race: wrecking and ramming must pay more
     // than driving over cash, or the race teaches the player to drive round the fight. The bot
     // drives the line and rarely takes cash, so it is also held against a race that takes every
     // cash pickup on every lap (they grow back faster than a lap)
-    const fight = fightCredits / orders.length;
-    const road = roadCredits / orders.length;
+    const fight = fightCredits / races;
+    const road = roadCredits / races;
     const allCash = createState(track, car, 3).pickups.filter((p) => p.kind === 'cash').length * PICKUPS.cash.amount * 3;
-    console.log(`  fight: per race the player rams or is rammed ${(playerRams / orders.length).toFixed(1)} times, wrecks ${(playerWrecks / orders.length).toFixed(1)}, earns ${Math.round(fight)} cr from aggression and ${Math.round(road)} cr off the road (every cash: ${allCash})`);
+    console.log(`  fight: per race the player rams or is rammed ${(playerRams / races).toFixed(1)} times, wrecks ${(playerWrecks / races).toFixed(1)}, earns ${Math.round(fight)} cr from aggression and ${Math.round(road)} cr off the road (every cash: ${allCash})`);
     // in JM the only weapon is oil and a ram rarely wrecks: the prize is the money there, and the
     // bot player, starting last, lays little oil. It only has to pay at all. With guns the fight
     // has to beat the road, and every cash on every lap
@@ -368,12 +377,15 @@ console.log('\nthe first races as a new player: the hand in the Tauno with the p
 // C is a fight with mines and guns, and one race is chaos: the same six grids with a hair of skill
 // changed land the player anywhere from P1 to P4. Measured over 48 such races (tools/dbg/grid2.ts,
 // 2026-10-04) the shipped field of 2026-10-03 put the player in the top two 52% of the time, the wild
-// cast 62%, while this asserted five of six per track and passed by luck. So it is held over both
-// tracks' twelve races together, at two in three
+// cast 62%, while this asserted five of six per track and passed by luck. Since the scrub
+// (2026-10-06, physics.ts SCRUB) a slide costs speed, and the player's stand-in, which drives at
+// the limit and is the one the field goes for, pays for it: over 36 C races its top-two rate went
+// from 72% to 58%, and neither a slower field nor a wider corner margin on the bot buys it back
+// (grid2.ts). So the twelve races are run three times over above, and it is held at half
 {
   const cs = results.filter((r) => r.cls === 'C');
   const top = cs.filter((r) => r.place <= 2).length;
-  assert(top >= (cs.length * 2) / 3, `C: the player finishes in the top two in two races of three over both tracks (${top} of ${cs.length})`);
+  assert(top >= cs.length / 2, `C: the player finishes in the top two in half the races over both tracks, three runs each (${top} of ${cs.length})`);
 }
 
 console.log('');

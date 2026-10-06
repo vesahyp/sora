@@ -28,7 +28,7 @@ in that class's money: a Niva and a Valmet tractor in C, a monster
 truck in B, a hearse in A (`cars.ts`). So does the
 field's skill: the folk rivals' ceiling is 0.75 to 0.85 and each folk
 event scales it, from 0.4 in the first race (weekend drivers who wobble
-and brake late, 4 s a lap off a new thumb) to 1.1 at the final; C sits
+and brake late, 4 s a lap off a new thumb) to 0.85 at the final; C sits
 at 0.5 to 0.6, B 0.68 to 0.8, A 0.84 to 1.0. `sim-check` holds the
 curve with the thumb driver (`tools/hand.ts`) in the Tauno with the
 parts a winning player has by each race: it wins the first two folk
@@ -130,8 +130,12 @@ in their own tiny cars. The field's cars stay stock until the final:
 the rivals never drive a better car than the player's in the folk
 class. What grows is the driver: each event sets the share of their
 skill the rivals drive at (`fieldSkill`), from 0.4 in the first race to
-1.1 at the final, so the fifth race is the hardest without a single
-part the player could not have bought. A folk rival brings one can of
+0.85 at the final, so the fifth race is the hardest without a single
+part the player could not have bought. The later three came down from
+0.7, 0.9 and 1.1 on 2026-10-06, when a scrubbing tyre began to cost
+speed (`SCRUB`, physics.ts): the bot brakes for a bend and never
+scrubs, a thumb at full stretch always does, so the same fields were
+suddenly a second a lap quicker than the thumb. A folk rival brings one can of
 oil to the early races and two from the fourth: on a 400 m loop two
 cans each covered the road in slicks by lap two. The
 parts and the pace gap arrive with the classes: C fields are stock
