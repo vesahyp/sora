@@ -33,9 +33,14 @@ The Räkkä architecture, copied from `hoyry`:
 
 - **Vite + TypeScript + React.** React renders the menus, the HUD and the
   overlays. The game itself never goes through React.
-- **Canvas 2D** for the game view. No engine. Sprites are drawn once with
-  canvas paths and cached (`src/render/sprites.ts`). The road is one
-  stroked path at road width. See `docs/adr/0001-canvas-2d.md`.
+- **three.js** for the race, behind the car (`src/render/render3d.ts`,
+  `docs/adr/0006-3d-view.md`): the same Rapier world drawn in 3D, each
+  car's body at its pitch and roll and its wheels on their springs
+  (`carPose`). The **top view** is the Canvas 2D renderer, an option on
+  the title screen (Camera) and `?view=top`: sprites drawn once with
+  canvas paths and cached (`src/render/sprites.ts`), the road one
+  stroked path (`docs/adr/0001-canvas-2d.md`). It also draws the
+  minimap over the 3D view.
 - **Rapier for the cars** (`@dimforge/rapier3d-compat`, WASM): a car is a
   3D rigid body on Rapier's raycast vehicle, four wheels on springs, and
   every number is a named physical quantity with a unit in
@@ -102,7 +107,10 @@ src/
                         a crest's light, static shadows, skid marks stamped in
     scenery.ts        the roadside computed from the track: spruce, birch, juniper, boulders,
                         posts, bales, a barn, a power line, the crowds. Cosmetic, never in the sim
-    renderer.ts       camera (24 m across, leading down the road) and shake, ground chunks, pickups, mines,
+    render3d.ts       the chase view: the ground from the track's heights, the scenery in 3D, cars from carPose
+                        (body pitched and rolled, wheels on their springs, steered, spinning), the weapons
+                        and effects, the camera behind the car looking down the road; the minimap from renderer.ts
+    renderer.ts       the top view: camera (24 m across, leading down the road) and shake, ground chunks, pickups, mines,
                         tracers, sights, cars with damage, the hit flash, smoke, sparks and shadows, wrecks,
                         nitro, dust and haze, minimap
     sprites.ts        procedural sprite cache: fifteen bodies in Hill Climb proportions lit per heading, the
@@ -159,6 +167,7 @@ scripts/
   car-shots.mjs       every player car cropped out of the race on the phone layout, the bot driving,
                         into shots/cars/ and one sheet: four wheels on each, the front pair turned
   pwa-check.mjs       the install check: manifest, every icon at its size, the service worker, offline
+  gpu.mjs             the Chromium launch options every phone script uses: the Mac's GPU, or WebGL crawls
   playthrough.mjs     the first hour by thumb: every folk race on an emulated iPhone in landscape, every
                         input a touch through input.ts, tools/hand.ts built and injected into the page
                         at the wheel (not the bot), parts bought between races; a video, a result sheet

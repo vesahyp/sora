@@ -64,3 +64,24 @@ export function saveTuned(t: Tuned): void {
     // private mode
   }
 }
+
+const VIEW_KEY = 'sora.view';
+
+/** The camera: behind the car in 3D (the default since ADR 0006), or the top view. */
+export type View = 'chase' | 'top';
+
+export function cameraView(): View {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'top' ? 'top' : 'chase';
+  } catch {
+    return 'chase';
+  }
+}
+
+export function setCameraView(v: View): void {
+  try {
+    localStorage.setItem(VIEW_KEY, v);
+  } catch {
+    // private mode
+  }
+}

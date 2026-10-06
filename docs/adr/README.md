@@ -7,3 +7,4 @@
 | [0003](0003-rigid-body-cars.md) | Cars are rigid boxes with impulses, on a tyre that lets go smoothly | Superseded by 0005 |
 | [0004](0004-career-starts-in-jokamiesluokka.md) | The career starts in jokamiesluokka with oil as the only weapon, and weapons arrive by class | Accepted |
 | [0005](0005-rapier-cars.md) | The cars run on Rapier's raycast vehicle, every parameter a named physical quantity | Accepted |
+| [0006](0006-3d-view.md) | The race is drawn in 3D with three.js over the same Rapier world, behind the car, with real terrain | Accepted |

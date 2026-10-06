@@ -11,12 +11,13 @@ import { LICENCE_BY_CLASS } from '../game/content/licences';
 import { cr, hasProgress, playerCar, type Save } from '../career/save';
 import { UpdateBanner } from './Update';
 import { face } from './Dash';
-import { physicsReadout, setPhysicsReadout, setTuningMode, tuningMode } from '../settings';
+import { cameraView, physicsReadout, setCameraView, setPhysicsReadout, setTuningMode, tuningMode } from '../settings';
 
 export function Title({ save, onPlay, onReset }: { save: Save; onPlay: () => void; onReset: () => void }) {
   const [asking, setAsking] = useState(false);
   const [readout, setReadout] = useState(physicsReadout());
   const [tuning, setTuning] = useState(tuningMode());
+  const [view, setView] = useState(cameraView());
   const car = playerCar(save);
   const fi = lang() === 'fi';
   return (
@@ -51,6 +52,17 @@ export function Title({ save, onPlay, onReset }: { save: Save; onPlay: () => voi
           EN
         </button>
       </div>
+      <button
+        className="btn ghost wide camera-toggle"
+        data-track="title-camera"
+        onClick={() => {
+          const next = view === 'chase' ? 'top' : 'chase';
+          setCameraView(next);
+          setView(next);
+        }}
+      >
+        {tr('Kamera', 'Camera')}: {view === 'chase' ? tr('auton takana, 3D', 'behind the car, 3D') : tr('ylhäältä', 'from above')}
+      </button>
       <div className="dev-toggles">
       <button
         className={`btn ghost readout-toggle${readout ? ' on' : ''}`}

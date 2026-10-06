@@ -5,6 +5,7 @@
 // felt: `make drive-log` (PHYSICS=old for the previous model). Needs
 // `make shots-setup`. Prints a summary per set piece; the frames go to
 // shots/drive-log-<physics>.json.
+import { GPU } from './gpu.mjs';
 import { chromium, devices } from 'playwright';
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -14,7 +15,7 @@ const physics = 'rapier';
 const port = 5198;
 const server = spawn('npx', ['vite', '--port', String(port), '--strictPort'], { stdio: 'ignore', detached: true });
 await new Promise((r) => setTimeout(r, 2500));
-const browser = await chromium.launch();
+const browser = await chromium.launch(GPU);
 const page = await (await browser.newContext({ ...devices['iPhone 15'], hasTouch: true })).newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));

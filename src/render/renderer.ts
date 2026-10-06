@@ -1038,6 +1038,14 @@ export class Renderer {
     }
   }
 
+  /** Only the minimap, on a cleared canvas: the overlay over the 3D view (render3d.ts). */
+  drawMapOnly(s: SimState): void {
+    this.ensureTrack(s.track);
+    this.g.setTransform(1, 0, 0, 1, 0, 0);
+    this.g.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.drawMinimap(s);
+  }
+
   /** The minimap: a steel plate with corner ticks, the road in a thin off-white line. */
   private drawMinimap(s: SimState): void {
     const g = this.g;

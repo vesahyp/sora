@@ -17,6 +17,7 @@
 // it, six by six), and summary.json and summary.md with the places, the laps, the time off the
 // road, the tows and the money. Exits non-zero when the hour is not fun by the rules at the end:
 // a race not finished, the first two folk races not won in three tries, the final not a fight.
+import { GPU } from './gpu.mjs';
 import { chromium, devices } from 'playwright';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync, existsSync } from 'node:fs';
@@ -60,7 +61,7 @@ for (let i = 0; ; i++) {
   if (i > 120) throw new Error(`no preview server on port ${port} after 60 s`);
   await new Promise((r) => setTimeout(r, 500));
 }
-const browser = await chromium.launch();
+const browser = await chromium.launch(GPU);
 const phone = devices['iPhone 15 landscape'];
 let failed = false;
 const check = (ok, what) => {
@@ -399,7 +400,7 @@ const ffmpegDir = readdirSync(join(homedir(), 'Library/Caches/ms-playwright')).f
 const ffmpeg = ffmpegDir && join(homedir(), 'Library/Caches/ms-playwright', ffmpegDir, 'ffmpeg-mac');
 if (ffmpeg && existsSync(ffmpeg)) {
   mkdirSync(join(OUT, 'sheets'), { recursive: true });
-  const sheets = await chromium.launch();
+  const sheets = await chromium.launch(GPU);
   for (const r of summary) {
     const frames = join(OUT, 'tmp-frames');
     rmSync(frames, { recursive: true, force: true });

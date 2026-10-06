@@ -2,6 +2,7 @@
 // start the first folk race, open the panel with TUNE, move the mass and the game pace, and assert
 // the running car took them; copy the set as JSON, reset to the defaults, drive on. Shots of the
 // title and the panel into shots/tuning/. `make tuning-check`.
+import { GPU } from './gpu.mjs';
 import { chromium, devices } from 'playwright';
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -22,7 +23,7 @@ const check = (ok, what) => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`);
   if (!ok) failed = true;
 };
-const browser = await chromium.launch();
+const browser = await chromium.launch(GPU);
 const errors = [];
 // the iPhone 15 in landscape, then an iPhone SE in landscape with Safari's bars showing (320 px of
 // page): there the panel must scroll under a finger to reach the last tyre slider

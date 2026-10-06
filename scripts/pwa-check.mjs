@@ -2,6 +2,7 @@
 // the iOS icon, the theme colour, the service worker, and that the title
 // screen still opens with the network off. `make pwa-check` against the live
 // site, `make pwa-check URL=http://localhost:4173/sora/` against a preview.
+import { GPU } from './gpu.mjs';
 import { chromium } from 'playwright';
 
 const url = process.argv[2] || 'https://vesahyp.github.io/sora/';
@@ -11,7 +12,7 @@ const check = (ok, what) => {
   if (!ok) failed = true;
 };
 
-const browser = await chromium.launch();
+const browser = await chromium.launch(GPU);
 const context = await browser.newContext({ serviceWorkers: 'allow' });
 const page = await context.newPage();
 await page.goto(url, { waitUntil: 'load' });

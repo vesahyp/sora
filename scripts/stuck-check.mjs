@@ -5,12 +5,16 @@
 // (nose first, at an angle, side on), and for each the car must get going
 // again by itself within 4 s. `make stuck-check` (PORT=5187 when another
 // repo's dev server holds the default). Needs `make shots-setup`.
+import { GPU } from './gpu.mjs';
 import { chromium, devices } from 'playwright';
 import { spawn } from 'node:child_process';
-const port = Number(process.env.PORT) || 5197;
+// a free port of its own: 5197 is often another repo's dev server, and the check then drove that repo's page
+import { createServer } from 'node:net';
+const freePort = () => new Promise((resolve) => { const srv = createServer(); srv.listen(0, () => { const p = srv.address().port; srv.close(() => resolve(p)); }); });
+const port = Number(process.env.PORT) || (await freePort());
 const server = spawn('npx', ['vite', '--port', String(port), '--strictPort'], { stdio: 'ignore' });
 await new Promise((r) => setTimeout(r, 2500));
-const browser = await chromium.launch();
+const browser = await chromium.launch(GPU);
 const phone = devices['iPhone 15'];
 const page = await (await browser.newContext({ ...phone, viewport: { width: phone.viewport.height, height: phone.viewport.width }, hasTouch: true })).newPage();
 let failed = false;

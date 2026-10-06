@@ -1,6 +1,7 @@
 // The physics readout on the phone: the first folk race on an emulated iPhone in landscape, the
 // bot driving, the readout switched on in the title screen's settings, a shot every few seconds
 // into shots/readout/. `make readout-shot`.
+import { GPU } from './gpu.mjs';
 import { chromium, devices } from 'playwright';
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -16,7 +17,7 @@ for (let i = 0; ; i++) {
 }
 const dir = 'shots/readout';
 mkdirSync(dir, { recursive: true });
-const browser = await chromium.launch();
+const browser = await chromium.launch(GPU);
 const ctx = await browser.newContext({ ...devices['iPhone 15 landscape'], hasTouch: true });
 const page = await ctx.newPage();
 const errors = [];

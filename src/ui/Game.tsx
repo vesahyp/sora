@@ -13,7 +13,8 @@ import { fmt, track } from '../records';
 import { t, tr } from '../i18n';
 import { Lamps, MineIcon, MissileIcon, NoteArrow, OilIcon, PauseIcon, SoundIcon, WheelIcon } from './Dash';
 import { nextNote, type PaceNote } from '../game/notes';
-import { loadTuned, physicsReadout, saveTuned, tuningMode, type Tuned } from '../settings';
+import { cameraView, loadTuned, physicsReadout, saveTuned, tuningMode, type Tuned } from '../settings';
+import { Renderer3D } from '../render/render3d';
 import { TuningPanel, tunedRig } from './Tuning';
 import { lockAt, rigOf, type Rig } from '../game/rig';
 import { rigInRace, setRigInRace } from '../game/physics';
@@ -103,6 +104,8 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
   const pedalRef = useRef<HTMLDivElement>(null);
   const steerRef = useRef<HTMLDivElement>(null);
   const debugRef = useRef<HTMLPreElement>(null);
+  const mapRef = useRef<HTMLCanvasElement>(null);
+  const [chase] = useState(() => (new URLSearchParams(location.search).get('view') ?? cameraView()) === 'chase');
   const [showReadout] = useState(physicsReadout());
   const simRef = useRef<SimState | null>(null);
   const [hud, setHud] = useState<Hud | null>(null);
@@ -122,10 +125,13 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
     const s = createState(TRACK_BY_ID[trackId], car, laps, field, ammo);
     simRef.current = s;
     (window as unknown as { __sim: SimState }).__sim = s;
-    const renderer = new Renderer(canvas);
+    // the chase view in 3D, or the top view (settings: the camera); ?view=top for the scripts that read the 2D sprites
+    const view = new URLSearchParams(location.search).get('view') ?? cameraView();
+    const renderer: Renderer | Renderer3D = view === 'top' ? new Renderer(canvas) : new Renderer3D(canvas, mapRef.current!);
+    (window as unknown as { __view: string }).__view = view;
     s.view = renderer.view();
     // for the scripts that crop a car out of the race (scripts/car-shots.mjs): toScreen()
-    (window as unknown as { __renderer: Renderer }).__renderer = renderer;
+    (window as unknown as { __renderer: Renderer | Renderer3D }).__renderer = renderer;
     const input = new InputController();
     input.attach(root);
     (window as unknown as { __input: InputController }).__input = input;
@@ -318,6 +324,7 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
 
     return () => {
       cancelAnimationFrame(raf);
+      if (renderer instanceof Renderer3D) renderer.dispose();
       dispose(s);
       input.detach();
       audio.stopEngine();
@@ -356,8 +363,9 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
 
   const count = hud && hud.hold > 0 ? Math.ceil(hud.hold) : 0;
   return (
-    <div className="game" ref={rootRef}>
+    <div className={`game${chase ? ' chase' : ''}`} ref={rootRef}>
       <canvas ref={canvasRef} />
+      <canvas ref={mapRef} className="mapcanvas" />
       <div className="wheel" ref={wheelRef}>
         <div />
       </div>

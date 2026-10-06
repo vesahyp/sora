@@ -2,6 +2,7 @@
 // with the bot driving at a few points, and the result. Run
 // `make shots-setup` once, then `make shots`. Starts its own dev server on
 // port 5199. `node scripts/shots.mjs en` takes the English set into shots/en/.
+import { GPU } from './gpu.mjs';
 import { chromium, devices } from 'playwright';
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -14,7 +15,7 @@ const dir = lang === 'en' ? 'shots/en' : 'shots';
 const say = (fi, en) => (lang === 'en' ? en : fi);
 mkdirSync(dir, { recursive: true });
 
-const browser = await chromium.launch();
+const browser = await chromium.launch(GPU);
 const ctx = await browser.newContext({ ...devices['iPhone 15'], hasTouch: true });
 const page = await ctx.newPage();
 const errors = [];

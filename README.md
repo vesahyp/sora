@@ -131,6 +131,9 @@ kääntyy tielle päin. Jos se ei vieläkään pääse liikkeelle, ratamiehet
 hiusneulan sisäkautta menee **oikotie**, metsään hakattu ura nurmella:
 lyhyempi, hitaampi ja puiden reunustama, ja Jorma löytää sen, kun jää
 jälkeen.
+Kisa näkyy kolmiulotteisena auton takaa: kori kallistuu ja nyökkää,
+pyörät kääntyvät ja joustavat. Alkuruudun **Kamera**-valinnalla saa
+vanhan näkymän ylhäältä.
 Autot ajavat oikealla fysiikkamoottorilla (Rapier): massa, painonsiirto,
 renkaiden pito ja ohjauskulma ovat oikeita suureita. Alkuruudun
 **Fysiikkalukemat**-kytkin näyttää kisan aikana nopeuden, kiertonopeuden,

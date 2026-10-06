@@ -3,6 +3,7 @@
 // density, into shots/cars/<car>.png, and the same with the works tyres on the Tauno. Look at them
 // after touching the renderer's car drawing or sprites.ts: four wheels on every car, the front
 // pair turned with the wheel. `make car-shots`. Needs `make shots-setup`. Starts its own dev server.
+import { GPU } from './gpu.mjs';
 import { chromium, devices } from 'playwright';
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -25,7 +26,7 @@ const STOCK = { ram: 0, armour: 0, engine: 0, tyres: 0, nitro: 0, weight: 0, bra
 /** what to shoot: the car id, its parts, and the file name */
 const SHOTS = [...CARS.map(([id, cls]) => ({ id, cls, parts: STOCK, name: id })), { id: 'tauno', cls: 'JM', parts: { ...STOCK, tyres: 3, brakes: 0 }, name: 'tauno-works-tyres' }];
 
-const browser = await chromium.launch();
+const browser = await chromium.launch(GPU);
 const phone = devices['iPhone 15 landscape'];
 const errors = [];
 try {
@@ -40,7 +41,8 @@ try {
       localStorage.setItem('sora.career', JSON.stringify(save));
       localStorage.setItem('sora.lang', 'en');
     }, { shot, STOCK });
-    await page.goto(`http://localhost:${port}/?bot=1&lang=en`);
+    // the top view: this crops the 2D renderer's sprites (the chase view has its own cars, render3d.ts)
+    await page.goto(`http://localhost:${port}/?bot=1&lang=en&view=top`);
     await page.getByRole('button', { name: 'Continue', exact: true }).tap();
     await page.getByRole('button', { name: 'Races', exact: true }).tap();
     await page.locator('.card.event').filter({ hasText: RACE[shot.cls] }).first().tap();

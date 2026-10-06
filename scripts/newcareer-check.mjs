@@ -2,13 +2,14 @@
 // save has moved, the dialog names what is lost and defaults to No, No keeps the save, Yes
 // wipes only the career key (language and records stay) and lands in the garage with the Tauno
 // and the starting credits. `make newcareer-check` (PORT=5187 when another repo holds the default).
+import { GPU } from './gpu.mjs';
 import { chromium, devices } from 'playwright';
 import { spawn } from 'node:child_process';
 
 const port = Number(process.env.PORT) || 5197;
 const server = spawn('npx', ['vite', '--port', String(port), '--strictPort'], { stdio: 'ignore' });
 await new Promise((r) => setTimeout(r, 2500));
-const browser = await chromium.launch();
+const browser = await chromium.launch(GPU);
 const context = await browser.newContext({ ...devices['iPhone 15 landscape'], hasTouch: true });
 const page = await context.newPage();
 let failed = false;

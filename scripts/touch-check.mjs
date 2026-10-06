@@ -2,14 +2,18 @@
 // a drag to the right must turn the car right, a drag to the left must
 // turn it left, a second finger must slow it, and the pause menu must
 // open and close by tap. Run with `make touch-check`; needs `make shots-setup`.
+import { GPU } from './gpu.mjs';
 import { chromium, devices } from 'playwright';
 import { spawn } from 'node:child_process';
 
 // PORT=5187 when another repo's dev server holds the default
-const port = Number(process.env.PORT) || 5197;
+// a free port of its own: 5197 is often another repo's dev server, and the check then drove that repo's page
+import { createServer } from 'node:net';
+const freePort = () => new Promise((resolve) => { const srv = createServer(); srv.listen(0, () => { const p = srv.address().port; srv.close(() => resolve(p)); }); });
+const port = Number(process.env.PORT) || (await freePort());
 const server = spawn('npx', ['vite', '--port', String(port), '--strictPort'], { stdio: 'ignore' });
 await new Promise((r) => setTimeout(r, 2500));
-const browser = await chromium.launch();
+const browser = await chromium.launch(GPU);
 const page = await (await browser.newContext({ ...devices['iPhone 15'], hasTouch: true })).newPage();
 let failed = false;
 const check = (ok, what) => {

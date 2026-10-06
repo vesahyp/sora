@@ -2,10 +2,11 @@
 // The PNGs are the same scene at each size: the launcher icons (192, 512, also
 // listed as maskable, the scene keeps its car inside the safe zone), the iOS
 // home screen icon (180) and a favicon for browsers that do not take SVG (32).
+import { GPU } from './gpu.mjs';
 import { chromium } from 'playwright';
 import { readFile } from 'node:fs/promises';
 const svg = await readFile('public/icon.svg', 'utf8');
-const b = await chromium.launch();
+const b = await chromium.launch(GPU);
 const p = await b.newPage();
 const out = [
   [512, 'public/icon-512.png'],

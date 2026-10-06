@@ -9,6 +9,7 @@
 // If two vehicles in it could be confused at a glance, the look is not
 // done. Starts its own dev server on port 5198 and draws with the race's
 // own sprites, so what it shows is what the race shows.
+import { GPU } from './gpu.mjs';
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -18,7 +19,7 @@ const server = spawn('npx', ['vite', '--port', String(port), '--strictPort'], { 
 await new Promise((r) => setTimeout(r, 2500));
 mkdirSync('shots', { recursive: true });
 
-const browser = await chromium.launch();
+const browser = await chromium.launch(GPU);
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 }, deviceScaleFactor: 1 });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));

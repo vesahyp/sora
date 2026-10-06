@@ -5,12 +5,16 @@
 // aspect, the dash stays inside the screen, the pedal is where the input
 // thinks it is, and the menus do not overflow sideways. `make rotate-check`
 // (PORT=5187 when another repo's dev server holds the default).
+import { GPU } from './gpu.mjs';
 import { chromium, devices } from 'playwright';
 import { spawn } from 'node:child_process';
-const port = Number(process.env.PORT) || 5197;
+// a free port of its own: 5197 is often another repo's dev server, and the check then drove that repo's page
+import { createServer } from 'node:net';
+const freePort = () => new Promise((resolve) => { const srv = createServer(); srv.listen(0, () => { const p = srv.address().port; srv.close(() => resolve(p)); }); });
+const port = Number(process.env.PORT) || (await freePort());
 const server = spawn('npx', ['vite', '--port', String(port), '--strictPort'], { stdio: 'ignore' });
 await new Promise((r) => setTimeout(r, 2500));
-const browser = await chromium.launch();
+const browser = await chromium.launch(GPU);
 const phone = devices['iPhone 15'];
 const portrait = { width: phone.viewport.width, height: phone.viewport.height };
 const landscape = { width: phone.viewport.height, height: phone.viewport.width };

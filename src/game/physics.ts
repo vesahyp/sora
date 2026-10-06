@@ -311,6 +311,31 @@ function applyRig(b: Body, r: Rig): void {
   b.loadR = (r.mass * G * (1 - r.frontWeight)) / 2;
 }
 
+/** One wheel as a renderer draws it: its centre in the body's frame, its steer and spin, rad, whether it touches. */
+export interface WheelPose {
+  x: number;
+  y: number;
+  z: number;
+  radius: number;
+  steer: number;
+  spin: number;
+  contact: boolean;
+}
+
+/** A car's body and wheels as they are now: position, orientation, and each wheel on its spring. Read-only, for the 3D view. */
+export function carPose(s: SimState, i: number): { x: number; y: number; z: number; q: RAPIER.Rotation; wheels: WheelPose[]; origin: number } {
+  const b = s.world.bodies[i];
+  const p = b.body.translation();
+  const wheels: WheelPose[] = [];
+  for (let k = 0; k < 4; k++) {
+    const c = b.vehicle.wheelChassisConnectionPointCs(k)!;
+    // the wheel hangs below its mount by the spring's length: the direction is straight down in the body
+    const len = b.vehicle.wheelSuspensionLength(k) ?? b.rig.restLength;
+    wheels.push({ x: c.x, y: c.y, z: c.z - len, radius: b.rig.wheelRadius, steer: b.vehicle.wheelSteering(k) ?? 0, spin: b.vehicle.wheelRotation(k) ?? 0, contact: b.vehicle.wheelIsInContact(k) });
+  }
+  return { x: p.x, y: p.y, z: p.z, q: b.body.rotation(), wheels, origin: b.origin };
+}
+
 /** The rig a car in the race is running on, and a new one for it, live: the tuning panel's way in. */
 export function rigInRace(s: SimState, i: number): Rig {
   return s.world.bodies[i].rig;
