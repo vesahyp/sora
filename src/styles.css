@@ -313,8 +313,14 @@ table.laps .total td { border-bottom: 0; color: var(--straw); font-weight: 800; 
 .tuning-derived { flex-basis: 100%; order: 9; font-size: 12px; color: var(--gravel-pale); }
 .tuning-copied { font-size: 12px; color: var(--amber); padding: 4px 0; }
 .tuning-copied textarea { display: block; width: 100%; height: 64px; margin-top: 4px; font: 10px ui-monospace, Menlo, monospace; background: #0d0b08; color: var(--bone); border: 1px solid var(--hair-strong); }
-.tuning-groups { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; columns: 260px; column-gap: 14px; padding-top: 8px; }
-.tuning fieldset { border: 1px solid var(--hair-strong); padding: 4px 10px 8px; margin: 0 0 8px; min-width: 0; break-inside: avoid; }
+.tuning-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 6px 0 2px; touch-action: pan-x; scrollbar-width: none; }
+.tuning-tabs button { flex: none; padding: 6px 10px; border: 1px solid var(--hair-strong); background: transparent; color: var(--gravel-pale); font: 700 13px var(--f-plate); letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; }
+.tuning-tabs button.on { background: var(--bone); color: var(--soot); }
+.tuning-tabs button.changed:not(.on) { color: var(--amber); border-color: var(--amber); }
+/* one system's sliders, in two columns on a phone in landscape, scrolled by a finger: the game's touch handler leaves [data-ui] alone */
+.tuning-groups { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; padding-top: 6px; }
+.tuning-rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); column-gap: 18px; }
+.tuning fieldset { border: 1px solid var(--hair-strong); padding: 4px 10px 8px; margin: 0; min-width: 0; }
 .tuning legend { font: 700 13px var(--f-plate); letter-spacing: 0.08em; color: var(--amber); padding: 0 4px; text-transform: uppercase; }
 .tuning label { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; align-items: baseline; padding: 4px 0; font-size: 13px; }
 .tuning label .val { font: 12px ui-monospace, Menlo, monospace; text-align: right; }

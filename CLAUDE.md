@@ -148,8 +148,9 @@ scripts/
   shots.mjs           phone screenshots with Playwright, the bot driving
   touch-check.mjs     drives the race by touch on an emulated phone: steer, brake, pause
   readout-shot.mjs    the physics readout switched on and shown in a race on the phone
-  tuning-check.mjs    the tuning mode by touch on the phone: the panel opens, a slider reaches the running car,
-                        copy as JSON, reset
+  tuning-check.mjs    the tuning mode by touch, on an iPhone 15 and on an iPhone SE with Safari's bars showing:
+                        the panel opens, a one-finger drag scrolls it, the last tyre slider is reached and
+                        dragged, sliders reach the running car, copy as JSON, reset
   drive-log.mjs       set pieces by touch on an emulated phone, the physics logged frame by frame
   icon.mjs            render public/icon.svg to the PNG icons: 512, 192, the 180 iOS icon, a 32 favicon
   lineup.mjs          every vehicle in the game on one canvas to shots/lineup.png, a row per class,

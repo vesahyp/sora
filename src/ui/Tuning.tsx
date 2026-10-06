@@ -135,6 +135,8 @@ export function TuningPanel({
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState('');
+  // one system at a time, picked from a row of tabs, so no group sits below the fold
+  const [tab, setTab] = useState(1);
   const value = (k: Key) => (k === 'pace' ? pace : (changes[k] ?? (base[k as keyof Rig] as number)));
   const def = (k: Key) => (k === 'pace' ? basePace : (base[k as keyof Rig] as number));
   const set = (k: Key, v: number) => {
@@ -177,10 +179,18 @@ export function TuningPanel({
           <textarea readOnly value={json} onFocus={(e) => e.currentTarget.select()} />
         </div>
       )}
+      <div className="tuning-tabs" role="tablist">
+        {GROUPS.map((g, i) => (
+          <button key={g.en} role="tab" aria-selected={tab === i} className={`${tab === i ? 'on' : ''}${g.params.some((p) => p.key === 'pace' ? pace !== basePace : p.key in changes) ? ' changed' : ''}`} onClick={() => setTab(i)}>
+            {tr(g.fi, g.en)}
+          </button>
+        ))}
+      </div>
       <div className="tuning-groups">
-        {GROUPS.map((g) => (
+        {GROUPS.filter((_, i) => i === tab).map((g) => (
           <fieldset key={g.en}>
             <legend>{tr(g.fi, g.en)}</legend>
+            <div className="tuning-rows">
             {g.params.map((p) => {
               const d = def(p.key);
               const min = p.rel ? d * p.min : p.min;
@@ -198,6 +208,7 @@ export function TuningPanel({
                 </label>
               );
             })}
+            </div>
           </fieldset>
         ))}
       </div>

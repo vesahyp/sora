@@ -80,6 +80,9 @@ export class InputController {
   };
 
   private onTouchMove = (e: TouchEvent) => {
+    // a finger on React's chrome (the tuning panel's scroll and sliders) is left to the browser;
+    // cancelling it here kept the panel from scrolling at all (Vesa, 2026-10-06)
+    if ((e.target as HTMLElement | null)?.closest('[data-ui]')) return;
     e.preventDefault();
     for (const t of Array.from(e.changedTouches)) {
       if (t.identifier === this.wheelId) {
