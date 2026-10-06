@@ -443,7 +443,7 @@ export class Renderer3D {
     const L = def.length;
     const W = def.width * 0.78;
     // the body's bottom a little over the physics' box's, its height by the body
-    const z0 = 0.2 - pose.origin;
+    const z0 = 0.28 - pose.origin;
     const box = (l: number, w: number, h: number, x: number, z: number, m: THREE.Material) => {
       const b = new THREE.Mesh(new THREE.BoxGeometry(l, w, h), m);
       b.position.set(x, 0, z + h / 2);

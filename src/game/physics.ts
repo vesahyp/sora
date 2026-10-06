@@ -81,6 +81,8 @@ interface Body {
   seen: { x: number; y: number; heading: number; vx: number; vy: number; yaw: number };
   /** m over the ground at rest: the height of the body's reference point, fixed for the race */
   origin: number;
+  /** m, in the body's frame: the height of the wheels' mounts, fixed for the race */
+  mount: number;
   /** the wheels' static loads, N */
   loadF: number;
   loadR: number;
@@ -279,7 +281,11 @@ function carBody(world: RAPIER.World, t: Track, c: Car): Body {
   vehicle.setIndexForwardAxis = 0;
   // front left, front right, rear left, rear right; +y is the car's right on the screen. Placed by applyRig
   for (let i = 0; i < 4; i++) vehicle.addWheel({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: -1 }, { x: 0, y: -1, z: 0 }, r.restLength, r.wheelRadius);
-  const b: Body = { rig: r, origin, body, collider, vehicle, seen: { x: NaN, y: NaN, heading: NaN, vx: NaN, vy: NaN, yaw: NaN }, loadF: 0, loadR: 0, wrecked: false };
+  // each wheel's mount on the body, fixed for the race: at rest the wheel hangs its spring's length less
+  // the sag (a quarter of the weight on each spring) below it, its centre a radius over the ground
+  const sag = G / (4 * (r.springRate / r.mass));
+  const mount = r.wheelRadius + r.restLength - sag - origin;
+  const b: Body = { rig: r, origin, mount, body, collider, vehicle, seen: { x: NaN, y: NaN, heading: NaN, vx: NaN, vy: NaN, yaw: NaN }, loadF: 0, loadR: 0, wrecked: false };
   applyRig(b, r);
   return b;
 }
@@ -289,10 +295,11 @@ function applyRig(b: Body, r: Rig): void {
   b.rig = r;
   const L = r.wheelbase;
   b.body.setAdditionalMassProperties(r.mass, { x: L * (r.frontWeight - 0.5), y: 0, z: r.comHeight - b.origin }, { x: r.rollInertia, y: r.pitchInertia, z: r.yawInertia }, { w: 1, x: 0, y: 0, z: 0 }, true);
-  // the springs' static sag: each wheel carries a quarter of the weight
   const stiff = r.springRate / r.mass;
-  const sag = G / (4 * stiff);
-  const mount = r.wheelRadius + r.restLength - sag - b.origin;
+  // the mounts are where the car was built (b.mount): a longer spring then lifts the car, a softer
+  // one lets it sag, a bigger wheel raises it. Until 2026-10-06 the mount moved to keep the ride
+  // height, and no spring setting changed how high the car sat (Vesa: "really low regardless of settings")
+  const mount = b.mount;
   const places = [[L / 2, -r.track / 2], [L / 2, r.track / 2], [-L / 2, -r.track / 2], [-L / 2, r.track / 2]];
   for (let i = 0; i < 4; i++) {
     b.vehicle.setWheelChassisConnectionPointCs(i, { x: places[i][0], y: places[i][1], z: mount });
