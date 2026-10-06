@@ -332,3 +332,14 @@ table.laps .total td { border-bottom: 0; color: var(--straw); font-weight: 800; 
 .tuning label .val small { color: var(--gravel-pale); font-size: 10px; }
 .tuning label.changed .name { color: var(--amber); }
 .tuning input[type='range'] { grid-column: 1 / -1; width: 100%; height: 28px; accent-color: var(--amber); margin: 0; }
+
+/* the gas lever (settings: Gas): a tall pedal under the left thumb, read like a trigger. Its zones
+   follow LEVER in input.ts: brake in the bottom 30%, a coasting band to 40%, gas above, full from 85% */
+.pedal.lever { width: 78px; height: min(210px, 48vh); justify-content: space-between; padding: 8px 0; box-sizing: border-box; background: linear-gradient(to top, rgba(160, 40, 24, 0.55) 0 30%, rgba(20, 18, 14, 0.7) 30% 40%, rgba(70, 64, 54, 0.6) 40% 100%); }
+.pedal.lever .gas, .pedal.lever .brk { position: absolute; left: 6px; right: 6px; border-radius: 4px; pointer-events: none; }
+.pedal.lever .gas { bottom: 40%; height: calc(var(--gas, 0) * 52%); background: var(--amber); opacity: 0.85; }
+.pedal.lever .brk { top: 70%; height: calc(var(--brk, 0) * 28%); background: var(--red); opacity: 0.9; }
+.pedal.lever span { position: relative; font-size: 15px; }
+.pedal.lever.held { border-color: var(--bone); }
+.pedal.lever.on { transform: none; }
+.pedal.lever.rev .b::after { content: ' R'; }

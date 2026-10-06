@@ -72,7 +72,8 @@ const check = (ok, what) => {
 };
 /** the career between races: the save and the records, carried from one page to the next */
 // the physics readout on: the video shows the speed, the yaw rate, the wheel and each tyre's slip
-let stored = { 'sora.career': null, 'sora.records': null, 'sora.lang': 'en', 'sora.physics-readout': '1' };
+// the gas always on: the hand is one thumb (tools/hand.ts); the left thumb's lever is checked by touch-check
+let stored = { 'sora.career': null, 'sora.records': null, 'sora.lang': 'en', 'sora.physics-readout': '1', 'sora.gas': 'auto' };
 const summary = [];
 
 /** One attempt at an event: a fresh page carrying the save, the garage, the race, the result. */
@@ -109,7 +110,7 @@ async function attempt(eventId, index, tries, skill) {
       order: [...document.querySelectorAll('.order tbody tr')].map((r) => r.textContent.trim().replace(/\s+/g, ' ')),
       credits: document.querySelector('.top .credits')?.textContent,
     }));
-    stored = await page.evaluate(() => ({ 'sora.career': localStorage.getItem('sora.career'), 'sora.records': localStorage.getItem('sora.records'), 'sora.lang': 'en', 'sora.physics-readout': '1' }));
+    stored = await page.evaluate(() => ({ 'sora.career': localStorage.getItem('sora.career'), 'sora.records': localStorage.getItem('sora.records'), 'sora.lang': 'en', 'sora.physics-readout': '1', 'sora.gas': 'auto' }));
     const save = JSON.parse(stored['sora.career']);
     result = { event: eventId, name, tries, skill, bought, ...race, sheet, credits: save.credits, parts: save.cars[0].parts, errors };
   } catch (e) {

@@ -1,7 +1,7 @@
 # Sora
 
-Soraa, mutkia ja kello. Ylhäältä kuvattu ralli puhelimeen: yksi peukalo
-ohjaa, kaasu on pohjassa, ja kello käy.
+Soraa, mutkia ja kello. Ralli puhelimeen: oikea peukalo ohjaa, vasen
+peukalo kaasuttaa ja jarruttaa, ja kello käy.
 
 **Pelaa: https://vesahyp.github.io/sora/**. Toimii puhelimessa ja
 selaimessa. Lisää kotinäytölle (iPhone: Jaa, Lisää Koti-valikkoon;
@@ -13,17 +13,22 @@ game follows your browser's language.*
 
 ## Miten pelataan
 
-**Puhelimella:** kaasu on aina pohjassa. Paina peukalo ruudulle mihin
-tahansa ja vedä sivulle: auto kääntyy sen verran kuin peukalo on siirtynyt.
+**Puhelimella:** vasemmassa alakulmassa on **kaasuvipu** vasemmalle
+peukalolle, kuin peliohjaimen liipaisin: mitä ylempänä peukalo on, sitä
+enemmän kaasua; vivun alaosa on jarru, ja pysähdyksissä se peruuttaa.
+Ilman peukaloa vivulla auto rullaa. Alkuruudun **Kaasu**-valinnalla saa
+vanhan tavan, jossa kaasu on aina pohjassa ja vasen poljin vain jarruttaa.
+
+Paina oikea peukalo ruudulle mihin tahansa ja vedä sivulle: auto kääntyy
+sen verran kuin peukalo on siirtynyt.
 Pieni liike on pieni korjaus, puoli vetoa on tavallinen mutka, ja täysi
 veto vauhdissa pyytää autolta enemmän kuin renkaat antavat: perä lähtee
 hieman, ja renkaat, jotka luistavat, syövät vauhtia. Liian kovaa otettu
 mutka hidastaa auton siihen asti, että keula taas puree; paremmat renkaat
 kantavat saman mutkan luistamatta, ja se on se, minkä rengaskaupasta saa.
 Nosta peukalo, niin ratti suoristuu. Napautus sytyttää **nitron**.
-Vasemmassa alakulmassa on **poljin**, ja toinen sormi missä tahansa on
-sama poljin: se jarruttaa ja irrottaa perän, eli jarrutus mutkaan heittää
-auton sivuluisuun. Pysähdyksissä pohjaan painettuna auto peruuttaa.
+Jarru (vivun alaosa, tai kolmas sormi missä tahansa) irrottaa perän, eli
+jarrutus mutkaan heittää auton sivuluisuun.
 
 **Aseet laukeavat itse.** Öljy vuotaa tielle, kun auto on ihan takana:
 lätäkössä renkaat eivät pidä ja perä lähtee. Konekivääri ampuu, kun auto

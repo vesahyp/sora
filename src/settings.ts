@@ -85,3 +85,24 @@ export function setCameraView(v: View): void {
     // private mode
   }
 }
+
+const GAS_KEY = 'sora.gas';
+
+/** The gas: under the left thumb on a lever (the default since 2026-10-06), or always on with the pedal only braking. */
+export type GasMode = 'lever' | 'auto';
+
+export function gasMode(): GasMode {
+  try {
+    return localStorage.getItem(GAS_KEY) === 'auto' ? 'auto' : 'lever';
+  } catch {
+    return 'lever';
+  }
+}
+
+export function setGasMode(m: GasMode): void {
+  try {
+    localStorage.setItem(GAS_KEY, m);
+  } catch {
+    // private mode
+  }
+}

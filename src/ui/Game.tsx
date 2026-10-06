@@ -13,7 +13,7 @@ import { fmt, track } from '../records';
 import { t, tr } from '../i18n';
 import { Lamps, MineIcon, MissileIcon, NoteArrow, OilIcon, PauseIcon, SoundIcon, WheelIcon } from './Dash';
 import { nextNote, type PaceNote } from '../game/notes';
-import { cameraView, loadTuned, physicsReadout, saveTuned, tuningMode, type Tuned } from '../settings';
+import { cameraView, gasMode, loadTuned, physicsReadout, saveTuned, tuningMode, type Tuned } from '../settings';
 import { Renderer3D } from '../render/render3d';
 import { TuningPanel, tunedRig } from './Tuning';
 import { lockAt, rigOf, type Rig } from '../game/rig';
@@ -105,6 +105,8 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
   const steerRef = useRef<HTMLDivElement>(null);
   const debugRef = useRef<HTMLPreElement>(null);
   const mapRef = useRef<HTMLCanvasElement>(null);
+  // the gas under the left thumb (settings: Gas), or always on with the pedal only braking
+  const [lever] = useState(() => gasMode() === 'lever');
   const [chase] = useState(() => (new URLSearchParams(location.search).get('view') ?? cameraView()) === 'chase');
   const [showReadout] = useState(physicsReadout());
   const simRef = useRef<SimState | null>(null);
@@ -141,6 +143,7 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
     // for the scripts that crop a car out of the race (scripts/car-shots.mjs): toScreen()
     (window as unknown as { __renderer: Renderer | Renderer3D }).__renderer = renderer;
     const input = new InputController();
+    input.gasMode = lever ? 'lever' : 'auto';
     input.attach(root);
     (window as unknown as { __input: InputController }).__input = input;
     track('race_start', { track: trackId, car: carId });
@@ -158,6 +161,8 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
     };
     const layoutPedal = () => {
       input.pedal = circle(pedalRef.current);
+      const r = pedalRef.current?.getBoundingClientRect();
+      if (r) input.lever = { x: r.left, y: r.top, w: r.width, h: r.height };
     };
     const onResize = () => {
       renderer.resize();
@@ -310,6 +315,10 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
       if (pd) {
         pd.classList.toggle('on', input.braking);
         pd.classList.toggle('rev', s.cars[0].speed < -0.3);
+        // the lever's gauge: how much gas, how much brake, whether a thumb is on it
+        pd.style.setProperty('--gas', String(input.leverOut.throttle));
+        pd.style.setProperty('--brk', String(input.leverOut.brake));
+        pd.classList.toggle('held', input.leverOut.active);
       }
       // the steering wheel turns with the car's wheel, a quarter turn at full lock
       const sw = steerRef.current;
@@ -379,10 +388,19 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
       <div className="wheel" ref={wheelRef}>
         <div />
       </div>
-      <div className="pedal" ref={pedalRef}>
-        <span>{tr('JARRU', 'BRAKE')}</span>
-        <small>{tr('pidä: peruuta', 'hold: reverse')}</small>
-      </div>
+      {lever ? (
+        <div className="pedal lever" ref={pedalRef}>
+          <i className="gas" />
+          <i className="brk" />
+          <span className="g">{tr('KAASU', 'GAS')}</span>
+          <span className="b">{tr('JARRU', 'BRAKE')}</span>
+        </div>
+      ) : (
+        <div className="pedal" ref={pedalRef}>
+          <span>{tr('JARRU', 'BRAKE')}</span>
+          <small>{tr('pidä: peruuta', 'hold: reverse')}</small>
+        </div>
+      )}
       <div className="steerwheel" ref={steerRef}>
         <WheelIcon />
       </div>

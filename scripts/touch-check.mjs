@@ -14,7 +14,10 @@ const port = Number(process.env.PORT) || (await freePort());
 const server = spawn('npx', ['vite', '--port', String(port), '--strictPort'], { stdio: 'ignore' });
 await new Promise((r) => setTimeout(r, 2500));
 const browser = await chromium.launch(GPU);
-const page = await (await browser.newContext({ ...devices['iPhone 15'], hasTouch: true })).newPage();
+// the gas always on for the checks that drive at speed without a hand on the gas; the lever is checked below
+const ctx = await browser.newContext({ ...devices['iPhone 15'], hasTouch: true });
+await ctx.addInitScript(() => localStorage.setItem('sora.gas', 'auto'));
+const page = await ctx.newPage();
 let failed = false;
 const check = (ok, what) => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`);
@@ -130,6 +133,67 @@ try {
   await page.waitForTimeout(200);
   const lvl = await page.locator('.card.part').first().locator('.ic').innerText();
   check(lvl.startsWith('1'), `a tap in the shop buys the first part, the ram bar (level ${lvl.trim()})`);
+  // the gas lever under the left thumb (the default): in landscape, as it is played
+  const lctx = await browser.newContext({ ...devices['iPhone 15 landscape'], hasTouch: true });
+  const lp = await lctx.newPage();
+  await lp.goto(`http://localhost:${port}/?lang=en`);
+  await lp.getByRole('button', { name: 'Drive', exact: true }).tap();
+  await lp.getByRole('button', { name: /Licences/ }).tap();
+  await lp.locator('.card.licence').first().tap();
+  await lp.waitForFunction(() => window.__sim && window.__sim.hold <= 0, null, { timeout: 20000 });
+  const lsim = (expr) => lp.evaluate(expr);
+  const lever = await lp.locator('.pedal.lever').boundingBox();
+  check(!!lever && lever.height > lever.width * 2, `the gas lever stands at the bottom left (${lever ? `${lever.width.toFixed(0)} x ${lever.height.toFixed(0)} px` : 'missing'})`);
+  const at = (share) => ({ x: lever.x + lever.width / 2, y: lever.y + lever.height * (1 - share) });
+  const lcdp = await lp.context().newCDPSession(lp);
+  const hold = async (share, ms, extra = []) => {
+    const p = at(share);
+    await lcdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...p, id: 1 }, ...extra] });
+    await lp.waitForTimeout(ms / 2);
+    const read = await lsim(() => window.__input.read());
+    await lp.waitForTimeout(ms / 2);
+    return read;
+  };
+  const lift = () => lcdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await lp.waitForTimeout(800);
+  const still = await lsim(() => [window.__sim.cars[0].speed, window.__input.read()]);
+  check(Math.abs(still[0]) < 1 && still[1].throttle === 0, `with no thumb on the lever the car stands (${(still[0] * 3.6).toFixed(0)} km/h, gas ${still[1].throttle})`);
+  const full = await hold(0.95, 2400);
+  const vFull = await lsim(() => window.__sim.cars[0].speed);
+  check(full.throttle > 0.95 && vFull * 3.6 > 30, `the thumb high on the lever is full gas, and the car goes (gas ${full.throttle.toFixed(2)}, ${(vFull * 3.6).toFixed(0)} km/h)`);
+  await lift();
+  const half = await hold(0.62, 300);
+  check(half.throttle > 0.35 && half.throttle < 0.65, `halfway up the gas zone is half gas (${half.throttle.toFixed(2)})`);
+  const coast = await hold(0.35, 300);
+  check(coast.throttle === 0 && coast.brake === 0, `between the zones it coasts (gas ${coast.throttle}, brake ${coast.brake})`);
+  await lift();
+  const off = await lsim(() => window.__input.read());
+  check(off.throttle === 0, `lifting the thumb coasts (gas ${off.throttle})`);
+  const v0b = await lsim(() => window.__sim.cars[0].speed);
+  const brk = await hold(0.05, 1000);
+  const v1b = await lsim(() => window.__sim.cars[0].speed);
+  check(brk.brake > 0.8 && v1b < v0b - 2, `low on the lever brakes (brake ${brk.brake.toFixed(2)}, ${(v0b * 3.6).toFixed(0)} -> ${(v1b * 3.6).toFixed(0)} km/h)`);
+  await lp.waitForTimeout(3000);
+  const vr2 = await lsim(() => window.__sim.cars[0].speed);
+  check(vr2 < -1, `held low at a standstill it reverses (${(vr2 * 3.6).toFixed(0)} km/h)`);
+  await lift();
+  // both thumbs: gas on the left, a drag on the right turns the car
+  await hold(0.95, 1500);
+  const hA = await lsim(() => window.__sim.cars[0].heading);
+  const vw = lp.viewportSize();
+  const wx = vw.width * 0.72;
+  const wy = vw.height * 0.6;
+  for (let i = 0; i <= 6; i++) {
+    await lcdp.send('Input.dispatchTouchEvent', { type: i ? 'touchMove' : 'touchStart', touchPoints: [{ ...at(0.95), id: 1 }, { x: wx + i * 12, y: wy, id: 2 }] });
+    await lp.waitForTimeout(40);
+  }
+  await lp.waitForTimeout(500);
+  const both = await lsim(() => window.__input.read());
+  const hB = await lsim(() => window.__sim.cars[0].heading);
+  await lift();
+  check(both.throttle > 0.95 && both.steer > 0.3 && hB - hA > 0.2, `gas held on the left while the right thumb steers (gas ${both.throttle.toFixed(2)}, steer ${both.steer.toFixed(2)}, turned ${(hB - hA).toFixed(2)} rad)`);
+  await lcdp.detach();
+  await lp.screenshot({ path: 'shots/lever.png' });
 } catch (e) {
   check(false, String(e));
 } finally {

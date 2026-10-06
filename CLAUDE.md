@@ -14,8 +14,10 @@ race, the car or the career.
 
 **Sora** is a top-down combat racer in the shape of Death Rally and
 Super Cars II, with a career in the shape of Gran Turismo, for the
-browser, phones first. One thumb steers, a tap is nitro, the pedal
-brakes and swings the tail; the guns fire themselves. Cars slide, ram,
+browser, phones first. The right thumb steers and a tap is nitro; the
+left thumb is a gas lever, high for gas and low for the brake, which
+swings the tail (or, in settings, the gas always on and the pedal only
+braking); the guns fire themselves. Cars slide, ram,
 wreck each other and come back. Finnish gravel roads, nineties cars.
 Four tracks, each with a river to jump and a crest, two of them short folk-class loops
 of about 400 m, and a shortcut through the forest on the Kiviaho ones; four
@@ -119,7 +121,8 @@ src/
                         liveries and numbers, every fitted part at every level and the weapons carried
                         (CarLook.load) on the car, damage stages, shadows,
                         trees and roadside objects
-  input/input.ts      one thumb (drag to steer, tap for nitro), the pedal, keyboard
+  input/input.ts      the right thumb (drag to steer, tap for nitro), the left thumb's gas lever (LEVER:
+                        how high on it is how much gas, the bottom brakes) or the pedal, keyboard
   ui/                 React: Game (loop + HUD), Screens (title, result), Garage (garage, races, shop, paint shop, dealer, licences),
                         Dash (the shared chrome: segmented lamps, inline SVG glyphs, the stencil-or-plain face() rule)
   styles.css          the chrome's look: palette tokens named after the frame (soot, gravel, straw, amber), grain,

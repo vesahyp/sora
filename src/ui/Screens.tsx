@@ -11,13 +11,14 @@ import { LICENCE_BY_CLASS } from '../game/content/licences';
 import { cr, hasProgress, playerCar, type Save } from '../career/save';
 import { UpdateBanner } from './Update';
 import { face } from './Dash';
-import { cameraView, physicsReadout, setCameraView, setPhysicsReadout, setTuningMode, tuningMode } from '../settings';
+import { cameraView, gasMode, physicsReadout, setCameraView, setGasMode, setPhysicsReadout, setTuningMode, tuningMode } from '../settings';
 
 export function Title({ save, onPlay, onReset }: { save: Save; onPlay: () => void; onReset: () => void }) {
   const [asking, setAsking] = useState(false);
   const [readout, setReadout] = useState(physicsReadout());
   const [tuning, setTuning] = useState(tuningMode());
   const [view, setView] = useState(cameraView());
+  const [gas, setGas] = useState(gasMode());
   const car = playerCar(save);
   const fi = lang() === 'fi';
   return (
@@ -43,7 +44,11 @@ export function Title({ save, onPlay, onReset }: { save: Save; onPlay: () => voi
       <button className="btn primary big wide" data-track="title-drive" onClick={onPlay}>
         {save.races ? tr('Jatka', 'Continue') : tr('Aja', 'Drive')}
       </button>
-      <p className="help">{tr('Vedä peukalolla sivulle: auto kääntyy. Toinen sormi jarruttaa.', 'Drag your thumb sideways to steer. A second finger brakes.')}</p>
+      <p className="help">
+        {gas === 'lever'
+          ? tr('Oikea peukalo ohjaa sivulle vetämällä. Vasen peukalo on kaasu: ylhäällä kaasua, alhaalla jarru.', 'Your right thumb steers by dragging sideways. Your left thumb is the gas: high is gas, low is the brake.')
+          : tr('Vedä peukalolla sivulle: auto kääntyy. Toinen sormi jarruttaa.', 'Drag your thumb sideways to steer. A second finger brakes.')}
+      </p>
       <div className="langs" role="group" aria-label={tr('Kieli', 'Language')}>
         <button className={fi ? 'on' : ''} aria-pressed={fi} aria-label="Suomeksi" onClick={() => setLang('fi')}>
           FI
@@ -62,6 +67,17 @@ export function Title({ save, onPlay, onReset }: { save: Save; onPlay: () => voi
         }}
       >
         {tr('Kamera', 'Camera')}: {view === 'chase' ? tr('auton takana, 3D', 'behind the car, 3D') : tr('ylhäältä', 'from above')}
+      </button>
+      <button
+        className="btn ghost wide camera-toggle"
+        data-track="title-gas"
+        onClick={() => {
+          const next = gas === 'lever' ? 'auto' : 'lever';
+          setGasMode(next);
+          setGas(next);
+        }}
+      >
+        {tr('Kaasu', 'Gas')}: {gas === 'lever' ? tr('vasen peukalo', 'left thumb') : tr('aina pohjassa', 'always on')}
       </button>
       <div className="dev-toggles">
       <button
