@@ -194,6 +194,10 @@ kolmeen paikkaan:
   yksin omalla autolla alle rajan. Kello käy lähtövaloista. C-luokkaan
   pääsee ostamalla auton.
 
+**Uusi ura.** Aloitusruudun Uusi ura -nappi aloittaa uran alusta Taunolla:
+autot, rahat, osat, maalit, ajokortit ja kisojen tulokset poistuvat.
+Kysymys vahvistetaan, ja oletus on Ei. Kieli ja ennätykset jäävät.
+
 Kisat on jaettu luokkiin. Kentän autot ovat luokan autoja, ja saman luokan
 myöhemmät kisat ajetaan rakennetummilla autoilla. Jokkisluokassa
 kilpailijoiden autot ovat vakioita loppuun asti: siellä kasvaa vain

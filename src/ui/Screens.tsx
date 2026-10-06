@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { tr, t, lang, setLang } from '../i18n';
 import { fmt, recordKey, type Records } from '../records';
 import { BUILD_NAME } from '../version';
@@ -7,11 +8,12 @@ import { TRACK_BY_ID } from '../game/content/tracks';
 import { CAR_BY_ID } from '../game/content/cars';
 import { EVENT_BY_ID } from '../game/content/events';
 import { LICENCE_BY_CLASS } from '../game/content/licences';
-import { cr, playerCar, type Save } from '../career/save';
+import { cr, hasProgress, playerCar, type Save } from '../career/save';
 import { UpdateBanner } from './Update';
 import { face } from './Dash';
 
-export function Title({ save, onPlay }: { save: Save; onPlay: () => void }) {
+export function Title({ save, onPlay, onReset }: { save: Save; onPlay: () => void; onReset: () => void }) {
+  const [asking, setAsking] = useState(false);
   const car = playerCar(save);
   const fi = lang() === 'fi';
   return (
@@ -46,7 +48,29 @@ export function Title({ save, onPlay }: { save: Save; onPlay: () => void }) {
           EN
         </button>
       </div>
+      {hasProgress(save) && (
+        <button className="btn ghost newcareer" data-track="title-newcareer" onClick={() => setAsking(true)}>
+          {tr('Uusi ura', 'New career')}
+        </button>
+      )}
       <div className="build">{BUILD_NAME}</div>
+      {asking && (
+        <div className="overlay" role="alertdialog" aria-labelledby="newcareer-h" data-ui>
+          <h2 id="newcareer-h">{tr('Uusi ura?', 'New career?')}</h2>
+          <p className="help">
+            {tr(
+              `Poistuu: ${save.cars.length} autoa, ${cr(save.credits)}, osat ja maalaukset, ajokortit ja ${save.races} kisan tulokset. Ura alkaa alusta Taunolla. Asetukset ja ennätykset säilyvät.`,
+              `Lost: ${save.cars.length} ${save.cars.length === 1 ? 'car' : 'cars'}, ${cr(save.credits)}, parts and paint, licences and the results of ${save.races} ${save.races === 1 ? 'race' : 'races'}. The career starts again in the Tauno. Settings and records stay.`,
+            )}
+          </p>
+          <button className="btn primary" autoFocus data-track="newcareer-no" onClick={() => setAsking(false)}>
+            {tr('Ei, jatka uraa', 'No, keep my career')}
+          </button>
+          <button className="btn danger" data-track="newcareer-yes" onClick={onReset}>
+            {tr('Kyllä, aloita alusta', 'Yes, start over')}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

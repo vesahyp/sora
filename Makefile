@@ -14,6 +14,7 @@
 #   make lineup        # every vehicle in the game on one canvas -> shots/lineup.png
 #   make car-shots     # every player car from the race camera, a crop each -> shots/cars/
 #   make touch-check   # drives the race by touch on an emulated phone
+#   make newcareer-check # New career on the title: confirm defaults to No, Yes wipes only the career (iPhone landscape)
 #   make drive-log     # set pieces by touch on a phone, the physics logged (PHYSICS=old for the old model)
 #   make stuck-check   # a wedged car frees itself, on the phone layout (PORT=5187 if 5197 is taken)
 #   make rotate-check  # turning the phone must not break the view (PORT=5187 if 5197 is taken)
@@ -32,7 +33,7 @@ PROFILE ?= personal
 AWS      = AWS_PROFILE=$(PROFILE) aws
 TF       = AWS_PROFILE=$(PROFILE) terraform -chdir=infra
 
-.PHONY: dev build preview check balance shots-setup shots shots-en icon lineup car-shots touch-check drive-log stuck-check rotate-check playthrough pwa-check plan apply outputs env deploy-pixel
+.PHONY: dev build preview check balance shots-setup shots shots-en icon lineup car-shots touch-check newcareer-check drive-log stuck-check rotate-check playthrough pwa-check plan apply outputs env deploy-pixel
 
 dev:
 	npm run dev
@@ -75,6 +76,9 @@ car-shots:
 
 touch-check:
 	node scripts/touch-check.mjs
+
+newcareer-check:
+	node scripts/newcareer-check.mjs
 
 PHYSICS ?= new
 drive-log:

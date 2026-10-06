@@ -4,7 +4,7 @@ import { Title, Result } from './ui/Screens';
 import { Garage, Events, Shop, Paint, Dealer, Licences, Armoury } from './ui/Garage';
 import { loadRecords, saveRace, recordKey, track, type Records } from './records';
 import { ErrorBoundary } from './ui/ErrorBoundary';
-import { loadSave, store, playerCar, currentCar, type Save } from './career/save';
+import { loadSave, resetSave, store, playerCar, currentCar, type Save } from './career/save';
 import { rivalField } from './game/content/rivals';
 import { EVENT_BY_ID, fieldAmmo, type EventDef } from './game/content/events';
 import { LICENCE_BY_CLASS, type LicenceDef } from './game/content/licences';
@@ -69,7 +69,14 @@ function Screens() {
 
   switch (screen.kind) {
     case 'title':
-      return <Title save={save} onPlay={() => setScreen({ kind: 'garage' })} />;
+      return <Title
+          save={save}
+          onPlay={() => setScreen({ kind: 'garage' })}
+          onReset={() => {
+            setSave(resetSave());
+            setScreen({ kind: 'garage' });
+          }}
+        />;
     case 'garage':
       return (
         <Garage

@@ -75,6 +75,21 @@ export function store(s: Save): Save {
   return { ...s };
 }
 
+/** A new career: only the career key goes. Records, language and the installed app stay. */
+export function resetSave(): Save {
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    /* no storage */
+  }
+  return store(newSave());
+}
+
+/** Has the career moved off the start: worth asking before it is wiped. */
+export function hasProgress(s: Save): boolean {
+  return JSON.stringify(s) !== JSON.stringify(newSave());
+}
+
 export function currentCar(s: Save): OwnedCar {
   return s.cars[s.current];
 }
