@@ -206,7 +206,8 @@ async function drive(page, skill) {
       };
       const tick = (now) => {
         requestAnimationFrame(tick);
-        const dt = Math.min(0.1, (now - last) / 1000) * SPEED;
+        // the hand's clock in sim time: the page's own pace (the game pace times ?speed=)
+        const dt = Math.min(0.1, (now - last) / 1000) * (window.__pace ?? SPEED);
         last = now;
         stats.frames++;
         const c = s.cars[0];
@@ -305,7 +306,7 @@ async function drive(page, skill) {
     await page.waitForTimeout(500);
   }
   stats.series = await page.evaluate(() => window.__series);
-  stats.seconds = ((Date.now() - t0) / 1000) * SPEED;
+  stats.seconds = ((Date.now() - t0) / 1000) * (await page.evaluate(() => window.__pace ?? 1));
   stats.meanTick = stats.ticks ? (1000 * stats.seconds) / Math.max(1, stats.frames) : 0;
   return stats;
 }

@@ -3,7 +3,7 @@ import { createState, dispose, placeOf, standings, type Ammo, type Entry, type S
 import { canCarry } from '../game/content/weapons';
 import type { Text } from '../i18n';
 import type { CarDef } from '../game/types';
-import { step, DT } from '../game/sim';
+import { step, DT, GAME_PACE } from '../game/sim';
 import { TRACK_BY_ID } from '../game/content/tracks';
 import { Renderer } from '../render/renderer';
 import { InputController } from '../input/input';
@@ -160,7 +160,9 @@ export function Game({ trackId, car, field, laps, ammo, onEnd, onQuit }: { track
     const bot = params.get('bot') === '1';
     // ?speed=3 runs the bot at triple speed for screenshots; under 1 is slow motion, for a
     // script that drives by touch and cannot keep up with sixty frames a second
-    const speed = Math.max(0.25, Number(params.get('speed') ?? 1));
+    // the game pace (sim.ts) on top: the world runs faster than the wall clock
+    const speed = Math.max(0.25, Number(params.get('speed') ?? 1)) * GAME_PACE;
+    (window as unknown as { __pace: number }).__pace = speed;
     const perf = { frames: 0, ms: 0, worst: 0 };
     (window as unknown as { __perf: typeof perf }).__perf = perf;
 

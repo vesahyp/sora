@@ -83,17 +83,17 @@ in `cars.ts` are honest now: `topSpeed` is the speed the car reaches.
 | Spring rate | N/m per wheel | 37 500 | 30 per kg of car |
 | Damping, compression / rebound | N·s/m per wheel | 7500 / 6250 | 6 / 5 per kg |
 | Most a spring pushes | N per wheel | 36 800 | 3 × the car's weight |
-| Tyre friction coefficient μ | | 1.33 | `grip` / g, times the surface's `grip` |
+| Tyre friction coefficient μ | | 1.83 | `grip` / g, times the surface's `grip` |
 | Peak slip angle, front / rear | rad | 0.13 / 0.07 | the surface's `peak`; the rear is stiffer |
-| Engine force | N | 12 500 | m × `accel`, at the rear wheels |
-| Engine power | kW | 87 | engine force × 0.3 × top speed |
-| Air drag | N·s²/m² | 7.1 | power / top speed³ |
-| Top speed | km/h | 83 | `topSpeed`, emerges from power and drag |
-| Brake force | N | 12 500 | m × `brake`, 60% on the front |
-| Handbrake force | N on the rear wheels | 13 000 | the pedal above 6 m/s: 0.8 × the force that locks them |
+| Engine force | N | 18 750 | m × `accel`, at the rear wheels |
+| Engine power | kW | 141 | engine force × 0.3 × top speed |
+| Air drag | N·s²/m² | 9.0 | power / top speed³ |
+| Top speed | km/h | 90 | `topSpeed`, emerges from power and drag |
+| Brake force | N | 16 250 | m × `brake`, 60% on the front |
+| Handbrake force | N on the rear wheels | 18 000 | the pedal above 6 m/s: 0.8 × the force that locks them |
 | Locked-tyre friction | share of μ | 0.85 | a sliding tyre's friction against a rolling one's |
-| Max steer angle | rad | 0.44 | `turnRate` × 0.17 |
-| Lock at speed | m/s that halves it | 28 | constant |
+| Max steer angle | rad | 0.53 | `turnRate` × 0.17 |
+| Lock at speed | rad | 0.21 at 60 km/h | atan(wheelbase × μg / v²) + 1.3 × front peak − rear peak |
 | Steer rate | rad/s | 5 | constant |
 
 The live values are in `src/game/rig.ts`; the title screen has a
@@ -143,3 +143,26 @@ reached that limit only at 70% of its swing. The lock now halves at
 28 m/s: a 30% swing turns at 0.76 g instead of 0.66, the limit comes at
 half a swing, and a pedal stab at half lock turns the car 1.4 rad, a
 hairpin's worth, as the old model did. 35 m/s turned a stab into a spin.
+
+## Update 2026-10-06, the pace
+
+Vesa: "Same curve. Same push. How can we speed up the pace of the game?
+Its all too sluggish. Like slow motion." His readout: 54 km/h, the
+wheel at full lock (0.29 rad), the fronts at twice their peak slip, the
+car turning at 0.73 rad/s. Three causes, three changes:
+
+- **The lock let a full swing plough.** At twice its peak slip a front
+  tyre scrubs, and the car used 80% of its grip. The rack now gives at
+  each speed the angle the front tyres can use: what the wheelbase needs
+  to turn at the tyres' grip, plus 1.3 times the front's peak slip, less
+  the rear's (`lockAt`, `lockSlip`). A full swing is the car's best turn.
+- **The folk car was slow by its numbers**: 1.3 g of grip and 10 m/s²
+  of pull, against 2.3 to 3 g and 18 to 28 m/s² in C to A. The Tauno now
+  has 1.8 g, 15 m/s² and a 0.53 rad lock, and 90 km/h instead of 83:
+  0 to 60 km/h in 1.7 s instead of 2.7, a right angle at 40 km/h in
+  1.2 s instead of 1.6. The folk rivals share its numbers.
+- **Real scale reads as slow motion from above.** A real car's turn rate
+  is its grip over its speed; a toy car's pace is a matter of scale. The
+  game runs at 1.25 times real time (`GAME_PACE`, sim.ts): every motion
+  alike, every number and check still in the sim's seconds. The camera
+  stays at 14 car widths across: ten hid the bends (2026-10-04).

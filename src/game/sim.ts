@@ -9,6 +9,14 @@ import { LANE_VERGE } from './track';
 import { advance } from './physics';
 
 export const DT = 1 / 60;
+/**
+ * The game pace: sim seconds per real second. The physics is a real car's at a real car's scale,
+ * and seen from above on a phone it read as slow motion (Vesa, 2026-10-06: "Like slow motion");
+ * the world runs this much faster than the wall clock, every motion alike, so the launch, the
+ * turn and the crossing of the screen are all snappier and every number, check and record stays
+ * in the sim's own seconds. The game loop applies it (Game.tsx); nothing in the sim sees it.
+ */
+export const GAME_PACE = 1.25;
 
 /**
  * One fixed step. The car model moves the cars (physics.ts: Rapier's

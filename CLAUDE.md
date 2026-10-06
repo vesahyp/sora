@@ -169,7 +169,9 @@ infra/                Terraform: the tracking pixel host (S3 + CloudFront + logs
    in the renderer.
 2. **Fixed step.** The sim runs at `DT = 1/60`; the render loop accumulates
    real time and calls `step` a whole number of times. Never pass a frame
-   delta into `step`. The car model steps Rapier `SUB` times a frame
+   delta into `step`. The loop runs the sim at `GAME_PACE` (1.25) sim
+   seconds per real second, so the race reads at an arcade pace; every
+   number, check and record is in sim seconds. The car model steps Rapier `SUB` times a frame
    (120 Hz); that is inside `physics.ts` and nothing outside sees it.
    Rapier's WASM is loaded once (`initPhysics()`, before the first
    screen and at the top of every tool), and a race's world is freed

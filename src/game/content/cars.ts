@@ -25,9 +25,10 @@ import type { CarDef } from '../types';
  * (tools/dbg/gripsweep.ts); the drag was not the lever, a third of it moved the lap half a second.
  *
  * The Tauno is slow on purpose (2026-10-05, after the owner played it: "the speed now is like a
- * really upgraded car"). Stock it pulls 10 m/s² and runs out at about 83 km/h on a straight
- * (`topSpeed` is that speed since ADR 0005: rig.ts sets the engine's power and the air's drag
- * to meet there), with 1.3 g of grip;
+ * really upgraded car"). Since 2026-10-06 ("all too sluggish, like slow motion", ADR 0005's
+ * pace update) it is slow on the straight but snappy: 15 m/s² of pull, 90 km/h (`topSpeed` is
+ * the speed it reaches: rig.ts sets the engine's power and the air's drag to meet there), 1.8 g
+ * of grip and a 0.53 rad lock; until then 10 m/s², 83 km/h and 1.3 g;
  * before, 15 m/s², 105 km/h and 1.9 g, and a thumb at that speed got 60 to 80% of the yaw it
  * asked for and ran wide, while a first engine upgrade made the thumb's lap slower, not faster
  * (tools/dbg/jmlaps.ts). The folk class races its own short loops (tracks.ts, the lenkki
@@ -44,11 +45,11 @@ export const CARS: CarDef[] = [
     shape: 'saloon',
     price: 1200,
     blurb: L('Pieni kulmikas jokkisauto: takaveto, pehmeä ja väsynyt. Vuotaa öljyä, ja se on ainoa aseesi.', 'A tiny boxy folk-racing saloon: rear drive, soft and tired. It leaks oil, and that is your only weapon.'),
-    accel: 10,
-    topSpeed: 23.1,
-    brake: 10,
-    turnRate: 2.6,
-    grip: 13,
+    accel: 15,
+    topSpeed: 25,
+    brake: 13,
+    turnRate: 3.1,
+    grip: 18,
     mass: 1.25,
     armour: 0,
     ram: 0,

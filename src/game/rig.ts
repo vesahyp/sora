@@ -55,9 +55,13 @@ export interface Rig {
   handbrakeForce: number;
   /** share of a tyre's friction left when its wheel is locked and sliding */
   lockedGrip: number;
-  /** rad: the wheel's lock at rest; the speed in m/s that halves it; how fast the wheel turns, rad/s */
+  /**
+   * rad: the wheel's lock at rest. At speed the rack gives the angle the front tyres can use
+   * (lockAt): what the wheelbase needs to turn at the tyres' grip, plus `lockSlip` times the front
+   * tyres' peak slip angle. How fast the wheel turns, rad/s
+   */
   maxSteer: number;
-  lockHalf: number;
+  lockSlip: number;
   steerRate: number;
   /** m: the body's box */
   length: number;
@@ -131,7 +135,7 @@ export function rig(def: CarDef): Rig {
     handbrakeForce: HANDBRAKE_SHARE * mass * def.grip,
     lockedGrip: 0.85,
     maxSteer: def.turnRate * LOCK_PER_TURN,
-    lockHalf: 28,
+    lockSlip: 1.3,
     steerRate: 5,
     length: L,
     width: W,
@@ -152,9 +156,19 @@ export function rigOf(def: CarDef): Rig {
   return r;
 }
 
-/** rad: the wheel's lock at this speed, m/s */
+/**
+ * rad: the wheel's lock at this speed, m/s. A full swing of the thumb is the car's best turn on
+ * gravel: the steer a bicycle of this wheelbase needs to corner at the tyres' grip (atan of
+ * wheelbase x grip / v²) plus a little past the front tyres' peak slip angle, less the rear's
+ * (the rear's slip adds to the front's in a turn), so the front works
+ * at its limit and a slide can still be provoked, never ploughing at twice its peak. Before
+ * (2026-10-06, a lock that halved at 28 m/s) a full swing at 54 km/h put the front at twice its
+ * peak slip and the car used 80% of its grip: "same push".
+ */
 export function lockAt(r: Rig, v: number): number {
-  return r.maxSteer / (1 + Math.abs(v) / r.lockHalf);
+  const vv = Math.max(Math.abs(v), 1);
+  // in a steady turn the front's slip is the steer, less the bicycle's angle, plus the rear's slip
+  return Math.min(r.maxSteer, Math.atan((r.wheelbase * r.mu * G) / (vv * vv)) + r.lockSlip * r.peakFront - r.peakRear);
 }
 
 /** N: what the engine pushes with at this forward speed, before the surface, damage and nitro */

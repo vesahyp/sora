@@ -10,8 +10,10 @@ The design is in `docs/design.md`.
   physics"). The scripted thumb says: the yaw rate reaches 63% of its
   turn 0.07 s after the thumb moves, at any swing; the hand laps
   Kiviahon lenkki in 25 to 26 s stock as before. What only a hand can
-  answer, in the readout's terms: is the lock at speed right (0.26 rad at
-  70 km/h, `lockHalf` 28 m/s since "still understeer" on 2026-10-06), does the turn-in at a full swing (the yaw peaks a
+  answer, in the readout's terms: is the pace right (`GAME_PACE` 1.25 in
+  sim.ts, the Tauno's 15 m/s² and 1.8 g since "like slow motion" on
+  2026-10-06), does a full swing turn without ploughing (the rack's
+  `lockSlip` 1.3 in rig.ts), does the turn-in at a full swing (the yaw peaks a
   third over what the car then holds) read as bite or as a twitch, is the
   pedal's tail swing enough (`handbrakeForce`, 0.8 of what locks the
   rear: a stab at 80 km/h at half lock turns the Tauno 1.4 rad, held
@@ -35,7 +37,7 @@ The design is in `docs/design.md`.
   balance`), and every car answers the thumb the same way: the Kortteli
   at 130 km/h may feel twitchy where the Tauno feels right. Playtest
   the first C race in the stock Kortteli before touching anything; the
-  knobs are `lockHalf` in `rig.ts` and `CURVE` in `input.ts`. The step from JM to C is also now a car half again as
+  knobs are `lockSlip` in `rig.ts` and `CURVE` in `input.ts`. The step from JM to C is also now a car half again as
   fast on tracks twice as long: if that is too much at once, slow the
   Kortteli a tenth (`cars.ts`) and the licence targets follow
   (`make balance`, `licences.ts`).
