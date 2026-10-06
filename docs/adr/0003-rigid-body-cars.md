@@ -2,7 +2,7 @@
 adr: 3
 title: Cars are rigid boxes with impulses, on a tyre that lets go smoothly
 date: 2026-10-03
-status: Accepted
+status: Superseded by 0005
 deciders: Vesa
 ---
 
