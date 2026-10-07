@@ -5,11 +5,14 @@ import type { Car, Driver, SimState } from '../state';
 export type Rival = Omit<Driver, 'skill' | 'id'> & { id: string };
 
 /**
- * The field. Three to race against; how hard the bot drives each one is
+ * The field. Seven to race against, eight cars on the road (Vesa,
+ * 2026-10-05); how hard the bot drives each one is
  * the vehicle's `skill` in rivals.ts, per class. Aggression is how fast a
  * grudge builds and how hard the bot leans, blocks and punts: Jorma is
  * cold and fast and mostly just drives, Marko is the brawler who
- * remembers every knock, Tapsa is timid. The player is red; these
+ * remembers every knock, Tapsa is timid, Raimo is a farmer who pushes
+ * back, Pirkko drives clean and fast, Seppo is an old hand who keeps out
+ * of trouble, Kalevi is Marko without the manners. The player is red; these
  * colours stay clear of it, and each rival's vehicles (rivals.ts) are
  * painted in their driver's hue.
  */
@@ -17,6 +20,10 @@ export const OPPONENTS: Rival[] = [
   { id: 'jorma', name: L('Jorma'), aggression: 0.6, colour: '#2f6fd6' },
   { id: 'marko', name: L('Marko'), aggression: 1.5, colour: '#e0b030' },
   { id: 'tapsa', name: L('Tapsa'), aggression: 0.4, colour: '#f2f2ea' },
+  { id: 'raimo', name: L('Raimo'), aggression: 1.1, colour: '#3f9a3c' },
+  { id: 'pirkko', name: L('Pirkko'), aggression: 0.8, colour: '#8b55c8' },
+  { id: 'seppo', name: L('Seppo'), aggression: 0.5, colour: '#23a6a6' },
+  { id: 'kalevi', name: L('Kalevi'), aggression: 1.3, colour: '#45484e' },
 ];
 
 /**

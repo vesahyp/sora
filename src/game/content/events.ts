@@ -2,6 +2,7 @@ import { L, type Text } from '../../i18n';
 import type { CarClass } from '../types';
 import { STOCK, type Parts } from './parts';
 import { carried } from './weapons';
+import { OPPONENTS } from './drivers';
 
 /**
  * The calendar. An event is a track, a lap count, a class, and the
@@ -49,12 +50,15 @@ export const EVENTS: EventDef[] = [
   // on the JM skills in rivals.ts. At 0.4 the rivals lap Kiviahon lenkki in about 29 s against a
   // new thumb's 25, which is what a thumb that starts last and fights through the pack needs to
   // win from any grid; the scale climbs a race at a time to 0.85 at the final, where the field
-  // also has the parts a winning Tauno has, and the final is won or lost by a lap's tenths
+  // also has the parts a winning Tauno has, and the final is won or lost by a lap's tenths. With
+  // the field at seven (2026-10-07) the best of seven runs faster than the best of three, and the
+  // built Tauno was top two in the final once in six: the Wade came down to 0.55, the final to 0.75
+  // (tools/dbg/folk8.ts)
   { id: 'jm-kiviaho', name: L('Kiviahon jokkis', 'Kiviaho Folk Race'), cls: 'JM', trackId: 'kiviaho-lenkki', laps: 3, prizes: purse(300), fieldParts: stock, fieldSkill: 0.4 },
   { id: 'jm-hirvisuo', name: L('Hirvisuon jokkis', 'Hirvisuo Folk Race'), cls: 'JM', trackId: 'hirvisuo-lenkki', laps: 3, prizes: purse(450), fieldParts: stock, fieldSkill: 0.45 },
-  { id: 'jm-kiviaho-4', name: L('Kiviahon kahlaus', 'Kiviaho Wade'), cls: 'JM', trackId: 'kiviaho-lenkki', laps: 4, prizes: purse(600), fieldParts: stock, fieldSkill: 0.6 },
+  { id: 'jm-kiviaho-4', name: L('Kiviahon kahlaus', 'Kiviaho Wade'), cls: 'JM', trackId: 'kiviaho-lenkki', laps: 4, prizes: purse(600), fieldParts: stock, fieldSkill: 0.55 },
   { id: 'jm-hirvisuo-4', name: L('Hirvisuon pitkä jokkis', 'Hirvisuo Long Folk Race'), cls: 'JM', trackId: 'hirvisuo-lenkki', laps: 4, prizes: purse(800), fieldParts: stock, fieldSkill: 0.75 },
-  { id: 'jm-final', name: L('Jokkisfinaali', 'Folk Race Final'), cls: 'JM', trackId: 'kiviaho-lenkki', laps: 6, prizes: purse(1200), fieldParts: jmFinal, fieldSkill: 0.85 },
+  { id: 'jm-final', name: L('Jokkisfinaali', 'Folk Race Final'), cls: 'JM', trackId: 'kiviaho-lenkki', laps: 6, prizes: purse(1200), fieldParts: jmFinal, fieldSkill: 0.75 },
   { id: 'c-kiviaho', name: L('Kiviahon sprintti', 'Kiviaho Sprint'), cls: 'C', trackId: 'kiviaho', laps: 3, prizes: purse(1200), fieldParts: stock, fieldSkill: 0.9 },
   { id: 'c-hirvisuo', name: L('Hirvisuon ajot', 'Hirvisuo Trophy'), cls: 'C', trackId: 'hirvisuo', laps: 3, prizes: purse(2200), fieldParts: stock },
   { id: 'c-kiviaho-5', name: L('Kiviahon kuntoajo', 'Kiviaho Endurance'), cls: 'C', trackId: 'kiviaho', laps: 5, prizes: purse(3400), fieldParts: some },
@@ -81,3 +85,26 @@ export function fieldAmmo(e: EventDef): { oil: number; mines: number; missiles: 
 }
 
 export const EVENT_BY_ID: Record<string, EventDef> = Object.fromEntries(EVENTS.map((e) => [e.id, e]));
+
+/** the field carries what this many rivals each carried when the field was three (2026-10-07) */
+const BOOTS = 3;
+
+/**
+ * What each rival takes into an event, by their place in OPPONENTS: the field as a whole carries
+ * BOOTS times fieldAmmo, dealt one item at a time from the most aggressive driver down. With all
+ * seven carrying a full boot the hand spent 5 to 17 s a folk race on oil and rolled in the pack
+ * (tools/dbg/folk8.ts), and the bot player was wrecked two to three times as often in B and A.
+ */
+export function fieldBoots(e: EventDef): { oil: number; mines: number; missiles: number }[] {
+  return dealBoots(fieldAmmo(e));
+}
+
+/** `each` times BOOTS dealt over the rivals, most aggressive first, by their place in OPPONENTS */
+export function dealBoots(each: { oil: number; mines: number; missiles: number }): { oil: number; mines: number; missiles: number }[] {
+  const boots = OPPONENTS.map(() => ({ oil: 0, mines: 0, missiles: 0 }));
+  const order = OPPONENTS.map((r, i) => ({ r, i })).sort((a, b) => b.r.aggression - a.r.aggression).map((x) => x.i);
+  for (const k of ['oil', 'mines', 'missiles'] as const) {
+    for (let n = 0; n < each[k] * BOOTS; n++) boots[order[n % order.length]][k]++;
+  }
+  return boots;
+}

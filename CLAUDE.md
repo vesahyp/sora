@@ -22,8 +22,8 @@ wreck each other and come back. Finnish gravel roads, nineties cars.
 Four tracks, each with a river to jump and a crest, two of them short folk-class loops
 of about 400 m, and a shortcut through the forest on the Kiviaho ones; four
 classes with a car each and a wild buy beside it (a tractor, a monster
-truck, a hearse), rivals in tractors, buses and plough lorries, a field of four with the bot driving the other
-three, and a career that starts in jokamiesluokka (folk racing) in a
+truck, a hearse), rivals in tractors, buses and plough lorries, a field of eight with the bot driving the other
+seven, and a career that starts in jokamiesluokka (folk racing) in a
 tired old saloon whose only weapon is the oil it leaks: credits from
 results, a parts shop, an armoury, a dealer, and licence tests that
 gate the upper classes; weapons and parts arrive by class (ADR 0004,

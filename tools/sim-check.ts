@@ -16,7 +16,7 @@ import { PICKUPS } from '../src/game/content/pickups';
 import { standings } from '../src/game/state';
 import { STOCK, tuned } from '../src/game/content/parts';
 import { RIVAL_CARS, rivalEntry, rivalField, vehicleDef } from '../src/game/content/rivals';
-import { EVENTS, fieldAmmo } from '../src/game/content/events';
+import { EVENTS, dealBoots, fieldBoots } from '../src/game/content/events';
 import { CLASSES } from '../src/game/types';
 import { canCarry, carried } from '../src/game/content/weapons';
 import { Hand } from './hand';
@@ -78,6 +78,8 @@ const NEW_PLAYER_SKILL = 0.5;
 /** the thumbs (the hand's seed) that race each folk event in the first-races check, from each of three grids */
 const FOLK_THUMBS = 4;
 const newPlayer = (s: ReturnType<typeof createState>, hand: Hand) => hand.input(s, s.cars[0], DT);
+/** a grid order of the seven opponents: the field turned k slots */
+const rotation = (k: number): number[] => OPPONENTS.map((_, i) => (i + k) % OPPONENTS.length);
 
 // the full workout on the class cars, the career's spine; the dealer's wild buys are lapped alone below
 for (const track of TRACKS) {
@@ -159,14 +161,16 @@ for (const track of TRACKS) {
       assert(inLane > 60 * 3, `${track.id}/${car.id}: the bot takes the shortcut every lap (${(inLane / 60).toFixed(1)} s in it)`);
       assert(saved > 0.3 && saved < 3, `${track.id}/${car.id}: the shortcut is worth taking and not a free lap (saves ${saved.toFixed(2)} s)`);
     }
-    // then the race: four bots, armed with what the class carries (oil in JM, mines and the
+    // then the race: eight bots, armed with what the class carries (oil in JM, mines and the
     // gun from C, missiles from B), so the race is tested with its weapons in. One race is
-    // chaos (a wreck early moves everything after it), so it is run in every grid order of the
-    // three opponents, everyone must finish each, and the view is the average.
+    // chaos (a wreck early moves everything after it), so it is run from six grid orders of the
+    // seven opponents (each one turned a slot), everyone must finish each, and the view is the average.
     const guns = canCarry(car.cls, 'mine');
     const parts = guns ? { ...STOCK, gun: 1 } : STOCK;
     const armed = tuned(car, parts);
     const boot = carried(car.cls, { oil: 2, mines: 2, missiles: 2 });
+    // the field carries three such boots between them, as the game deals it (events.ts)
+    const boots = dealBoots(boot);
     let racing = 0;
     let onScreen = 0;
     let inSights = 0;
@@ -175,7 +179,7 @@ for (const track of TRACKS) {
     let stalled = 0;
     let fightCredits = 0;
     let roadCredits = 0;
-    const orders = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+    const orders = [0, 1, 2, 3, 4, 5].map(rotation);
     // C is chaos (the block at the end): its races are run three times over with a hair of skill
     // on the rivals, and the places and the money are read over all of them; the race logs and the
     // per-race asserts come from the first run, as before
@@ -184,7 +188,7 @@ for (const track of TRACKS) {
     for (const grid of orders) {
       const first = rep === 0;
       // every rival in their own vehicle at its class's skill: the class car's numbers under their body and mass
-      const race = createState(track, armed, 3, grid.map((k) => { const e = rivalEntry(OPPONENTS[k], car.cls, parts); return { ...e, driver: { ...e.driver, skill: e.driver.skill + rep * 0.003 }, ...boot }; }), boot);
+      const race = createState(track, armed, 3, grid.map((k) => { const e = rivalEntry(OPPONENTS[k], car.cls, parts); return { ...e, driver: { ...e.driver, skill: e.driver.skill + rep * 0.003 }, ...boots[k] }; }), boot);
       let drifting = 0;
       let boosts = 0;
       let slicks = 0;
@@ -216,7 +220,7 @@ for (const track of TRACKS) {
       const shots = race.cars.reduce((a, c) => a + c.shots, 0);
       const wrecks = race.cars.reduce((a, c) => a + c.wrecked, 0);
       const cash = race.cars.reduce((a, c) => a + c.cash, 0);
-      const oils = race.cars.reduce((a, c) => a + (boot.oil - c.oil), 0);
+      const oils = race.cars.reduce((a, c, i) => a + ((i ? boots[grid[i - 1]].oil : boot.oil) - c.oil), 0);
       if (first) {
         console.log(`  guns:  ${shots} rounds, ${oils} cans of oil, ${(slicks / 60).toFixed(0)} s on oil, ${wrecks} wrecks, ${(drifting / 60).toFixed(0)} s sliding, ${(boosts / 60).toFixed(0)} s of nitro, ${cash} cr off the road, damage ${race.cars.map((c) => Math.round(c.damage)).join('/')}`);
         if (guns) assert(shots > 0, `${track.id}/${car.id}: the guns fire (${shots} rounds)`);
@@ -327,7 +331,7 @@ for (const track of TRACKS) {
 // the career's curve, read off the player's results: the default bot (skill 1) is a fair
 // stand-in for a player who has learnt the car. JM must be won easily from the back of the
 // grid, C fought for, A not handed over
-console.log('\nthe player against the field, the default bot driving, every grid order (J M T = Jorma Marko Tapsa)');
+console.log('\nthe player against the field, the default bot driving, six grid orders (initials of the seven rivals)');
 for (const track of TRACKS) {
   for (const cls of CLASSES) {
     const rs = results.filter((r) => r.track === track.id && r.cls === cls);
@@ -372,11 +376,11 @@ console.log('\nthe first races as a new player: the hand in the Tauno with the p
     const gaps: number[] = [];
     const thumbs = stage ? FOLK_THUMBS : 1;
     for (let thumb = 0; thumb < thumbs; thumb++)
-    for (const grid of [[0, 1, 2], [1, 2, 0], [2, 0, 1]]) {
+    for (const grid of [0, 2, 4].map(rotation)) {
       const field = rivalField(e.cls, e.fieldParts, e.fieldSkill ?? 1);
       // the field's boot as the game packs it (one can of oil each in the early folk races); the player's own is a new career's
-      const boot = fieldAmmo(e);
-      const race = createState(track, mine, e.laps, grid.map((k) => ({ ...field[k], ...boot })), carried(e.cls, { oil: 3, mines: 1, missiles: 1 }));
+      const boots = fieldBoots(e);
+      const race = createState(track, mine, e.laps, grid.map((k) => ({ ...field[k], ...boots[k] })), carried(e.cls, { oil: 3, mines: 1, missiles: 1 }));
       const hand = stage ? new Hand(stage.skill, 1234 + thumb * 7919) : null;
       while (race.cars.some((c) => c.finishedAt < 0) && race.time < 900) step(race, race.cars.map((c, i) => (i === 0 && hand ? newPlayer(race, hand) : botInput(race, c))), DT);
       const me = race.cars[0];
@@ -388,12 +392,15 @@ console.log('\nthe first races as a new player: the hand in the Tauno with the p
     if (stage) {
       const n = jm - 1;
       const k = places.length;
-      const won = places.filter((p) => p === 1).length;
       const top2 = places.filter((p) => p <= 2).length;
+      const top3 = places.filter((p) => p <= 3).length;
       const last = places.filter((p) => p === OPPONENTS.length + 1).length;
-      if (n < 2) assert(won >= (k * 2) / 3, `${e.id}: a new player wins the folk race two times in three (${won} of ${k})`);
-      else if (n < 4) assert(top2 >= (k * 5) / 6, `${e.id}: a player with his first parts is top two five times in six (${top2} of ${k})`);
-      else assert(top2 >= k / 2, `${e.id}: the final is a fight, top two in half the races (${top2} of ${k})`);
+      // with eight cars (2026-10-07) a race in four is lost in the pack from the back of the grid,
+      // stuck 8 to 12 s among the field, whatever the field's pace (tools/dbg/folk8.ts); with four
+      // the rules were a win two times in three, then top two five in six, then top two in half
+      if (n < 2) assert(top3 >= k / 2, `${e.id}: a new player is top three in half the folk races (${top3} of ${k})`);
+      else if (n < 4) assert(top2 >= (k * 2) / 3, `${e.id}: a player with his first parts is top two two times in three (${top2} of ${k})`);
+      else assert(top3 >= k / 2, `${e.id}: the final is a fight, top three in half the races (${top3} of ${k})`);
       assert(last <= k / 6, `${e.id}: a new player is last in at most one race in six (${last} of ${k})`);
     }
   }
@@ -406,11 +413,14 @@ console.log('\nthe first races as a new player: the hand in the Tauno with the p
 // (2026-10-06, physics.ts SCRUB) a slide costs speed, and the player's stand-in, which drives at
 // the limit and is the one the field goes for, pays for it: over 36 C races its top-two rate went
 // from 72% to 58%, and neither a slower field nor a wider corner margin on the bot buys it back
-// (grid2.ts). So the twelve races are run three times over above, and it is held at half
+// (grid2.ts). So the twelve races are run three times over above, and it is held at half.
+// With eight cars (2026-10-07) the rule is the top three: a rival on the front row leads from the
+// lights while the stand-in climbs through six cars, and the top two sat at half (grid2.ts, 6 of 12
+// twice) where the top three was 9 of 12
 {
   const cs = results.filter((r) => r.cls === 'C');
-  const top = cs.filter((r) => r.place <= 2).length;
-  assert(top >= cs.length / 2, `C: the player finishes in the top two in half the races over both tracks, three runs each (${top} of ${cs.length})`);
+  const top = cs.filter((r) => r.place <= 3).length;
+  assert(top >= cs.length / 2, `C: the player finishes in the top three in half the races over both tracks, three runs each (${top} of ${cs.length})`);
 }
 
 console.log('');

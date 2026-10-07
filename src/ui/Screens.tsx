@@ -135,7 +135,7 @@ export function Result({ r, purpose, prize, repair, passed, set, records, onAgai
   const total = r.laps.reduce((a, b) => a + b, 0);
   const best = Math.min(...r.laps);
   const licence = purpose.kind === 'licence';
-  const placeWord = [tr('Voitto!', 'Winner!'), tr('Toinen', 'Second'), tr('Kolmas', 'Third'), tr('Neljäs', 'Fourth')][r.place - 1] ?? `${r.place}.`;
+  const placeWord = [tr('Voitto!', 'Winner!'), tr('Toinen', 'Second'), tr('Kolmas', 'Third'), tr('Neljäs', 'Fourth'), tr('Viides', 'Fifth'), tr('Kuudes', 'Sixth'), tr('Seitsemäs', 'Seventh'), tr('Kahdeksas', 'Eighth')][r.place - 1] ?? `${r.place}.`;
   const title = licence ? (passed ? tr('Ajokortti on sinun!', 'Licence earned!') : tr('Ei riittänyt', 'Not enough')) : placeWord;
   const where = purpose.kind === 'event' ? t(EVENT_BY_ID[purpose.id].name) : t(LICENCE_BY_CLASS[purpose.cls]!.name);
   const net = prize + r.bounty + r.ramCash + r.cash - repair;

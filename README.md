@@ -52,9 +52,12 @@ on poljin, X tai ylös on nitro.
 
 ## Kisa
 
-Kolme kierrosta, neljä autoa, ja kaikki yrittävät romuttaa toisensa.
+Kolme kierrosta, kahdeksan autoa, ja kaikki yrittävät romuttaa toisensa.
 **Lähdet viimeisenä**: kisa on nousu kentän läpi. Jorma ajaa kovaa ja
 kylmästi, Marko on tappelija, Tapsa on arka kuski jonka ohitat ensin.
+Raimo on vihreällä isäntä, joka tönäisee takaisin, Pirkko ajaa violetilla
+puhtaasti ja nopeasti, Seppo turkoosilla farmarilla pysyy poissa
+rytäkästä, ja Kalevi mustalla on Marko ilman tapoja.
 Kuskit paranevat luokka luokalta: jokkiksessa he ovat viikonloppukuskeja,
 jotka heiluvat, jarruttavat myöhään, ajavat leveäksi ja unohtavat öljyn,
 ja A-luokassa he ajavat niin kovaa kuin osaavat ja kostavat kaiken.

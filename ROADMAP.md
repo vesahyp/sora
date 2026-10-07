@@ -5,6 +5,21 @@ The design is in `docs/design.md`.
 
 ## Next
 
+- **The first folk race in a pack of eight** (2026-10-07). From the back
+  of eight on a 400 m loop, the new thumb (`tools/hand.ts` at 0.5) is
+  stuck 8 to 12 s in the pack in about half the first races and finishes
+  P4 to P7; with four cars it won two in three. The rival field carries
+  three boots between them (`fieldBoots`, `events.ts`), so it is not the
+  oil. If the first race should be won by learning the car, the knob is
+  the field's size per event (four in the first race, eight by the
+  final) or the player's grid slot (`createState`, `state.ts`).
+  `tools/dbg/folk8.ts` reads it in a few minutes.
+- **Seven guns on the player in B and A** (2026-10-07). With the mines
+  and missiles dealt over the field, the bot player is still wrecked
+  about 3.5 times a race in B and A (2 with four cars), since every
+  rival has the machine gun fitted (`sim-check`'s view lines). Play a B
+  race before touching it; the knobs are the gun on the field's parts
+  (`fieldParts` in `events.ts`) or the gun's damage (`weapons.ts`).
 - **The 3D view on an older phone** (ADR 0006, 2026-10-06): at a quarter
   CPU speed the chase view runs 55 frames a second with one frame in
   fifteen two refreshes long; the game's own work is 10.8 ms a frame,

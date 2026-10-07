@@ -6,7 +6,7 @@ import { loadRecords, saveRace, recordKey, track, type Records } from './records
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { loadSave, resetSave, store, playerCar, currentCar, type Save } from './career/save';
 import { rivalField } from './game/content/rivals';
-import { EVENT_BY_ID, fieldAmmo, type EventDef } from './game/content/events';
+import { EVENT_BY_ID, fieldBoots, type EventDef } from './game/content/events';
 import { LICENCE_BY_CLASS, type LicenceDef } from './game/content/licences';
 import { CAR_BY_ID } from './game/content/cars';
 import { partPrice, STOCK, type PartKind } from './game/content/parts';
@@ -55,8 +55,8 @@ function Screens() {
   const enter = (e: EventDef) => {
     // every rival in their own vehicle, on the class car's numbers; the field carries what its
     // class allows, more as the cars get built
-    const ammo = fieldAmmo(e);
-    const field: Entry[] = rivalField(e.cls, e.fieldParts, e.fieldSkill ?? 1).map((r) => ({ ...r, ...ammo }));
+    const boots = fieldBoots(e);
+    const field: Entry[] = rivalField(e.cls, e.fieldParts, e.fieldSkill ?? 1).map((r, k) => ({ ...r, ...boots[k] }));
     setScreen({ kind: 'race', purpose: { kind: 'event', id: e.id }, trackId: e.trackId, car: playerCar(save), field, laps: e.laps });
   };
   const take = (l: LicenceDef) => {

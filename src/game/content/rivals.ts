@@ -11,12 +11,20 @@ import { tuned, type Parts } from './parts';
  * Beetle, a saloon, a rally car and a hearse; Marko, the brawler, in
  * whatever shoves hardest: a tiny van, a Valmet tractor, a monster truck,
  * a lorry with a snowplough blade; Tapsa, timid, in a mopoauto, a Niva,
- * a country bus (he cannot pass, so he blocks) and a coupe. In every
- * class the four bodies on the grid differ, every grid has at least one
- * machine that is not a car (Hill Climb Racing's garage, the owner on
- * 2026-10-04: "i want tractors, monster trucks, wild stuff"), and no
- * rival drives the same body twice, so a body in a driver's colour is
- * one vehicle.
+ * a country bus (he cannot pass, so he blocks) and a coupe. The four
+ * who joined when the field grew to eight (2026-10-07): Raimo in what a
+ * farm owns, a pickup, a van, a big Valmet; Pirkko in quick saloons;
+ * Seppo in an estate in every class; Kalevi in a scrapyard hatch, then
+ * pickups, then a black monster truck. In every class the bodies of the
+ * seven rivals differ from each other and from the class car, and every
+ * grid has at least one machine that is not a car (Hill Climb Racing's
+ * garage, the owner on 2026-10-04: "i want tractors, monster trucks,
+ * wild stuff"). Seven drivers over fifteen bodies repeat a body across
+ * drivers in different classes; the driver's colour tells them apart.
+ * The four sit at the slow end of each class's skills: they are the pack
+ * the player climbs through, and Jorma, Marko and Tapsa still set the
+ * front. Inside the old three's range they put the bot player in C's top
+ * two four times in twelve (tools/dbg/grid2.ts, 2026-10-07).
  *
  * Size climbs with the class, Hill Climb Racing's first jeep to its
  * monster: JM cars are tiny boxes, 2.4 to 3.2 m (a mopoauto, a Fiat
@@ -100,6 +108,31 @@ export const RIVAL_CARS: Record<string, Record<CarClass, Vehicle>> = {
     B: { shape: 'bus', name: L('Linja-auto'), colour: '#e6e4d8', accent: '#2f6f8a', livery: 'band', number: 18, length: 7.5, width: 2.3, massScale: 3.0, pace: { top: 0.86, accel: 0.8, turn: 1.3 }, skill: 0.8 },
     A: { shape: 'coupe', name: L('Liitäjä'), colour: '#f2f2ea', accent: '#d06a2a', livery: 'split', number: 5, length: 4.7, width: 1.8, massScale: 1.05, skill: 0.86 },
   },
+  raimo: {
+    JM: { shape: 'pickup', name: L('Lava'), colour: '#3f9a3c', accent: '#d8d2bc', livery: 'band', number: 7, length: 3.1, width: 1.5, massScale: 1.05, skill: 0.72 },
+    C: { shape: 'van', name: L('Paku'), colour: '#3a8f38', accent: '#d8d2bc', livery: 'band', number: 17, length: 4.0, width: 1.75, massScale: 1.2, pace: { top: 0.95 }, skill: 0.4 },
+    B: { shape: 'tractor', name: L('Iso Valmet'), colour: '#3f9a3c', accent: '#2c2a26', livery: 'roof', number: 77, length: 4.4, width: 2.2, massScale: 2.0, pace: { top: 0.7, accel: 1.15, turn: 1.4 }, offroad: 0.85, skill: 0.78 },
+    A: { shape: 'pickup', name: L('Avolava'), colour: '#357f33', accent: '#d8d2bc', livery: 'stripe', number: 70, length: 5.0, width: 1.9, massScale: 1.3, pace: { top: 0.97 }, offroad: 0.4, skill: 0.84 },
+  },
+  pirkko: {
+    JM: { shape: 'coupe', name: L('Kupee'), colour: '#8b55c8', accent: '#e6dfcc', livery: 'twin', number: 9, length: 3.1, width: 1.45, massScale: 0.95, skill: 0.75 },
+    C: { shape: 'rally', name: L('Ralli'), colour: '#7f4dba', accent: '#e6dfcc', livery: 'works', number: 29, length: 4.0, width: 1.7, massScale: 1, skill: 0.44 },
+    B: { shape: 'saloon', name: L('Sedan'), colour: '#8b55c8', accent: '#e6dfcc', livery: 'twin', number: 19, length: 4.6, width: 1.8, massScale: 1.05, skill: 0.8 },
+    A: { shape: 'saloon', name: L('Pikataksi'), colour: '#7a46b4', accent: '#e8c040', livery: 'checker', number: 1, length: 4.8, width: 1.8, massScale: 1.05, skill: 0.86 },
+  },
+  seppo: {
+    JM: { shape: 'estate', name: L('Farmari'), colour: '#23a6a6', accent: '#e6dfcc', livery: 'roof', number: 51, length: 3.2, width: 1.5, massScale: 1.05, pace: { top: 0.97 }, skill: 0.68 },
+    C: { shape: 'estate', name: L('Farmari'), colour: '#219a9a', accent: '#e6dfcc', livery: 'roof', number: 15, length: 4.1, width: 1.7, massScale: 1.1, skill: 0.36 },
+    B: { shape: 'estate', name: L('Farmari'), colour: '#23a6a6', accent: '#e6dfcc', livery: 'band', number: 55, length: 4.7, width: 1.8, massScale: 1.15, skill: 0.74 },
+    A: { shape: 'estate', name: L('Kaksoistuki'), colour: '#1f9494', accent: '#2c2a26', livery: 'band', number: 50, length: 4.9, width: 1.85, massScale: 1.15, skill: 0.8 },
+  },
+  kalevi: {
+    // the heaviest in the folk class, and he knows it
+    JM: { shape: 'hatch', name: L('Romu'), colour: '#45484e', accent: '#c87a2a', livery: 'primer', number: 13, length: 3.0, width: 1.45, massScale: 1.1, skill: 0.7 },
+    C: { shape: 'pickup', name: L('Lava-auto'), colour: '#45484e', accent: '#c87a2a', livery: 'split', number: 31, length: 3.9, width: 1.75, massScale: 1.3, pace: { top: 0.96 }, skill: 0.38 },
+    B: { shape: 'pickup', name: L('Avolava'), colour: '#3e4147', accent: '#c87a2a', livery: 'stripe', number: 13, length: 4.8, width: 1.9, massScale: 1.35, pace: { top: 0.97 }, offroad: 0.4, skill: 0.76 },
+    A: { shape: 'monster', name: L('Musta Monsteri'), colour: '#45484e', accent: '#c87a2a', livery: 'split', number: 13, length: 4.8, width: 2.6, massScale: 2.1, pace: { top: 0.96, grip: 0.92 }, offroad: 0.6, spinOnShunt: true, skill: 0.82 },
+  },
 };
 
 /** The rival's vehicle as a def: the class car built to `parts`, under this body, bent to the machine. */
@@ -136,7 +169,6 @@ export function rivalEntry(rival: Rival, cls: CarClass, parts: Parts, skillScale
   return { driver: { ...rival, skill: Math.min(1, v.skill * skillScale) }, car: vehicleDef(v, cls, parts) };
 }
 
-/** The field for a race: every rival in their own vehicle. */
 /** The field of a race: every rival in that class's vehicle, built to `parts`, driving at `skillScale` of its skill (EventDef.fieldSkill). */
 export function rivalField(cls: CarClass, parts: Parts, skillScale = 1): { driver: Driver; car: CarDef }[] {
   return OPPONENTS.map((rival) => rivalEntry(rival, cls, parts, skillScale));
