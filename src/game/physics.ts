@@ -47,6 +47,14 @@ const CAR_FRICTION = 0.25;
 const TREE_FRICTION = 0.12;
 /** m: the radius of the body's edges: 0.3 let a car ride up onto another in a T-bone */
 const BODY_ROUND = 0.1;
+/**
+ * the roof and the upper sides against the ground, a rolled car: gravel on paint and steel. The sills
+ * and the floor stay frictionless: with the whole body at 0.7, two cars in five folk races caught a
+ * sill on a bump and rolled (tools/dbg/rolls.ts, 2026-10-07)
+ */
+const ROOF_ON_GROUND = 0.7;
+/** m the roof stands out of the body */
+const ROOF_PROUD = 0.02;
 /** a landing harder than this, m/s down, costs damage */
 const LAND_HURT = 7;
 /** a spun car's tyres keep this share of their friction at the start of the spin */
@@ -190,7 +198,8 @@ function strip(world: RAPIER.World, rows: [number, number, number][][], closed: 
     RAPIER.ColliderDesc.trimesh(verts, new Uint32Array(idx), RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES)
       // the tyres are rays with their own friction (the vehicle controller); this is only what the
       // body itself meets when it touches down, and it slides: a car shoved sideways in a T-bone
-      // caught the ground with its sill and was tipped onto its side (tools/dbg/tbone.ts)
+      // caught the ground with its sill and was tipped onto its side (tools/dbg/tbone.ts). The roof
+      // brings its own friction (carBody)
       .setFriction(0)
       .setCollisionGroups(groups(GROUND, CAR | WRECK)),
   );
@@ -276,6 +285,19 @@ function carBody(world: RAPIER.World, t: Track, c: Car): Body {
       .setCollisionGroups(CAR_GROUPS),
     body,
   );
+  // the roof: the body's upper half again, meeting only the ground, with friction. A car on its roof
+  // or its side scrapes to a stop; with the body frictionless it slid away like on ice (Vesa, 2026-10-07)
+  world.createCollider(
+    // ROOF_PROUD over the body's top and sides, so the ground meets it and not the frictionless body
+    RAPIER.ColliderDesc.roundCuboid(r.length / 2 - BODY_ROUND, r.width / 2 + ROOF_PROUD - BODY_ROUND, r.height / 4 - BODY_ROUND, BODY_ROUND)
+      .setTranslation(0, 0, CLEARANCE + (r.height * 3) / 4 + ROOF_PROUD - origin)
+      .setDensity(0)
+      .setFriction(ROOF_ON_GROUND)
+      .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Max)
+      .setRestitution(0)
+      .setCollisionGroups(groups(CAR, GROUND)),
+    body,
+  );
   const vehicle = world.createVehicleController(body);
   vehicle.indexUpAxis = 2;
   vehicle.setIndexForwardAxis = 0;
@@ -345,6 +367,18 @@ export function carPose(s: SimState, i: number): { x: number; y: number; z: numb
 export function rigInRace(s: SimState, i: number): Rig {
   return s.world.bodies[i].rig;
 }
+/** Put a rolled car back on its wheels where it lies, facing the way it faced, at a standstill. */
+export function rightCar(s: SimState, i: number): void {
+  const c = s.cars[i];
+  const b = s.world.bodies[i];
+  const z = s.track.terrainAt(c.x, c.y) + b.origin + 0.3;
+  b.body.setTranslation({ x: c.x, y: c.y, z }, true);
+  b.body.setRotation(yawQuat(c.heading), true);
+  b.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+  b.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+  readBack(c, b, s.track, 0);
+}
+
 export function setRigInRace(s: SimState, i: number, r: Rig): void {
   applyRig(s.world.bodies[i], r);
 }
@@ -583,6 +617,9 @@ function readBack(c: Car, b: Body, t: Track, dt: number, u?: Under): void {
     c.wheelSlip[i] = Math.hypot(wf, wl) > 0.5 ? Math.atan2(wl, Math.abs(wf)) : 0;
   }
   c.air = contact === 0;
+  // how upright the body is: 1 on its wheels, 0 on its side, -1 on its roof
+  const q = b.body.rotation();
+  c.up = 1 - 2 * (q.x * q.x + q.y * q.y);
   c.steer = b.rig.maxSteer > 0 ? c.steerAngle / b.rig.maxSteer : 0;
   c.slipAngle = Math.abs(fwd) > 1 ? Math.atan2(lat, Math.abs(fwd)) : 0;
   const peakF = b.rig.peakFront * ((u?.front.peak ?? SURFACES.gravel.peak) / SURFACES.gravel.peak);

@@ -333,6 +333,32 @@ for (const p of pieces) {
   assert(half.out > 0 && half.out < 4, `and drives out up the far bank (${f(half.out, 2)} s in the water)`);
 }
 
+// 7c. a car on its roof scrapes to a stop on the gravel rather than sliding on as on ice, and the
+// marshals put it back on its wheels within two seconds (Vesa, 2026-10-07: "just slides around like on ice")
+{
+  const s = setup(oval(20), { s: 60, v: 14 }, CAR_BY_ID.tauno);
+  const c = s.cars[0];
+  const b = s.world.bodies[0];
+  // a step first: placing the car is a teleport the next step puts into the body, upright
+  run(s, DT, () => [go(0, 0)]);
+  const p = b.body.translation();
+  // upside down: half a turn about the car's own length, the body a metre up
+  const h = c.heading;
+  const yawQ = { w: Math.cos(h / 2), z: Math.sin(h / 2) };
+  b.body.setRotation({ w: 0, x: yawQ.w, y: yawQ.z, z: 0 }, true);
+  b.body.setTranslation({ x: p.x, y: p.y, z: p.z + 1 }, true);
+  let upMin = 1;
+  let v05 = -1;
+  let righted = -1;
+  run(s, 3, () => [go(0, 0)], (t) => {
+    upMin = Math.min(upMin, c.up);
+    if (v05 < 0 && t >= 1.4) v05 = speed(c);
+    if (righted < 0 && upMin < 0 && c.up > 0.9) righted = t;
+  });
+  assert(upMin < -0.5 && v05 >= 0 && v05 < 14 * 0.6, `a Tauno dropped on its roof at 50 km/h scrapes down to ${f(v05 * 3.6, 0)} km/h in 1.4 s, not sliding on as on ice (on its roof: up ${f(upMin, 2)})`);
+  assert(righted > 0 && righted < 2.2, `and is back on its wheels in ${f(righted, 2)} s`);
+}
+
 // 8. surfaces: water drags and splashes, ice slides further, the road's edge blends
 {
   const s = setup(oval(10, { patches: [{ surface: 'water', s: 60, to: 80 }] }), { s: 20, v: 25 });

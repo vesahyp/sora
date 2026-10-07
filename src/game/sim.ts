@@ -6,7 +6,7 @@ import { CLASS_RANK } from './types';
 import { GRUDGE, hostility, leaderOf } from './content/drivers';
 import { anger, boom, clamp, hurt, spin, wrap } from './harm';
 import { LANE_VERGE } from './track';
-import { advance } from './physics';
+import { advance, rightCar } from './physics';
 
 export const DT = 1 / 60;
 /**
@@ -454,6 +454,18 @@ function settle(s: SimState, c: Car, player: boolean): void {
     c.stuck = 0;
     c.stuckS = c.s;
   }
+  // rolled: on its side or its roof, a car lies a moment and the marshals put it back on its wheels
+  c.rolled = c.up < ROLLED && c.wreck <= 0 ? c.rolled + DT : 0;
+  if (c.rolled > RIGHT_AFTER) {
+    c.rolled = 0;
+    c.stall = 0;
+    rightCar(s, s.cars.indexOf(c));
+    if (c === s.cars[0]) {
+      s.sounds.push('tow');
+      s.toasts.push({ text: { fi: 'Katolla! Käännetty', en: 'Rolled! Righted' }, colour: '#e8c040', age: 0 });
+    }
+    return;
+  }
   if (c.stuck > TOW_AFTER && c.wreck <= 0) tow(s, c);
   // going nowhere anywhere, on the road too: a car beached on a river's lip with its wheels over the
   // water (2026-10-06, Rapier's bodies can rest on an edge), or one pinned in a pile
@@ -468,6 +480,9 @@ function settle(s: SimState, c: Car, player: boolean): void {
  */
 export const TOW_AFTER = 4;
 const TOW_ALONG = 8;
+/** a car whose up axis has tipped below this (past about 70 degrees) is rolled; it is righted after RIGHT_AFTER seconds */
+const ROLLED = 0.35;
+const RIGHT_AFTER = 1.5;
 /** seconds going nowhere, anywhere, before the marshals tow a car: longer than the back-out takes */
 const STALL_TOW = 6;
 /** stalled this long, seconds, with the nose in the trees, a car reverses on its own for BACK_OUT seconds */

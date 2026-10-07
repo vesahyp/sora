@@ -33,6 +33,9 @@ export interface Car {
   vz: number;
   /** off the ground: no grip, no steering, until it lands */
   air: boolean;
+  /** how upright the body is, 1 on its wheels, 0 on its side, -1 on its roof; and the seconds it has lain rolled */
+  up: number;
+  rolled: number;
   /** what the tyres are on, under the middle of the car */
   surface: Surface;
   /** the thumb's share of the lock, -1..1, the wheel's angle in radians as it turns toward it, and that angle as a share of the lock at rest */
@@ -264,6 +267,8 @@ export function createState(trackDef: TrackDef, playerCar: CarDef, totalLaps: nu
       z: 0,
       vz: 0,
       air: false,
+      up: 1,
+      rolled: 0,
       surface: trackDef.surface as Surface,
       steerWant: 0,
       steerAngle: 0,

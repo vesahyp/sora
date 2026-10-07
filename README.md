@@ -30,6 +30,9 @@ Nosta peukalo, niin ratti suoristuu. Napautus sytyttää **nitron**.
 Jarru (vivun alaosa, tai kolmas sormi missä tahansa) irrottaa perän, eli
 jarrutus mutkaan heittää auton sivuluisuun.
 
+Jos auto kierähtää katolleen tai kyljelleen, se raapii soraa ja pysähtyy,
+ja ratamiehet kääntävät sen pyörilleen puolentoista sekunnin päästä.
+
 **Aseet laukeavat itse.** Öljy vuotaa tielle, kun auto on ihan takana:
 lätäkössä renkaat eivät pidä ja perä lähtee. Konekivääri ampuu, kun auto
 on edessä tähtäimen kartiossa, ja kuumenee parin sekunnin sarjasta. Ohjus
